@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import clsx from 'clsx';
 import { CheckSquare, FolderKanban, HelpCircle, LayoutDashboard, LogOut, Shield, Sheet, UserCircle2, WifiOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useOnline } from '../hooks/useAsync';
+import { isDemo } from '../lib/supabase';
+import { resetDemo } from '../lib/demo/mockClient';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -14,6 +17,7 @@ const NAV = [
 export default function Layout() {
   const { profile, signOut, session } = useAuth();
   const online = useOnline();
+  const [confirmReset, setConfirmReset] = useState(false);
   const nav = [...NAV, ...(profile?.is_platform_admin ? [{ to: '/admin', label: 'Administração', icon: Shield }] : [])];
 
   return (
@@ -65,7 +69,33 @@ export default function Layout() {
             </button>
           </div>
         </header>
-        {!online && (
+        {isDemo && (
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-gradient-to-r from-cyan-700 to-teal-600 px-4 py-1.5 text-center text-xs font-semibold text-white">
+            MODO DEMONSTRAÇÃO · dados fictícios, salvos só neste aparelho
+            {confirmReset ? (
+              <span className="flex items-center gap-2">
+                Apagar suas alterações e voltar ao exemplo?
+                <button
+                  className="rounded bg-white/20 px-2 py-0.5 underline"
+                  onClick={() => {
+                    resetDemo();
+                    window.location.reload();
+                  }}
+                >
+                  Sim, restaurar
+                </button>
+                <button className="underline" onClick={() => setConfirmReset(false)}>
+                  Cancelar
+                </button>
+              </span>
+            ) : (
+              <button className="underline" onClick={() => setConfirmReset(true)}>
+                Restaurar exemplo
+              </button>
+            )}
+          </div>
+        )}
+        {!online && !isDemo && (
           <div role="alert" className="flex items-center gap-2 bg-orange-600 px-4 py-2 text-sm font-semibold text-white">
             <WifiOff className="h-4 w-4" /> Sem conexão. Dados não são salvos offline; alterações exigem internet.
           </div>

@@ -144,7 +144,7 @@ export default function Dashboard() {
         <h1 className="headline text-2xl font-extrabold uppercase sm:text-3xl">Plano × realizado</h1>
       </div>
 
-      <details className="rounded-xl border border-navy-700 bg-navy-900/60 p-3 sm:open" open>
+      <details className="rounded-xl border border-navy-700 bg-navy-900/60 p-3" open={typeof window === 'undefined' || window.innerWidth >= 768}>
         <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-200">
           <Filter className="h-4 w-4" /> Filtros
         </summary>

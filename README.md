@@ -8,8 +8,20 @@ importação/exportação XLSX/CSV e acesso móvel (PWA).
 Supabase (PostgreSQL + RLS, Auth, Storage) · Netlify (estático) · custo-alvo R$ 0.
 
 > **Status de publicação:** código completo e testado localmente; **ainda não
-> publicado** — requer login do titular no Supabase e no Netlify
-> ([docs/IMPLANTACAO.md](docs/IMPLANTACAO.md)).
+> publicado**. Rotas gratuitas em [docs/IMPLANTACAO.md](docs/IMPLANTACAO.md):
+> **demo** (GitHub Pages, sem contas novas), **A** (GitHub Pages + Supabase Free)
+> e **B** (Netlify Free + Supabase Free).
+
+## Modo demonstração
+Roda inteiro no aparelho, sem servidor e sem conta, com dados de exemplo
+fictícios (salvos só naquele navegador). Mesmas telas e regras de negócio;
+não demonstra segurança multiusuário.
+```bash
+npm run dev:demo                # local
+npm run build:demo              # site estático com PWA (dist-demo/)
+npm run build:preview-file      # um único index.html (dist-single/)
+npx playwright test -c playwright.demo.config.ts   # testes da demo em viewport de iPhone
+```
 
 ## Funcionalidades
 - **Dashboard**: projetos ativos/atrasados, avanço físico × planejado, ações

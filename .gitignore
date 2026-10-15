@@ -11,3 +11,6 @@ test-results
 backups/
 .DS_Store
 dist-e2e
+dist-demo
+dist-single
+dist-pages

@@ -27,7 +27,8 @@ locais (sem credenciais de produção, banco `gestao_test` isolado).
 | Excel | Concluído | Template → importação; rejeição controlada; ida e volta XLSX/CSV sem alterações |
 | Histórico | Concluído | Auditoria campo a campo, imutável até para o dono do banco |
 | PWA | Concluído (local) | Manifesto, ícones, service worker, offline, 390 px sem rolagem |
-| Publicação | **Pendente** | Sem credenciais Supabase/Netlify neste ambiente — ver docs/IMPLANTACAO.md |
+| Modo demonstração | Concluído | 4 testes E2E em viewport de iPhone; prévia publicada como artefato privado no claude.ai |
+| Publicação | **Pendente** | Workflow do GitHub Pages pronto (publica a partir da `main`); Supabase/Netlify exigem login do titular |
 | Backup | Concluído (local) | `verify-restore.sh`: RESTAURAÇÃO VERIFICADA |
 | Custos | **Pendente de validação** | Páginas oficiais inacessíveis daqui; números de fontes secundárias (TO VALIDATE) |
 
@@ -42,13 +43,13 @@ locais (sem credenciais de produção, banco `gestao_test` isolado).
 - Datas exibidas conforme o idioma do navegador nos campos de data nativos.
 - Retentativas automáticas do cliente fazem a mensagem de “serviço indisponível”
   aparecer após ~7–10 s.
-- Repositório GitHub está público (recomenda-se torná-lo privado).
+- Repositório GitHub está público. Necessário para GitHub Pages gratuito (Rota A); para torná-lo privado sem custo, use a Rota B (Netlify).
 
 ## Próximos passos exatos (intervenção humana)
-1. Tornar o repositório privado (opcional, recomendado).
-2. Criar projeto Supabase Free e aplicar `supabase/migrations/` (docs/IMPLANTACAO.md §1).
-3. Criar site Netlify Free a partir do repositório, definir `VITE_SUPABASE_URL` e
-   `VITE_SUPABASE_ANON_KEY`, confirmar auto recharge desligado (§2).
+1. Merge da branch na `main` → GitHub Pages publica a demo (habilitar Pages → GitHub Actions se pedido).
+2. Criar projeto Supabase Free e rodar `supabase/setup.sql` no SQL Editor (§1).
+3. Cadastrar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` como Variables do
+   repositório e rodar o workflow (Rota A) — ou usar Netlify (Rota B).
 4. Promover o primeiro administrador via SQL (§1.5).
 5. Validar na URL HTTPS real: login, criar projeto, anexar e baixar documento,
    instalar o PWA no celular; conferir Billing/Usage dos dois serviços.

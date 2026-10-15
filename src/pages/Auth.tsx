@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { appUrl, isDemo, supabase } from '../lib/supabase';
 import { friendlyError } from '../lib/errors';
 import { useAuth } from '../hooks/useAuth';
 import { Button, Field, inputCls } from '../components/ui';
@@ -56,6 +56,7 @@ export function Login() {
             <input id={id} type="password" autoComplete="current-password" required className={inputCls} value={password} onChange={(e) => setPassword(e.target.value)} />
           )}
         </Field>
+        {isDemo && <p className="text-xs text-teal-200">Modo demonstração: qualquer e-mail e senha entram como “Você (demo)”.</p>}
         {err && <Msg kind="error" text={err} />}
         <Button type="submit" className="w-full" loading={busy}>
           Entrar
@@ -91,7 +92,7 @@ export function Signup() {
           const { data, error } = await supabase.auth.signUp({
             email: email.trim(),
             password,
-            options: { data: { full_name: name.trim() }, emailRedirectTo: `${window.location.origin}/` },
+            options: { data: { full_name: name.trim() }, emailRedirectTo: appUrl('/') },
           });
           setBusy(false);
           if (error) return setMsg({ kind: 'error', text: friendlyError(error) });
@@ -135,7 +136,7 @@ export function ForgotPassword() {
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
-          const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/redefinir-senha` });
+          const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: appUrl('/redefinir-senha') });
           setBusy(false);
           // Mensagem neutra: não revela se o e-mail existe.
           setMsg(error ? { kind: 'error', text: friendlyError(error) } : { kind: 'ok', text: 'Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha.' });

@@ -15,7 +15,11 @@
     "test:e2e": "playwright test",
     "stack:up": "bash scripts/local-stack/up.sh",
     "stack:down": "bash scripts/local-stack/down.sh",
-    "template": "tsx scripts/generate-template.ts"
+    "template": "tsx scripts/generate-template.ts",
+    "build:demo": "VITE_DEMO=true vite build --outDir dist-demo",
+    "build:preview-file": "VITE_DEMO=true SINGLEFILE=true vite build --outDir dist-single",
+    "dev:demo": "VITE_DEMO=true vite",
+    "setup-sql": "node scripts/build-setup-sql.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
@@ -48,6 +52,7 @@
     "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
     "vite-plugin-pwa": "^2.0.0",
+    "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^5.0.5"
   }
 }

@@ -243,8 +243,8 @@ test('PWA: manifesto, ícones e service worker', async ({ page, request }) => {
   const res = await request.get('/manifest.webmanifest');
   expect(res.ok()).toBeTruthy();
   const m = await res.json();
-  expect(m).toMatchObject({ name: 'Gestão Executiva de Projetos', display: 'standalone', start_url: '/' });
-  for (const icon of m.icons) expect((await request.get(icon.src)).ok()).toBeTruthy();
+  expect(m).toMatchObject({ name: 'Gestão Executiva de Projetos', display: 'standalone', start_url: './' });
+  for (const icon of m.icons) expect((await request.get('/' + icon.src)).ok()).toBeTruthy();
   await page.goto('/entrar');
   const sw = await page.evaluate(async () => {
     const reg = await navigator.serviceWorker.ready;
