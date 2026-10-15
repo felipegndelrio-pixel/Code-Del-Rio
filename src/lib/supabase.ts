@@ -10,9 +10,15 @@ const REQUEST_TIMEOUT_MS = 20_000;
 /** Evita espera indefinida em conexões travadas. Leituras ainda contam com as
  *  retentativas automáticas do cliente (1s, 2s, 4s) para falhas transitórias. */
 const fetchWithTimeout: typeof fetch = (input, init) => {
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
-  return fetch(input, { ...init, signal });
+  // AbortController + setTimeout: compatível com Safari/iOS antigos (sem AbortSignal.any).
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new DOMException('Tempo de resposta excedido', 'TimeoutError')), REQUEST_TIMEOUT_MS);
+  const outer = init?.signal;
+  if (outer) {
+    if (outer.aborted) ctrl.abort(outer.reason);
+    else outer.addEventListener('abort', () => ctrl.abort(outer.reason), { once: true });
+  }
+  return fetch(input, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 };
 
 // Apenas a chave pública (anon/publishable) é usada no navegador.
