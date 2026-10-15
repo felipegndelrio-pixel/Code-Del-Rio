@@ -170,9 +170,8 @@ function addDataSheet(wb: ExcelJS.Workbook, entity: EntityKey, rows: SheetRow[],
       const formula = `"${list.join(',')}"`;
       if (formula.length > 255) return;
       const col = ws.getColumn(i + 1).letter;
-      for (let r = 2; r <= 500; r++) {
-        ws.getCell(`${col}${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: [formula] };
-      }
+      // Validação por intervalo: não cria linhas vazias na planilha.
+      (ws as any).dataValidations.add(`${col}2:${col}1000`, { type: 'list', allowBlank: true, formulae: [formula] });
     });
   }
   return ws;
@@ -385,5 +384,5 @@ export function toCsv(entity: EntityKey, rows: SheetRow[]): string {
       })
       .join(';'),
   );
-  return '﻿' + [head, ...lines].join('\r\n') + '\r\n';
+  return '\uFEFF' + [head, ...lines].join('\r\n') + '\r\n';
 }

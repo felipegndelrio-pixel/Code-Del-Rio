@@ -32,6 +32,7 @@ export const sql = new pg.Pool({ connectionString: env.TEST_DB_URL, max: 3 });
 export interface TestUser {
   id: string;
   email: string;
+  password: string;
   client: SupabaseClient;
 }
 
@@ -61,7 +62,7 @@ export async function createUser(label: string, opts: { admin?: boolean; canCrea
   const client = anonClient();
   const { error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw error;
-  return { id: user.id, email, client };
+  return { id: user.id, email, password, client };
 }
 
 /** Executa SQL como um usuário autenticado (simula exatamente o que o PostgREST faz). */

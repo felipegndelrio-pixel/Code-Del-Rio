@@ -50,7 +50,7 @@ export async function readWorkbook(data: ArrayBuffer): Promise<ParsedSheet[]> {
 }
 
 export function readCsv(text: string, name = 'CSV'): ParsedSheet {
-  const src = text.replace(/^﻿/, '');
+  const src = text.replace(/^\uFEFF/, '');
   const firstLine = src.split(/\r?\n/, 1)[0] ?? '';
   const delim = [';', ',', '\t'].sort((a, b) => firstLine.split(b).length - firstLine.split(a).length)[0];
   const records: string[][] = [];

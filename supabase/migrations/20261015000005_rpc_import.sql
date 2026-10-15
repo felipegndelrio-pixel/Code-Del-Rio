@@ -171,7 +171,8 @@ declare
   v_project uuid;
   v_id      uuid;
   v_ref     text;
-  v_ref_id  uuid;
+  v_new     uuid[];
+  v_old     uuid[];
 begin
   if nullif(btrim(p_row->>'code'), '') is null then
     return; -- vínculos exigem código estável
@@ -179,12 +180,16 @@ begin
   v_project := app.import_resolve_project(p_row->>'project_code');
   if p_entity = 'actions' and p_row ? 'depends_on' then
     v_id := app.import_resolve_code('actions', p_row->>'code', v_project);
-    delete from public.action_dependencies where action_id = v_id;
+    v_new := '{}';
     foreach v_ref in array coalesce(string_to_array(nullif(btrim(p_row->>'depends_on'), ''), ','), '{}') loop
-      v_ref_id := app.import_resolve_code('actions', btrim(v_ref), v_project);
-      insert into public.action_dependencies (project_id, action_id, depends_on_id)
-      values (v_project, v_id, v_ref_id) on conflict do nothing;
+      v_new := v_new || app.import_resolve_code('actions', btrim(v_ref), v_project);
     end loop;
+    select coalesce(array_agg(depends_on_id), '{}') into v_old from public.action_dependencies where action_id = v_id;
+    if not (v_old @> v_new and v_new @> v_old) then -- só altera se o conjunto mudou
+      delete from public.action_dependencies where action_id = v_id and not (depends_on_id = any(v_new));
+      insert into public.action_dependencies (project_id, action_id, depends_on_id)
+      select v_project, v_id, x from unnest(v_new) x on conflict do nothing;
+    end if;
   elsif p_entity = 'wbs_items' then
     v_id := app.import_resolve_code('wbs_items', p_row->>'code', v_project);
     if p_row ? 'parent_code' then
@@ -194,12 +199,16 @@ begin
          and parent_id is distinct from app.import_resolve_code('wbs_items', p_row->>'parent_code', v_project);
     end if;
     if p_row ? 'predecessors' then
-      delete from public.wbs_dependencies where successor_id = v_id;
+      v_new := '{}';
       foreach v_ref in array coalesce(string_to_array(nullif(btrim(p_row->>'predecessors'), ''), ','), '{}') loop
-        v_ref_id := app.import_resolve_code('wbs_items', btrim(v_ref), v_project);
-        insert into public.wbs_dependencies (project_id, predecessor_id, successor_id)
-        values (v_project, v_ref_id, v_id) on conflict do nothing;
+        v_new := v_new || app.import_resolve_code('wbs_items', btrim(v_ref), v_project);
       end loop;
+      select coalesce(array_agg(predecessor_id), '{}') into v_old from public.wbs_dependencies where successor_id = v_id;
+      if not (v_old @> v_new and v_new @> v_old) then
+        delete from public.wbs_dependencies where successor_id = v_id and not (predecessor_id = any(v_new));
+        insert into public.wbs_dependencies (project_id, predecessor_id, successor_id)
+        select v_project, x, v_id from unnest(v_new) x on conflict do nothing;
+      end if;
     end if;
   end if;
 end $$;
