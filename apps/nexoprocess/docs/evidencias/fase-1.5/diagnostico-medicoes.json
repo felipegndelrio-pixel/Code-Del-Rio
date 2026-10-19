@@ -1,0 +1,341 @@
+{
+ "geometry": [
+  {
+   "innerHeight": 844,
+   "innerWidth": 390,
+   "scrollY": 0,
+   "navH": 57,
+   "fold": 787,
+   "canvas": {
+    "top": 572,
+    "bottom": 1146,
+    "left": 17,
+    "right": 373,
+    "height": 574,
+    "width": 356
+   },
+   "canvasStyleHeight": "min(68vh, 640px)",
+   "diagram": {
+    "top": 796,
+    "bottom": 922,
+    "left": 27,
+    "right": 699
+   },
+   "zoom": "0.6",
+   "viewportTransform": "matrix(0.6 0 0 0.6 -41.4 192.8)",
+   "tag": "390x844",
+   "diagramVisibleInFirstFold": false,
+   "diagramOffsetInsideCanvas": 224,
+   "diagramHeight": 126,
+   "canvasPixelsInFirstFold": 215
+  },
+  {
+   "innerHeight": 800,
+   "innerWidth": 360,
+   "scrollY": 0,
+   "navH": 57,
+   "fold": 743,
+   "canvas": {
+    "top": 572,
+    "bottom": 1116,
+    "left": 17,
+    "right": 343,
+    "height": 544,
+    "width": 326
+   },
+   "canvasStyleHeight": "min(68vh, 640px)",
+   "diagram": {
+    "top": 781,
+    "bottom": 907,
+    "left": 27,
+    "right": 699
+   },
+   "zoom": "0.6",
+   "viewportTransform": "matrix(0.6 0 0 0.6 -41.4 177.8)",
+   "tag": "360x800",
+   "diagramVisibleInFirstFold": false,
+   "diagramOffsetInsideCanvas": 209,
+   "diagramHeight": 126,
+   "canvasPixelsInFirstFold": 171
+  },
+  {
+   "innerHeight": 900,
+   "innerWidth": 1366,
+   "scrollY": 0,
+   "navH": 0,
+   "fold": 900,
+   "canvas": {
+    "top": 450,
+    "bottom": 1062,
+    "left": 297,
+    "right": 1333,
+    "height": 612,
+    "width": 1036
+   },
+   "canvasStyleHeight": "min(68vh, 640px)",
+   "diagram": {
+    "top": 659,
+    "bottom": 852,
+    "left": 297,
+    "right": 1333
+   },
+   "zoom": "0.924",
+   "viewportTransform": "matrix(0.924175 0 0 0.924175 -78.5549 160.905)",
+   "tag": "1366x900",
+   "diagramVisibleInFirstFold": true,
+   "diagramOffsetInsideCanvas": 209,
+   "diagramHeight": 193,
+   "canvasPixelsInFirstFold": 450
+  }
+ ],
+ "contrast": [
+  {
+   "theme": "light",
+   "cls": "np-badge-amber",
+   "text": "1 retrabalho",
+   "fg": "rgb(17, 17, 17)",
+   "bg": "rgb(146, 64, 14)",
+   "behind": "rgb(245, 247, 250)",
+   "fontSize": "11px",
+   "fontWeight": "600",
+   "textOnBadge": 2.66,
+   "badgeOnBehind": 6.61
+  },
+  {
+   "theme": "light",
+   "cls": "np-badge-bad",
+   "text": "1 gargalo",
+   "fg": "rgb(255, 255, 255)",
+   "bg": "rgb(176, 26, 26)",
+   "behind": "rgb(245, 247, 250)",
+   "fontSize": "11px",
+   "fontWeight": "600",
+   "textOnBadge": 6.98,
+   "badgeOnBehind": 6.5
+  },
+  {
+   "theme": "light",
+   "cls": "np-badge-amber",
+   "against": "--surface",
+   "badgeOnContext": 7.09
+  },
+  {
+   "theme": "light",
+   "cls": "np-badge-amber",
+   "against": "--surface-2",
+   "badgeOnContext": 6.26
+  },
+  {
+   "theme": "light",
+   "cls": "np-badge-bad",
+   "against": "--surface",
+   "badgeOnContext": 6.98
+  },
+  {
+   "theme": "light",
+   "cls": "np-badge-bad",
+   "against": "--surface-2",
+   "badgeOnContext": 6.16
+  },
+  {
+   "theme": "dark",
+   "cls": "np-badge-amber",
+   "text": "1 retrabalho",
+   "fg": "rgb(17, 17, 17)",
+   "bg": "rgb(245, 190, 70)",
+   "behind": "rgb(14, 17, 23)",
+   "fontSize": "11px",
+   "fontWeight": "600",
+   "textOnBadge": 11.09,
+   "badgeOnBehind": 11.1
+  },
+  {
+   "theme": "dark",
+   "cls": "np-badge-bad",
+   "text": "1 gargalo",
+   "fg": "rgb(255, 255, 255)",
+   "bg": "rgb(248, 120, 120)",
+   "behind": "rgb(14, 17, 23)",
+   "fontSize": "11px",
+   "fontWeight": "600",
+   "textOnBadge": 2.64,
+   "badgeOnBehind": 7.15
+  },
+  {
+   "theme": "dark",
+   "cls": "np-badge-amber",
+   "against": "--surface",
+   "badgeOnContext": 10.24
+  },
+  {
+   "theme": "dark",
+   "cls": "np-badge-amber",
+   "against": "--surface-2",
+   "badgeOnContext": 9.25
+  },
+  {
+   "theme": "dark",
+   "cls": "np-badge-bad",
+   "against": "--surface",
+   "badgeOnContext": 6.6
+  },
+  {
+   "theme": "dark",
+   "cls": "np-badge-bad",
+   "against": "--surface-2",
+   "badgeOnContext": 5.96
+  }
+ ],
+ "axe": [
+  {
+   "theme": "light",
+   "vp": "1366x900",
+   "mode": "com exclusão .djs-container (atual)",
+   "total": 0,
+   "violations": []
+  },
+  {
+   "theme": "light",
+   "vp": "1366x900",
+   "mode": "sem exclusão",
+   "total": 1,
+   "violations": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "nodes": 2,
+     "sample": [
+      "div[data-overlay-id=\"ov-823481608-5\"] > div > .np-badge-amber.np-badge :: Element has insufficient color contrast of 2.66 (foreground color: #111111, background color: #92400e, font si",
+      "div[data-overlay-id=\"ov-823481608-7\"] > div > .np-badge-amber.np-badge :: Element has insufficient color contrast of 2.66 (foreground color: #111111, background color: #92400e, font si"
+     ]
+    }
+   ]
+  },
+  {
+   "theme": "light",
+   "vp": "390x844",
+   "mode": "com exclusão .djs-container (atual)",
+   "total": 1,
+   "violations": [
+    {
+     "id": "link-name",
+     "impact": "serious",
+     "nodes": 2,
+     "sample": [
+      ".text-navInk\\/80.hover\\:text-navInk.gap-1\\.5:nth-child(1) :: Element does not have text that is visible to screen readers",
+      "a[href$=\"ajuda\"] :: Element does not have text that is visible to screen readers"
+     ]
+    }
+   ]
+  },
+  {
+   "theme": "light",
+   "vp": "390x844",
+   "mode": "sem exclusão",
+   "total": 2,
+   "violations": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "nodes": 1,
+     "sample": [
+      "div[data-overlay-id=\"ov-718039273-5\"] > div > .np-badge-amber.np-badge :: Element has insufficient color contrast of 2.66 (foreground color: #111111, background color: #92400e, font si"
+     ]
+    },
+    {
+     "id": "link-name",
+     "impact": "serious",
+     "nodes": 2,
+     "sample": [
+      ".text-navInk\\/80.hover\\:text-navInk.gap-1\\.5:nth-child(1) :: Element does not have text that is visible to screen readers",
+      "a[href$=\"ajuda\"] :: Element does not have text that is visible to screen readers"
+     ]
+    }
+   ]
+  },
+  {
+   "theme": "dark",
+   "vp": "1366x900",
+   "mode": "com exclusão .djs-container (atual)",
+   "total": 0,
+   "violations": []
+  },
+  {
+   "theme": "dark",
+   "vp": "1366x900",
+   "mode": "sem exclusão",
+   "total": 1,
+   "violations": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "nodes": 2,
+     "sample": [
+      "div[data-overlay-id=\"ov-321616708-6\"] > div > .np-badge-bad.np-badge :: Element has insufficient color contrast of 2.64 (foreground color: #ffffff, background color: #f87878, font si",
+      "div[data-overlay-id=\"ov-321616708-7\"] > div > .np-badge-bad.np-badge :: Element has insufficient color contrast of 2.64 (foreground color: #ffffff, background color: #f87878, font si"
+     ]
+    }
+   ]
+  },
+  {
+   "theme": "dark",
+   "vp": "390x844",
+   "mode": "com exclusão .djs-container (atual)",
+   "total": 1,
+   "violations": [
+    {
+     "id": "link-name",
+     "impact": "serious",
+     "nodes": 2,
+     "sample": [
+      ".text-navInk\\/80.hover\\:text-navInk.gap-1\\.5:nth-child(1) :: Element does not have text that is visible to screen readers",
+      "a[href$=\"ajuda\"] :: Element does not have text that is visible to screen readers"
+     ]
+    }
+   ]
+  },
+  {
+   "theme": "dark",
+   "vp": "390x844",
+   "mode": "sem exclusão",
+   "total": 2,
+   "violations": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "nodes": 1,
+     "sample": [
+      "div[data-overlay-id=\"ov-490488804-6\"] > div > .np-badge-bad.np-badge :: Element has insufficient color contrast of 2.64 (foreground color: #ffffff, background color: #f87878, font si"
+     ]
+    },
+    {
+     "id": "link-name",
+     "impact": "serious",
+     "nodes": 2,
+     "sample": [
+      ".text-navInk\\/80.hover\\:text-navInk.gap-1\\.5:nth-child(1) :: Element does not have text that is visible to screen readers",
+      "a[href$=\"ajuda\"] :: Element does not have text that is visible to screen readers"
+     ]
+    }
+   ]
+  }
+ ],
+ "tokens": {
+  "light": {
+   "--surface": "255 255 255",
+   "--surface-2": "238 241 246",
+   "--bg": "245 247 250",
+   "--bad": "176 26 26",
+   "--amber": "146 64 14",
+   "--ink": "14 22 38"
+  },
+  "dark": {
+   "--surface": "22 26 34",
+   "--surface-2": "30 35 45",
+   "--bg": "14 17 23",
+   "--bad": "248 120 120",
+   "--amber": "245 190 70",
+   "--ink": "232 236 242"
+  }
+ }
+}

@@ -11,7 +11,7 @@ import type { BpmnBuild } from './model';
 
 export interface Decoration {
   classes: string[];
-  badges: { text: string; tone: 'bad' | 'amber' | 'info' }[];
+  badges: { text: string; tone: 'bad' | 'amber' }[];
 }
 
 export interface BpmnCanvasHandle {
@@ -198,25 +198,30 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-line/15 bg-surface2/30">
-      <div className="no-print absolute left-2 top-2 z-10 flex flex-wrap gap-1">
-        {stage && (
-          <button type="button" onClick={() => onStageChange(null)} className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-line/20 bg-surface px-3 text-sm font-semibold text-ink shadow-card hover:border-brand/60">
-            <ChevronLeft className="h-4 w-4" aria-hidden /> Visão macro
-          </button>
-        )}
-      </div>
-      <div className="no-print absolute right-2 top-2 z-10 flex gap-1">
-        <CtrlBtn label="Aproximar" onClick={() => zoom(1.25)}>
-          <Plus className="h-4 w-4" />
-        </CtrlBtn>
-        <CtrlBtn label="Afastar" onClick={() => zoom(0.8)}>
-          <Minus className="h-4 w-4" />
-        </CtrlBtn>
-        <CtrlBtn label="Ajustar à tela" onClick={() => zoom('fit')}>
-          <Maximize2 className="h-4 w-4" />
-        </CtrlBtn>
-      </div>
       <div ref={host} className="np-canvas w-full" style={{ height }} role="region" aria-label={stage ? `Mapa detalhado da etapa ${stage}` : 'Mapa macro do processo'} data-testid="bpmn-canvas" />
+      {/* Abaixo de 768 px (zoom travado, diagrama ancorado no topo) os controles ficam numa
+          barra abaixo do quadro: não cobrem o diagrama nem a marca do bpmn.io (canto inferior
+          direito, exigida pela licença). A partir de md, sobrepostos aos cantos superiores. */}
+      <div className="no-print flex items-center justify-between gap-2 border-t border-line/10 px-2 py-1.5 md:contents" data-testid="bpmn-controls">
+        <div className="flex flex-wrap gap-1 md:absolute md:left-2 md:top-2 md:z-10">
+          {stage && (
+            <button type="button" onClick={() => onStageChange(null)} className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-line/20 bg-surface px-3 text-sm font-semibold text-ink shadow-card hover:border-brand/60">
+              <ChevronLeft className="h-4 w-4" aria-hidden /> Visão macro
+            </button>
+          )}
+        </div>
+        <div className="flex gap-1 md:absolute md:right-2 md:top-2 md:z-10">
+          <CtrlBtn label="Aproximar" onClick={() => zoom(1.25)}>
+            <Plus className="h-4 w-4" />
+          </CtrlBtn>
+          <CtrlBtn label="Afastar" onClick={() => zoom(0.8)}>
+            <Minus className="h-4 w-4" />
+          </CtrlBtn>
+          <CtrlBtn label="Ajustar à tela" onClick={() => zoom('fit')}>
+            <Maximize2 className="h-4 w-4" />
+          </CtrlBtn>
+        </div>
+      </div>
       <p className="no-print border-t border-line/10 px-3 py-1.5 text-xs text-muted">Arraste para mover · roda do mouse, pinça ou + / − para zoom · “Ajustar à tela” mostra tudo.</p>
       {!ready && !error && <p className="absolute inset-0 flex items-center justify-center text-sm text-muted">Desenhando o mapa…</p>}
       {error && (
@@ -230,18 +235,22 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
 
 /**
  * Enquadra o diagrama sem deixá-lo ilegível: se "ajustar à tela" exigir zoom
- * menor que 60% (telas pequenas), usa 60% ancorado no início (esquerda) e o
- * usuário navega com arrastar/pinça. Nunca amplia além de 110%.
+ * menor que 60% (telas pequenas), usa 60% ancorado no início (esquerda e topo,
+ * com margem de 16 px na tela) e o usuário navega com arrastar/pinça. Ancorar no
+ * topo, e não no centro, mantém o diagrama na primeira dobra do celular: centrado,
+ * um diagrama baixo ficava no meio de um quadro alto, abaixo da dobra.
+ * Nunca amplia além de 110%.
  */
 function fitReadable(canvas: any, el: HTMLElement) {
   const MIN = 0.6;
+  const MARGIN_PX = 16;
   canvas.zoom('fit-viewport', 'auto');
   const vb = canvas.viewbox();
   if (vb.scale > 1.1) canvas.zoom(1.1, 'auto');
   else if (vb.scale < MIN) {
     const w = el.clientWidth / MIN;
     const h = el.clientHeight / MIN;
-    canvas.viewbox({ x: vb.inner.x - 16, y: vb.inner.y + vb.inner.height / 2 - h / 2, width: w, height: h });
+    canvas.viewbox({ x: vb.inner.x - 16, y: vb.inner.y - MARGIN_PX / MIN, width: w, height: h });
   }
   el.dataset.zoom = String(canvas.zoom());
 }
