@@ -1,4 +1,4 @@
-# Decisões técnicas — NexoProcess (V3)
+# Decisões técnicas — NexoProcess (V3 → V4)
 
 Atualizado em 2026-10-19. Branch `claude/plataforma-gestao-projetos-vni4py`.
 
@@ -52,3 +52,18 @@ Atualizado em 2026-10-19. Branch `claude/plataforma-gestao-projetos-vni4py`.
 4. LibreOffice: reconhece abas e células protegidas (teste automatizado), mas **não preserva** a trava de estrutura sem senha. **Excel não foi testado** neste ambiente (indisponível): TO VALIDATE.
 5. Dados só no navegador: limpar dados do site apaga tudo. Mitigação: backup/restauração JSON.
 6. Sem multiusuário, sem sincronização e sem login (fora do escopo do MVP; não simulados).
+
+## 5. Decisões da V4
+
+| Decisão | Motivo | Classificação |
+|---|---|---|
+| Evoluir a V3 no mesmo app; o formulário da V3 vai para `/app/novo/formulario` e o assistente conversacional assume `/app/novo`. | Preservar funcionalidades e testes; nenhuma tela removida. | FACT |
+| Fontes IBM Plex Sans/Mono via `@fontsource` (subconjunto latino, OFL), empacotadas no build. | Identidade própria sem CDN externo: mantém a CSP `default-src 'self'` e custo zero. | FACT |
+| Paleta própria (marinho #173263 + ciano). A referência à Bosch foi usada só como critério de sobriedade; nenhum logotipo, cor ou layout foi copiado. | Exigência do prompt. | FACT |
+| Desfazer em memória (30 passos, edições sem rótulo agrupadas em 1,5 s), aplicado em toda escrita do workspace. | Implementação simples e testável; não persiste entre sessões (limitação documentada). | FACT |
+| Continuidade entre aparelhos por **arquivo de projeto** (`.nexoprocess.json`, mesmo formato do backup) com Web Share quando disponível. | Sincronização exigiria backend/conta; não prometida nem simulada. | FACT |
+| Casos conservador/base/otimista por fatores editáveis (realização do ganho e do investimento) sobre o business case base. | Transparente e auditável; não inventa distribuição estatística. A simulação Monte Carlo da V3 segue para prazo. | FACT |
+| Conclusão de ação exige resultado observado e data (`completionIssue`). | Evita “concluída” sem evidência. | FACT |
+| Tokens claros ajustados após o axe: acento #006474, ok #116038, texto suave #4E5A6E. | Contraste ≥ 4,5:1 inclusive em selos sobre o próprio tom. | FACT |
+| Card de privacidade da tela inicial só após carregar a lista. | CLS medido de 0,395 → ~0 no perfil móvel. | FACT |
+| Testes em Chromium com perfis 1440, 768, 390 (iPhone 13), 320 e Pixel 7. | WebKit/Safari real não está disponível no ambiente: **comportamento no Safari do iPhone fica a validar em aparelho real**. | TO VALIDATE |

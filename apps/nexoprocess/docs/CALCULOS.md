@@ -59,3 +59,19 @@ Desvio = realizado − previsão; % do ganho previsto = (base − realizado) ÷ 
 
 ## Simulação
 Triangular (mín., mais provável = duração, máx.), inversão da CDF, 1.500 iterações (padrão), semente 20261019. Saídas: P10/P50/P80/P90 do tempo decorrido (caminho mais longo por iteração) e faixa do trabalho ativo por execução.
+
+## Casos conservador / base / otimista (V4)
+Premissas **editáveis por cenário** (padrão: conservador = 50% de realização do ganho e 130% do investimento; otimista = 110% e 90%; base = 100% e 100%). Implementação: `businessCases()` em `src/domain/compare.ts`.
+- Horas liberadas do caso = horas liberadas (base) × realização%.
+- Benefício bruto do caso = benefício bruto (base) × realização%.
+- Benefício líquido do caso = bruto do caso − custo recorrente (o recorrente não é escalado).
+- Investimento do caso = investimento × investimento%.
+- Payback do caso = investimento do caso ÷ líquido do caso, **somente se líquido > 0**; caso contrário, “sem payback”.
+- ROI do caso = (líquido × horizonte − investimento do caso) ÷ investimento do caso × 100; investimento 0 → não aplicável.
+Os três casos são **estimativas**; nenhum deles é economia realizada.
+
+## Responsabilidades alteradas (V4)
+Comparação atividade a atividade (mesmo código) entre AS-IS e TO-BE: *transferida* (responsável mudou), *definida* (não havia responsável), *deixa de existir* (atividade removida) e *nova*. Carga mensal por responsável = Σ esforço por período das atividades do responsável × fator mensal, nos dois cenários; sem volume ou pessoas, “não calculável”.
+
+## Lean: necessário × desperdício (V4)
+Atividades **necessárias (NNVA)** recebem um motivo: exigência legal/regulatória, controle interno/auditoria, segurança, restrição técnica/contratual ou outro. Com motivo legal, de controle ou de segurança, as recomendações trazem o alerta “não elimine: simplifique ou automatize preservando o requisito” e a dependência de validação pela área responsável. NNVA sem motivo aparece como informação ausente.

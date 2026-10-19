@@ -1,5 +1,58 @@
 # Matriz de critérios de aceite — evidências
 
+## V4 — execução local em 2026-10-19 (Linux, Node 22, Chromium do Playwright)
+
+| Verificação | Comando | Resultado |
+|---|---|---|
+| Lint (repositório inteiro) | `npm run lint` | 0 erros |
+| Typecheck NexoProcess / app existente | `npm run nexo:typecheck` / `npm run typecheck` | 0 erros / 0 erros |
+| Unitários NexoProcess | `npm run nexo:test` | **95/95** (7 arquivos; +assistente, +decisão) |
+| Unitários do app existente (regressão) | `npm run test:unit` | 25/25 (inalterado) |
+| Builds | `npm run nexo:build` / `npm run build` | OK (PWA: 66 arquivos em precache) / OK |
+| E2E (todos os perfis) | `npm run nexo:e2e` | **46 passaram**, 2 pulados (capturas sob demanda): desktop 1366 = 23, 1440 = 4, 768 = 4, iPhone 390 = 5, 320 = 5, Android Pixel 7 = 5 |
+| Acessibilidade (axe-core, regras WCAG 2.0/2.1/2.2 A e AA) | `a11y.spec.ts` | 0 violações em 19 telas, temas claro e escuro |
+| Desempenho medido | `node apps/nexoprocess/scripts/perf.mjs` | ver tabela abaixo e `docs/desempenho-medido.json` |
+
+### Critérios V4
+| Critério | Status | Evidência |
+|---|---|---|
+| V3 preservada (nenhuma tela removida) | Passou | jornada V3 completa (`journey.spec.ts`) pelo formulário em `/app/novo/formulario`; tour por todas as abas |
+| Identidade visual própria, tokens centralizados, sem copiar marca de terceiros | Passou | `src/styles/index.css`, `tailwind.config.js`; `docs/DECISOES_TECNICAS.md` §5 |
+| Navegação por jornada com orientação por etapa | Passou | barra lateral/inferior; `data-testid="step-requirements"`; `v4.spec.ts` (visão geral) |
+| Início muda conforme o estado | Passou | `journey.spec.ts` (1), helper `openDemo` cobre os dois estados |
+| Desfazer | Passou | `v4.spec.ts`: valor salvo e revertido no IndexedDB |
+| Assistente conversacional com “Não sei”, texto→estrutura confirmada, correção e resumo | Passou | `mobile-assistant.spec.ts` em desktop, iPhone 390, 320 e Android: rascunho retomado após recarregar; “não sei” fica ausente (não zero) |
+| Continuidade sem prometer sincronização | Passou | `v4.spec.ts`: arquivo gerado em um contexto do navegador e importado em outro |
+| Offline honesto | Passou | `responsive.spec.ts`: aviso “Offline — seus dados continuam disponíveis” + dados locais carregam |
+| Lean distingue exigência de desperdício | Passou | `v4.spec.ts` + `decision.test.ts`: motivo regulatório gera alerta “Não elimine” |
+| Recomendações com problema, evidência, impacto, intervenção, dependências, riscos e informações ausentes | Passou | `decision.test.ts`, `v4.spec.ts` |
+| Casos conservador/base/otimista com premissas editáveis; payback só com benefício positivo | Passou | `decision.test.ts` (fórmulas), `v4.spec.ts` (edição → “sem payback”) |
+| Responsabilidades alteradas | Passou | `decision.test.ts` (transferência, nova, removida, carga −200/+200 pessoa-h/mês), `v4.spec.ts` |
+| Ação não é “concluída” sem registro | Passou | `decision.test.ts` (`completionIssue`), `v4.spec.ts` (bloqueia e depois salva com resultado e data) |
+| Demonstração coerente até o plano, rotulada como fictícia | Passou | `decision.test.ts` (recomendações aceitas = mudanças ligadas; 4 ações; nenhuma concluída; sem resultados) |
+| Larguras 1440/768/390/320 sem rolagem horizontal, nos dois temas | Passou | `responsive.spec.ts` em 17 telas por perfil |
+| Custo zero | Passou | nenhuma API ou serviço pago; fontes e bibliotecas empacotadas; E2E falha se houver requisição externa |
+| Safari real (iPhone) | **A validar** | ambiente sem WebKit; perfil iPhone executado em Chromium |
+| Leitor de tela real (VoiceOver/TalkBack) | **A validar** | só verificação automatizada (axe) |
+| Publicação no Cloudflare Pages | **Não realizada** | sem credencial/ferramenta de deploy de Pages no ambiente; ver `DEPLOY_CLOUDFLARE.md` |
+
+### Desempenho medido (build de produção servido localmente)
+Perfil móvel: 390×844, CPU 4× mais lenta, rede 1,6 Mbps / 150 ms, cache HTTP desativado. Páginas do projeto medidas após abrir a demonstração no mesmo navegador (service worker pode servir o app shell — equivale a uma visita de retorno). Servidor local, sem CDN: na internet os tempos podem ser maiores.
+
+| Página | Desktop LCP · CLS | Móvel FCP · LCP · CLS | Transferido |
+|---|---|---|---|
+| Landing `/` | 216 ms · 0 | 1.952 · 1.952 ms · 0,015 | 305 KB |
+| Meus projetos `/app` | 180 ms · 0 | 1.840 · 1.988 ms · 0,001 | 305–329 KB |
+| Assistente `/app/novo` | 460 ms · 0 | 1.876 · 2.212 ms · 0 | 319 KB |
+| Visão geral do projeto | 452 ms · 0 | 1.584 · 2.316 ms · 0 | 351 KB |
+| Mapa BPMN | 400 ms · 0,004 | 1.632 · 1.952 ms · 0,02 | 419–433 KB |
+
+Correção feita a partir da medição: CLS de 0,395 → 0,001 em `/app` no perfil móvel.
+
+---
+
+## V3 (histórico)
+
 Execução local em 2026-10-19 (Linux, Node 22.22, Chromium do Playwright). Status: **Passou** / **Falhou** / **Não implementado** / **Parcial (a validar)**.
 
 ## Resultados das suítes

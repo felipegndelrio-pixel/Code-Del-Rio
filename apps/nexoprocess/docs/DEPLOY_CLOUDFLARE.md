@@ -31,7 +31,7 @@ npx wrangler pages deploy apps/nexoprocess/dist --project-name nexoprocess
 (Exige `wrangler login` do titular.)
 
 ## Verificação pós-deploy (manual)
-1. Abrir a URL HTTPS → landing → “Testar com um exemplo”.
+1. Abrir a URL HTTPS → landing → “Ver demonstração fictícia”.
 2. DevTools → Application → Manifest/Service Workers: instalável; Network: nenhuma chamada externa.
 3. Instalar no Android (Chrome: “Instalar app”) e no iPhone (Safari: Compartilhar → “Adicionar à Tela de Início”).
 4. Conferir os cabeçalhos com `curl -I https://SEU-DOMINIO/`.
