@@ -1,0 +1,110 @@
+{
+  "measuredAt": "2026-10-19T07:03:37.925Z",
+  "base": "http://127.0.0.1:4180",
+  "results": {
+    "desktop": [
+      {
+        "path": "/",
+        "fcp": 216,
+        "lcp": 216,
+        "cls": 0,
+        "longTasks": 1,
+        "tbtApprox": 2,
+        "kbTransferred": 305,
+        "wallMs": 2233
+      },
+      {
+        "path": "/app",
+        "fcp": 180,
+        "lcp": 180,
+        "cls": 0,
+        "longTasks": 0,
+        "tbtApprox": 0,
+        "kbTransferred": 329,
+        "wallMs": 2234
+      },
+      {
+        "path": "/app/novo",
+        "fcp": 132,
+        "lcp": 460,
+        "cls": 0,
+        "longTasks": 0,
+        "tbtApprox": 0,
+        "kbTransferred": 319,
+        "wallMs": 2468
+      },
+      {
+        "path": "/app/p/w_4f8306fe/visao-geral",
+        "fcp": 112,
+        "lcp": 452,
+        "cls": 0,
+        "longTasks": 0,
+        "tbtApprox": 0,
+        "kbTransferred": 351,
+        "wallMs": 2763
+      },
+      {
+        "path": "/app/p/w_327053be/mapa",
+        "fcp": 104,
+        "lcp": 400,
+        "cls": 0.004,
+        "longTasks": 1,
+        "tbtApprox": 52,
+        "kbTransferred": 433,
+        "wallMs": 2766
+      }
+    ],
+    "movel": [
+      {
+        "path": "/",
+        "fcp": 1952,
+        "lcp": 1952,
+        "cls": 0.015,
+        "longTasks": 3,
+        "tbtApprox": 261,
+        "kbTransferred": 305,
+        "wallMs": 4406
+      },
+      {
+        "path": "/app",
+        "fcp": 1840,
+        "lcp": 1988,
+        "cls": 0.001,
+        "longTasks": 3,
+        "tbtApprox": 224,
+        "kbTransferred": 305,
+        "wallMs": 4384
+      },
+      {
+        "path": "/app/novo",
+        "fcp": 1876,
+        "lcp": 2212,
+        "cls": 0,
+        "longTasks": 2,
+        "tbtApprox": 220,
+        "kbTransferred": 319,
+        "wallMs": 4602
+      },
+      {
+        "path": "/app/p/w_151a4e72/visao-geral",
+        "fcp": 1584,
+        "lcp": 2316,
+        "cls": 0,
+        "longTasks": 1,
+        "tbtApprox": 7,
+        "kbTransferred": 351,
+        "wallMs": 4581
+      },
+      {
+        "path": "/app/p/w_c86d0b6c/mapa",
+        "fcp": 1632,
+        "lcp": 1952,
+        "cls": 0.02,
+        "longTasks": 3,
+        "tbtApprox": 335,
+        "kbTransferred": 419,
+        "wallMs": 5387
+      }
+    ]
+  }
+}

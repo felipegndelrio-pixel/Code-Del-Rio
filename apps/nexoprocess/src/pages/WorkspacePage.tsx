@@ -83,7 +83,7 @@ function SaveIndicator() {
         </span>
       ) : (
         <>
-          <Check className="h-3.5 w-3.5 text-ok" aria-hidden /> Salvo neste dispositivo
+          <Check className="h-3.5 w-3.5 text-ok" aria-hidden /> Salvo<span className="sr-only sm:not-sr-only"> neste dispositivo</span>
           <span className="hidden sm:inline">{savedAt ? ` · ${fmtDateTime(savedAt)}` : ''}</span>
         </>
       )}
@@ -144,7 +144,7 @@ function StepHeader({ item, step, base }: { item: NavItem; step?: JourneyStep; b
   const missingRequired = reqs.filter((r) => r.kind === 'obrigatório' && !r.ok);
   const objective = step ? STEP_OBJECTIVE[step.key] : item.objective;
   return (
-    <header className="mb-5">
+    <header className="mb-4 sm:mb-5">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-xl font-semibold text-ink sm:text-2xl">{item.label}</h2>
         {step && (
@@ -245,14 +245,14 @@ function Shell() {
             </>
           )}
         </nav>
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line/10 pb-4">
-          <h1 className="w-full min-w-0 text-lg font-semibold leading-snug sm:w-auto sm:flex-1 sm:truncate sm:text-xl">{w.asIs.name}</h1>
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line/10 pb-3 sm:mb-4 sm:pb-4">
+          <h1 className="w-full min-w-0 text-base font-semibold leading-snug sm:w-auto sm:flex-1 sm:truncate sm:text-xl">{w.asIs.name}</h1>
           {w.isDemo && (
             <Badge tone="amber" className="text-xs">
-              Exemplo fictício — dados ilustrativos
+              Exemplo fictício<span className="sr-only sm:not-sr-only"> — dados ilustrativos</span>
             </Badge>
           )}
-          <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 sm:w-auto sm:flex-none">
             <SaveIndicator />
             <Button size="sm" variant="ghost" onClick={doUndo} disabled={!undoLabel} title={undoLabel ? `Desfazer: ${undoLabel} (Ctrl+Z)` : 'Nada para desfazer'} aria-label={undoLabel ? `Desfazer: ${undoLabel}` : 'Nada para desfazer'}>
               <Undo2 className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Desfazer</span>
@@ -273,9 +273,10 @@ function Shell() {
         {item && <StepHeader item={item} step={step} base={base} />}
         {j.next && step && step.key !== j.next.key && step.state !== 'atual' && (
           <div className="no-print -mt-2 mb-4 flex flex-wrap items-center gap-2 text-sm text-ink2">
-            <span>
+            <span className="hidden sm:inline">
               Próxima etapa recomendada: <strong className="text-ink">{j.next.label}</strong>
             </span>
+            <span className="sm:hidden">Próxima etapa:</span>
             <Link to={`${base}/${STEP_PATH[j.next.key]}`} className="inline-flex items-center gap-1 font-semibold text-accent hover:underline">
               Ir para {j.next.short} <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>

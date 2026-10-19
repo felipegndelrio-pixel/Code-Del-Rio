@@ -267,35 +267,38 @@ export default function Home() {
         </>
       )}
 
-      <Card title="Seus dados, seu controle" subtitle="Privacidade e continuidade">
-        <div className="grid gap-4 md:grid-cols-[1fr_auto]">
-          <div className="flex gap-3 text-sm text-ink2">
-            <ShieldCheck className="h-6 w-6 shrink-0 text-ok" aria-hidden />
-            <div className="space-y-1">
-              <p>
-                Projetos e planilhas ficam apenas neste navegador (IndexedDB). O app não envia o conteúdo dos seus projetos a servidores e <strong>não sincroniza entre aparelhos</strong>.
-              </p>
-              <p>
-                Para continuar em outro aparelho: abra o projeto → Visão geral → <em>Gerar arquivo do projeto</em>; no outro aparelho use <em>Importar projeto</em>.{' '}
-                <Link to="/app/ajuda#privacidade" className="font-semibold text-accent hover:underline">
-                  Detalhes
-                </Link>
-              </p>
+      {/* Só depois de carregar a lista: evita deslocar o layout (CLS). */}
+      {list !== null && (
+        <Card title="Seus dados, seu controle" subtitle="Privacidade e continuidade">
+          <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+            <div className="flex gap-3 text-sm text-ink2">
+              <ShieldCheck className="h-6 w-6 shrink-0 text-ok" aria-hidden />
+              <div className="space-y-1">
+                <p>
+                  Projetos e planilhas ficam apenas neste navegador (IndexedDB). O app não envia o conteúdo dos seus projetos a servidores e <strong>não sincroniza entre aparelhos</strong>.
+                </p>
+                <p>
+                  Para continuar em outro aparelho: abra o projeto → Visão geral → <em>Gerar arquivo do projeto</em>; no outro aparelho use <em>Importar projeto</em>.{' '}
+                  <Link to="/app/ajuda#privacidade" className="font-semibold text-accent hover:underline">
+                    Detalhes
+                  </Link>
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-start gap-2">
+              <Button size="sm" variant="secondary" onClick={() => void backup()}>
+                <Download className="h-4 w-4" aria-hidden /> Baixar backup
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => backupRef.current?.click()}>
+                <FileJson className="h-4 w-4" aria-hidden /> Restaurar backup
+              </Button>
+              <Button size="sm" variant="ghost" className="text-bad" onClick={() => void wipe()}>
+                <Trash2 className="h-4 w-4" aria-hidden /> Apagar dados locais
+              </Button>
             </div>
           </div>
-          <div className="flex flex-wrap items-start gap-2">
-            <Button size="sm" variant="secondary" onClick={() => void backup()}>
-              <Download className="h-4 w-4" aria-hidden /> Baixar backup
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => backupRef.current?.click()}>
-              <FileJson className="h-4 w-4" aria-hidden /> Restaurar backup
-            </Button>
-            <Button size="sm" variant="ghost" className="text-bad" onClick={() => void wipe()}>
-              <Trash2 className="h-4 w-4" aria-hidden /> Apagar dados locais
-            </Button>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
