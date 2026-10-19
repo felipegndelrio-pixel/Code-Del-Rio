@@ -67,3 +67,13 @@ Atualizado em 2026-10-19. Branch `claude/plataforma-gestao-projetos-vni4py`.
 | Tokens claros ajustados após o axe: acento #006474, ok #116038, texto suave #4E5A6E. | Contraste ≥ 4,5:1 inclusive em selos sobre o próprio tom. | FACT |
 | Card de privacidade da tela inicial só após carregar a lista. | CLS medido de 0,395 → ~0 no perfil móvel. | FACT |
 | Testes em Chromium com perfis 1440, 768, 390 (iPhone 13), 320 e Pixel 7. | WebKit/Safari real não está disponível no ambiente: **comportamento no Safari do iPhone fica a validar em aparelho real**. | TO VALIDATE |
+
+## 6. Decisões da auditoria de release (rodada 2)
+
+| Decisão | Motivo | Classificação |
+|---|---|---|
+| Normalizar projetos na leitura e na restauração (`normalizeWorkspace`), em vez de exigir a versão atual do formato. | Backups antigos ou parciais quebravam a tela; o defeito foi reproduzido no app real. | FACT |
+| Limite de erro na casca do app, com dados preservados. | Sem ele, qualquer exceção de renderização deixava a aplicação em branco. | FACT |
+| Apóstrofo em texto de CSV iniciado por fórmula; XLSX não alterado. | Injeção de fórmula no Excel afeta CSV; o ExcelJS grava texto como texto. | FACT |
+| Não trocar `exceljs` para eliminar a vulnerabilidade moderada de `uuid`. | A única correção é troca de versão com risco de regressão na exportação; uso sem `buf` e entradas controladas pelo próprio usuário. Reavaliar a cada atualização. | RECOMMENDATION |
+| Não publicar em produção nesta rodada. | Sem credencial nem ferramenta de deploy do Cloudflare Pages neste ambiente; a publicação exige autorização explícita. | FACT |

@@ -1,5 +1,5 @@
 // Criação de objetos do domínio com valores padrão explícitos.
-import type { Activity, ProcessModel, Scenario, Workspace } from './types';
+import type { Activity, Assumption, ChangeEntry, ProcessModel, Scenario, Workspace } from './types';
 import { nowIso, uid } from './units';
 
 export function newProcess(name = 'Novo processo'): ProcessModel {
@@ -64,4 +64,67 @@ export function nextActivityId(p: ProcessModel): string {
   let n = (nums.length ? Math.max(...nums) : 0) + 1;
   while (p.activities.some((a) => a.id === `A${n}`)) n++;
   return `A${n}`;
+}
+
+/**
+ * Completa um projeto lido de backup ou de versões anteriores: campos ausentes
+ * recebem os mesmos valores padrão de um projeto novo. Lança erro apenas quando
+ * falta o que não há como inventar (identificador e processo AS-IS).
+ */
+export function normalizeWorkspace(raw: unknown): Workspace {
+  const r = (raw ?? {}) as Partial<Workspace> & Record<string, unknown>;
+  if (typeof r.id !== 'string' || !r.id) throw new Error('um dos projetos não tem identificador.');
+  const asIs = normalizeProcess(r.asIs);
+  if (!asIs) throw new Error(`o projeto “${r.id}” não tem o processo atual (AS-IS).`);
+  const at = nowIso();
+  const base = newWorkspace(asIs, { kind: 'backup' });
+  const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+  const obj = <T extends object>(v: unknown, fallback: T): T => (v && typeof v === 'object' && !Array.isArray(v) ? (v as T) : fallback);
+  const scenarios = arr<Scenario>(r.scenarios)
+    .filter((sc) => sc && typeof sc === 'object' && typeof sc.id === 'string')
+    .map((sc) => ({
+      ...sc,
+      process: normalizeProcess(sc.process) ?? structuredClone(asIs),
+      changes: arr<ChangeEntry>(sc.changes),
+      assumptions: arr<Assumption>(sc.assumptions),
+      horizonMonths: typeof sc.horizonMonths === 'number' && sc.horizonMonths > 0 ? sc.horizonMonths : 12,
+    }));
+  return {
+    ...base,
+    id: r.id,
+    isDemo: r.isDemo === true,
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : at,
+    updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : at,
+    source: obj(r.source, { kind: 'backup' as const }),
+    asIs,
+    asIsBaseline: normalizeProcess(r.asIsBaseline) ?? structuredClone(asIs),
+    validationAcceptedAt: typeof r.validationAcceptedAt === 'string' ? r.validationAcceptedAt : undefined,
+    visited: obj(r.visited, {}),
+    bottleneck: obj(r.bottleneck, base.bottleneck),
+    recDecisions: obj(r.recDecisions, {}),
+    scenarios,
+    activeScenarioId: scenarios.some((sc) => sc.id === r.activeScenarioId) ? r.activeScenarioId : scenarios[0]?.id,
+    actions: arr(r.actions),
+    results: arr(r.results),
+    risks: arr(r.risks),
+    raci: obj(r.raci, base.raci),
+    automation: obj(r.automation, {}),
+    history: arr<Workspace['history'][number]>(r.history),
+    snapshots: arr(r.snapshots),
+  };
+}
+
+function normalizeProcess(v: unknown): ProcessModel | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const p = v as Partial<ProcessModel>;
+  if (!Array.isArray(p.activities)) return undefined;
+  return {
+    ...newProcess(typeof p.name === 'string' ? p.name : 'Processo'),
+    ...p,
+    activities: p.activities.filter((a): a is Activity => !!a && typeof a === 'object' && typeof a.id === 'string' && typeof a.name === 'string').map((a) => ({ ...a, next: Array.isArray(a.next) ? a.next : [] })),
+    stageOrder: Array.isArray(p.stageOrder) ? p.stageOrder : [],
+    costPerHourByRole: p.costPerHourByRole && typeof p.costPerHourByRole === 'object' ? p.costPerHourByRole : {},
+    volumePeriod: p.volumePeriod ?? 'mes',
+    hoursPerDay: typeof p.hoursPerDay === 'number' && p.hoursPerDay > 0 ? p.hoursPerDay : 8,
+  };
 }

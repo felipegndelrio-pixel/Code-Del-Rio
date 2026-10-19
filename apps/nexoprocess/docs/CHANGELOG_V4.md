@@ -24,3 +24,11 @@ A V4 evolui a V3 no mesmo código, sem remover funcionalidades. O formulário ú
 - E2E nas larguras 1440, 768, 390 (perfil iPhone em Chromium), 320 e Android (Pixel 7).
 - axe-core com regras WCAG 2.0/2.1/2.2 A/AA em 19 telas, nos dois temas.
 - Desempenho **medido** (`scripts/perf.mjs`, resultado em `docs/desempenho-medido.json`).
+
+## Auditoria de release (rodada 2)
+- **Backup parcial:** restaurar um backup sem os campos da versão atual deixava a página do projeto em branco. Agora os campos ausentes são preenchidos com os valores padrão; um backup sem processo AS-IS é recusado com explicação e nenhum dado é alterado.
+- **Limite de erro:** uma falha de renderização mostra uma mensagem e um caminho de volta, em vez de deixar a aplicação inteira em branco.
+- **CSV seguro:** texto iniciado por `=`, `+`, `-` ou `@` recebe apóstrofo, para não virar fórmula no Excel. Números não são alterados.
+- **Downloads no artifact:** arquivos são entregues pela capacidade do viewer, com fallback para o download comum.
+- **Largura 1024 px** incluída nos testes responsivos.
+- Dependências: 2 vulnerabilidades moderadas em `exceljs` → `uuid`, sem correção sem troca de versão. Risco aceito e documentado em `docs/ACEITE.md`.

@@ -302,9 +302,12 @@ async function lockStructure(xlsx: Uint8Array): Promise<Uint8Array<ArrayBuffer>>
 }
 
 // ---------- CSV
+/** Texto que começa com = + - @ (ou tab/CR) vira fórmula no Excel: recebe apóstrofo. */
+const FORMULA_START = /^[=+\-@\t\r]/;
 function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
-  const s = typeof v === 'number' ? String(v).replace('.', ',') : String(v);
+  if (typeof v === 'number') return String(v).replace('.', ',');
+  const s = FORMULA_START.test(String(v)) ? `'${String(v)}` : String(v);
   return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

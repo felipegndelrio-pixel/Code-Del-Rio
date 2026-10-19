@@ -25,6 +25,7 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 }, launchOptions: { executablePath } } },
     // Larguras de referência da V4: 1440 · 768 · 390 (iPhone) · 320, além de Android (Pixel 7).
     { name: 'w1440', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, launchOptions: { executablePath } }, testMatch: /responsive/ },
+    { name: 'w1024', use: { ...devices['Desktop Chrome'], viewport: { width: 1024, height: 768 }, launchOptions: { executablePath } }, testMatch: /responsive/ },
     { name: 'w768', use: { ...devices['Desktop Chrome'], viewport: { width: 768, height: 1024 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, launchOptions: { executablePath } }, testMatch: /responsive/ },
     { name: 'iphone-390', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium', launchOptions: { executablePath } }, testMatch: /responsive|mobile/ },
     { name: 'w320', use: { ...devices['Desktop Chrome'], viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, launchOptions: { executablePath } }, testMatch: /responsive|mobile/ },

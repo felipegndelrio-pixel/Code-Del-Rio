@@ -2,6 +2,7 @@
 // Banco "nexoprocess" v1:
 //   workspaces  — processos (AS-IS, TO-BE, plano, resultados…), chave = id
 //   drafts      — rascunhos do assistente, chave = nome
+import { normalizeWorkspace } from '../domain/factory';
 import type { Workspace } from '../domain/types';
 import { nowIso, uid } from '../domain/units';
 
@@ -66,8 +67,11 @@ function memOp<T>(store: string, _mode: IDBTransactionMode, fn: (s: IDBObjectSto
 }
 
 export const db = {
-  listWorkspaces: () => tx<Workspace[]>('workspaces', 'readonly', (s) => s.getAll() as IDBRequest<Workspace[]>),
-  getWorkspace: (id: string) => tx<Workspace | undefined>('workspaces', 'readonly', (s) => s.get(id) as IDBRequest<Workspace | undefined>),
+  listWorkspaces: async (): Promise<Workspace[]> => (await tx<unknown[]>('workspaces', 'readonly', (s) => s.getAll() as IDBRequest<unknown[]>)).map(normalizeWorkspace),
+  getWorkspace: async (id: string): Promise<Workspace | undefined> => {
+    const raw = await tx<unknown | undefined>('workspaces', 'readonly', (s) => s.get(id) as IDBRequest<unknown | undefined>);
+    return raw ? normalizeWorkspace(raw) : undefined;
+  },
   putWorkspace: (w: Workspace) => tx('workspaces', 'readwrite', (s) => s.put(w)),
   deleteWorkspace: (id: string) => tx('workspaces', 'readwrite', (s) => s.delete(id)),
   getDraft: <T>(k: string) => tx<T | undefined>('drafts', 'readonly', (s) => s.get(k) as IDBRequest<T | undefined>),
@@ -105,11 +109,11 @@ export function parseBackup(text: string): Workspace[] {
   }
   const b = data as Partial<BackupFile>;
   if (b?.format !== 'nexoprocess-backup' || !Array.isArray(b.workspaces)) throw new Error('O arquivo não é um backup do NexoProcess.');
-  for (const w of b.workspaces) {
-    if (!w || typeof w.id !== 'string' || !w.asIs || !Array.isArray(w.asIs.activities) || !Array.isArray(w.scenarios))
-      throw new Error('Backup incompleto ou corrompido: um dos processos não tem a estrutura esperada.');
+  try {
+    return b.workspaces.map(normalizeWorkspace);
+  } catch (e) {
+    throw new Error(`Backup incompleto ou corrompido: ${(e as Error).message} Nenhum dado foi alterado.`, { cause: e });
   }
-  return b.workspaces;
 }
 
 /** Restaura sem sobrescrever: processos com id existente recebem novo id. */

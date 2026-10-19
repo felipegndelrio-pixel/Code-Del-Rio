@@ -1,5 +1,45 @@
 # Matriz de critérios de aceite — evidências
 
+## Auditoria de release (rodada 2, 2026-10-19)
+
+### Defeitos encontrados e corrigidos (com reprodução antes e depois)
+| # | Defeito | Evidência do defeito | Correção | Evidência após a correção |
+|---|---|---|---|---|
+| 1 | Restaurar um backup parcial (faltando campos da versão atual) deixava a página do projeto **em branco** (`TypeError` em `actions`/`bottleneck`). | Reprodução no app real: 2 erros de runtime, tela vazia. | `normalizeWorkspace()` completa campos ausentes na leitura e na restauração; sem AS-IS ou identificador, recusa com explicação e não altera dados. | `normalize.test.ts` (5 testes); E2E `regression.spec.ts` (projeto abre sem erro; backup inválido recusado com "Nenhum dado foi alterado"). |
+| 2 | Qualquer erro de renderização deixava a aplicação inteira em branco (sem limite de erro). | Inspeção: nenhum `ErrorBoundary` no código. | `ErrorBoundary` na casca do app: mensagem, caminho de volta, dados preservados; reseta ao navegar. | Verificação por código e build; não há teste dedicado de erro forçado (limitação). |
+| 3 | **Injeção de fórmulas no CSV**: texto iniciado por `=`, `+`, `@` ou `-` vira fórmula ao abrir no Excel. | Inspeção de `csvCell`; sem escape. | Apóstrofo antes de texto que começa com `= + - @ tab CR` (números não são afetados). | `csv-safety.test.ts` (2 testes). O XLSX não é afetado: o ExcelJS grava texto como texto. |
+| 4 | Download de arquivos não funcionava dentro do artifact de prévia. | Relatado pelo usuário; o viewer bloqueia links de download. | Capacidade `downloads` quando disponível; fallback para download comum. | E2E de exportação e importação passam; prévia publicada com `downloads`. |
+
+### Verificações sem defeito (inspecionadas)
+- Valores negativos e percentuais fora de 0–100 são sinalizados na validação (`validation.ts`).
+- Importação tem limite de 10 MB e 3.000 linhas (`io/parse.ts`).
+- Cabeçalhos de segurança e CSP em `public/_headers` (sem chamadas externas; testado pelo E2E).
+
+### Dependências
+- `npm audit --omit=dev`: **2 vulnerabilidades moderadas**, ambas em `exceljs` → `uuid` (faixa afetada do `uuid`).
+- Correção disponível apenas por troca de versão (`exceljs` 4.4.0 ainda depende de `uuid@^8`). **Risco aceito e registrado**: o app não passa `buf` para a geração de UUID, e as únicas entradas são planilhas que o próprio usuário escolhe no aparelho. Reavaliar a cada atualização do `exceljs`.
+
+### Resultados desta rodada (executados)
+| Verificação | Resultado |
+|---|---|
+| Lint (repositório) | 0 erros |
+| Typecheck (ambos os apps) | 0 erros |
+| Unitários NexoProcess | **102/102** (9 arquivos) |
+| Unitários do app existente | 25/25 |
+| Build NexoProcess (PWA) / app existente | OK (65 / 32 arquivos em precache) |
+| E2E (todos os perfis, incluindo 1024 px novo) | **52 passaram**, 2 pulados (capturas sob demanda) |
+
+### Limitações do harness (não do produto)
+- Caminhos de arquivo com acentos (título do teste) fazem o `setInputFiles` do Chromium falhar silenciosamente neste ambiente. O teste usa título sem acento e um comentário explica o motivo.
+- Um `readWorkspaces` executado antes de o app criar o banco cria o IndexedDB sem as tabelas. Só afeta testes; o app sempre abre o banco antes de ler.
+
+### Publicação e reversão
+- **Produção não publicada.** Não há ferramenta de deploy do Cloudflare Pages nem credencial neste ambiente. Pré-requisitos atendidos: build e testes aprovados nesta rodada.
+- **Reversão:** a versão estável anterior à rodada 2 é o commit `b0f31b7`. Para reverter a produção, reimplantar um deployment anterior no painel do Pages (a confirmar no painel antes da primeira publicação).
+- **Prévia:** o arquivo de prévia privada foi atualizado com as correções (versão 4).
+
+---
+
 ## V4 — execução local em 2026-10-19 (Linux, Node 22, Chromium do Playwright)
 
 | Verificação | Comando | Resultado |

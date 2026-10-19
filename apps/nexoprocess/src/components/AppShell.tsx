@@ -1,10 +1,11 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { HelpCircle, LayoutGrid, Moon, Sun, WifiOff } from 'lucide-react';
 import clsx from 'clsx';
 import { BRAND } from '../config/brand';
 import { useTheme } from '../state/theme';
 import { Logo } from './Logo';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggle } = useTheme();
@@ -44,6 +45,7 @@ function Connectivity() {
 
 export default function AppShell() {
   const link = ({ isActive }: { isActive: boolean }) => clsx('inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 text-sm font-medium', isActive ? 'bg-white/10 text-navInk' : 'text-navInk/80 hover:text-navInk');
+  const { pathname } = useLocation();
   return (
     <div className="flex min-h-screen flex-col">
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[70] focus:rounded-lg focus:bg-brand focus:px-3 focus:py-2 focus:text-brandInk">
@@ -70,7 +72,9 @@ export default function AppShell() {
         </div>
       </header>
       <main id="conteudo" className="flex-1">
-        <Outlet />
+        <ErrorBoundary resetKey={pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );
