@@ -7,17 +7,19 @@ import { prepare, readWorkspaces, waitSaved } from './helpers';
 test('1. exemplo demonstrativo abre isolado e marcado como fictício', async ({ page }) => {
   const { errors } = await prepare(page);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Testar com um exemplo' }).first().click();
-  await expect(page).toHaveURL(/\/app\/p\/w_[^/]+\/mapa$/);
+  await page.getByRole('button', { name: 'Ver demonstração fictícia' }).first().click();
+  await expect(page).toHaveURL(/\/app\/p\/w_[^/]+\/visao-geral$/);
   await expect(page.getByText('Exemplo fictício — dados ilustrativos')).toBeVisible();
+  await page.getByRole('link', { name: /Mapa AS-IS/ }).first().click();
   await page.waitForSelector('.djs-element');
   const ws = await readWorkspaces(page);
   expect(ws).toHaveLength(1);
   expect(ws[0].isDemo).toBe(true);
   // Abrir o exemplo de novo não duplica.
   await page.goto('/app');
-  await page.getByRole('button', { name: /Abrir (o )?exemplo/ }).click();
-  await expect(page).toHaveURL(/\/mapa$/);
+  await page.getByRole('button', { name: /Outras formas de começar/ }).click();
+  await page.getByRole('button', { name: 'Abrir demonstração' }).click();
+  await expect(page).toHaveURL(/\/visao-geral$/);
   expect(await readWorkspaces(page)).toHaveLength(1);
   expect(errors).toEqual([]);
 });
@@ -26,8 +28,8 @@ test('2–13. jornada completa: AS-IS → validação → mapa → diagnóstico 
   test.setTimeout(180_000);
   const { errors, external } = await prepare(page);
 
-  // ---------- 2. Criar AS-IS pelo assistente (sem custo-hora)
-  await page.goto('/app/novo');
+  // ---------- 2. Criar AS-IS pelo formulário único (sem custo-hora)
+  await page.goto('/app/novo/formulario');
   await page.getByLabel('Qual é o nome do processo?').fill('Atendimento de solicitações');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByLabel('Nome da etapa 1').fill('Entrada');
@@ -125,15 +127,15 @@ test('2–13. jornada completa: AS-IS → validação → mapa → diagnóstico 
   await page.goto(`/app/p/${id}/comparar`);
   await expect(page.getByText('333 pessoa-h/mês').first()).toBeVisible(); // 20 min × 1.000 = 333,3 h
   await expect(page.getByText('R$ 20.000/mês').first()).toBeVisible(); // 333,3 × R$ 60 (bruto = líquido, recorrente 0)
-  await expect(page.getByText('0,3 meses')).toBeVisible(); // 5.000 ÷ 20.000
-  await expect(page.getByText('4.700%')).toBeVisible(); // (20.000 × 12 − 5.000) ÷ 5.000
+  await expect(page.getByText('0,3 meses').first()).toBeVisible(); // 5.000 ÷ 20.000
+  await expect(page.getByText('4.700%').first()).toBeVisible(); // (20.000 × 12 − 5.000) ÷ 5.000
   // Premissa alterada → comparação recalculada
   await page.goto(`/app/p/${id}/tobe`);
   await page.getByLabel('Custo recorrente novo (R$/mês)').fill('10000');
   await waitSaved(page);
   await page.goto(`/app/p/${id}/comparar`);
   await expect(page.getByText('R$ 10.000/mês').first()).toBeVisible();
-  await expect(page.getByText('0,5 meses')).toBeVisible();
+  await expect(page.getByText('0,5 meses').first()).toBeVisible();
 
   // ---------- 10. Plano de ação
   await page.goto(`/app/p/${id}/plano`);

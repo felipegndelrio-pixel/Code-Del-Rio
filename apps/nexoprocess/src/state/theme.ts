@@ -48,6 +48,6 @@ export function chartColors(theme: Theme) {
         ink: '#0e1626',
         surface: '#ffffff',
         asIs: '#94a3b8',
-        toBe: '#007688',
+        toBe: '#006474',
       };
 }

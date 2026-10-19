@@ -48,6 +48,8 @@ export interface AssistantDraft {
   costPerHour?: number;
   costUnknown?: boolean;
   detailIndex: number;
+  /** Correção feita a partir do resumo: ao continuar, volta direto ao resumo. */
+  returnToReview?: boolean;
 }
 
 export function emptyDraft(): AssistantDraft {

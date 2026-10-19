@@ -235,7 +235,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button size="sm" onClick={() => nav(`/app/p/${w.id}/${nextPath}`)} aria-label={`Continuar ${w.asIs.name}${j.next ? `: ${j.next.label}` : ''}`}>
+                    <Button size="sm" onClick={() => nav(`/app/p/${w.id}/${nextPath}`)} aria-label={`Continuar${j.next ? `: ${j.next.short}` : ''} — ${w.asIs.name}`}>
                       Continuar{j.next ? `: ${j.next.short}` : ''}
                     </Button>
                     {w.isDemo && (

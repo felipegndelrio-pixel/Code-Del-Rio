@@ -14,7 +14,7 @@ export default function Landing() {
   const demo = async () => {
     try {
       const w = await openDemo();
-      nav(`/app/p/${w.id}/mapa`);
+      nav(`/app/p/${w.id}/visao-geral`);
     } catch {
       toast('bad', 'Não foi possível abrir o exemplo neste navegador.');
     }

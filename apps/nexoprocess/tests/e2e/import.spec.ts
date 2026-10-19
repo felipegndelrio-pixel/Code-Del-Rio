@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { prepare, readWorkspaces } from './helpers';
+import { prepare, readWorkspaces, openDemo } from './helpers';
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -11,11 +11,9 @@ async function choose(page: Page, name: string, mimeType: string, buffer: Buffer
 test('XLSX válido (modelo oficial preenchido) importa com fluxo, decisões e custos', async ({ page }) => {
   const { errors } = await prepare(page);
   // Fixture: XLSX gerado pelo próprio app (exportação do exemplo, mesmo formato do modelo).
-  await page.goto('/app');
-  await page.getByRole('button', { name: /Abrir (o )?exemplo/ }).click();
-  await expect(page).toHaveURL(/\/mapa$/);
+  const base = await openDemo(page);
   const demo = (await readWorkspaces(page))[0].asIs;
-  await page.goto(page.url().replace(/mapa$/, 'exportar'));
+  await page.goto(`${base}/exportar`);
   const card = page.locator('div', { has: page.getByText('Dados em XLSX', { exact: true }) }).last();
   const [d] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Baixar' }).click()]);
   const buf = readFileSync((await d.path())!);

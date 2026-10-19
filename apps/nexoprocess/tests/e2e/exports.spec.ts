@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { prepare } from './helpers';
+import { prepare, openDemo } from './helpers';
 
 // bpmn-moddle publica só ESM no "exports"; o runner do Playwright carrega a build CJS por caminho.
 const BpmnModdle = createRequire(import.meta.url)(resolve(process.cwd(), 'node_modules/bpmn-moddle/dist/index.cjs'));
@@ -11,11 +11,8 @@ const BpmnModdle = createRequire(import.meta.url)(resolve(process.cwd(), 'node_m
 test('exportações geram arquivos utilizáveis (BPMN XML, SVG/PNG, XLSX, CSV, modelo)', async ({ page }) => {
   test.setTimeout(120_000);
   const { errors } = await prepare(page);
-  await page.goto('/app');
-  await page.getByRole('button', { name: /Abrir (o )?exemplo/ }).click();
-  await expect(page).toHaveURL(/\/mapa$/);
-  const id = page.url().match(/\/p\/([^/]+)\//)![1];
-  await page.goto(`/app/p/${id}/exportar`);
+  const base = await openDemo(page);
+  await page.goto(`${base}/exportar`);
   const dl = async (title: string) => {
     const card = page.locator('div', { has: page.getByText(title, { exact: true }) }).last();
     const [d] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Baixar' }).click()]);
@@ -48,8 +45,9 @@ test('exportações geram arquivos utilizáveis (BPMN XML, SVG/PNG, XLSX, CSV, m
   const csv = await dl('Dados em CSV');
   expect(csv.data.toString('utf8')).toContain('Etapa macro;Atividade');
 
-  // Modelo XLSX na tela inicial
+  // Modelo XLSX na tela inicial (em “Outras formas de começar” quando já há projetos)
   await page.goto('/app');
+  await page.getByRole('button', { name: /Outras formas de começar/ }).click();
   const [t] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Baixar modelo XLSX' }).click()]);
   expect(t.suggestedFilename()).toBe('modelo-nexoprocess.xlsx');
   const tz = await JSZip.loadAsync(readFileSync((await t.path())!));

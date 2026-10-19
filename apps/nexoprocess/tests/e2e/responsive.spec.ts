@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { expectNoHorizontalScroll, prepare } from './helpers';
+import { expectNoHorizontalScroll, openDemo, prepare } from './helpers';
 
 const SHOTS = process.env.SHOTS_DIR;
-const PAGES = ['mapa', 'diagnostico', 'recomendacoes', 'tobe', 'comparar', 'plano', 'dados'];
+const PAGES = ['visao-geral', 'dados', 'validar', 'mapa', 'diagnostico', 'recomendacoes', 'tobe', 'comparar', 'plano', 'resultados', 'riscos', 'responsabilidades', 'simulacao', 'automacao', 'exportar'];
 
 test('layout sem rolagem horizontal em todas as telas, nos dois temas', async ({ page }, info) => {
   test.setTimeout(150_000);
@@ -14,9 +14,9 @@ test('layout sem rolagem horizontal em todas as telas, nos dois temas', async ({
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/${info.project.name}-${theme}-landing.png` });
     await page.goto('/app');
     await expectNoHorizontalScroll(page);
-    await page.getByRole('button', { name: /Abrir (o )?exemplo/ }).click();
-    await expect(page).toHaveURL(/\/mapa$/);
-    const base = page.url().replace(/\/mapa$/, '');
+    const base = await openDemo(page);
+    await page.goto('/app');
+    await expectNoHorizontalScroll(page);
     for (const p of PAGES) {
       await page.goto(`${base}/${p}`);
       if (p === 'mapa') await page.waitForSelector('.djs-element');
@@ -27,6 +27,8 @@ test('layout sem rolagem horizontal em todas as telas, nos dois temas', async ({
     }
     await page.goto('/app/novo');
     await expectNoHorizontalScroll(page);
+    await page.goto('/app/novo/formulario');
+    await expectNoHorizontalScroll(page);
     await page.goto('/app/importar');
     await expectNoHorizontalScroll(page);
   }
@@ -35,8 +37,8 @@ test('layout sem rolagem horizontal em todas as telas, nos dois temas', async ({
 
 test('mapa no celular: etapa abre e detalhes aparecem em painel', async ({ page }, info) => {
   await prepare(page);
-  await page.goto('/app');
-  await page.getByRole('button', { name: /Abrir (o )?exemplo/ }).click();
+  const base = await openDemo(page);
+  await page.goto(`${base}/mapa`);
   await page.waitForSelector('.djs-element');
   const vp = page.viewportSize()!;
   // O diagrama nunca fica espremido: escala mínima legível de 60%.
@@ -86,7 +88,8 @@ test('PWA: manifesto, ícones, service worker e funcionamento offline com dados 
   await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
   await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=cover/);
 
-  await page.getByRole('button', { name: /Abrir (o )?exemplo/ }).click();
+  const base = await openDemo(page);
+  await page.goto(`${base}/mapa`);
   await page.waitForSelector('.djs-element');
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -97,6 +100,7 @@ test('PWA: manifesto, ícones, service worker e funcionamento offline com dados 
   await context.setOffline(true);
   await page.goto(url.replace(/mapa$/, 'diagnostico'));
   await expect(page.getByText('Resumo do processo atual')).toBeVisible();
+  await expect(page.getByText(/Offline — seus dados continuam disponíveis/)).toBeVisible();
   await page.goto(url);
   await page.waitForSelector('.djs-element');
   await context.setOffline(false);

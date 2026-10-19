@@ -53,3 +53,15 @@ export async function expectNoHorizontalScroll(page: Page) {
 export async function waitSaved(page: Page) {
   await expect(page.getByTestId('save-state')).toContainText('Salvo neste dispositivo');
 }
+
+/** Abre a demonstração pela tela “Meus projetos” e devolve a URL base do projeto. */
+export async function openDemo(page: Page): Promise<string> {
+  await page.goto('/app');
+  const direct = page.getByRole('button', { name: 'Abrir demonstração' });
+  const more = page.getByRole('button', { name: /Outras formas de começar/ });
+  await expect(direct.or(more).first()).toBeVisible();
+  if (!(await direct.isVisible())) await more.click();
+  await direct.click();
+  await expect(page).toHaveURL(/\/visao-geral$/);
+  return page.url().replace(/\/visao-geral$/, '');
+}

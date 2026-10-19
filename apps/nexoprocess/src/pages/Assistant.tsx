@@ -62,10 +62,11 @@ export default function Assistant() {
   const order = stepOrder(d);
   const idx = Math.max(0, order.indexOf(d.step));
   const set = (patch: Partial<AssistantDraft>) => setD((x) => ({ ...x, ...patch }));
-  const go = (step: string) => setD((x) => ({ ...x, step }));
+  const go = (step: string) => setD((x) => ({ ...x, step, returnToReview: x.step === 'review' && SINGLE_ANSWER.has(step) }));
   const next = (patch: Partial<AssistantDraft> = {}) =>
     setD((x) => {
       const merged = { ...x, ...patch };
+      if (merged.returnToReview) return { ...merged, step: 'review', returnToReview: false };
       const o = stepOrder(merged);
       const i = o.indexOf(merged.step);
       return { ...merged, step: o[Math.min(o.length - 1, i + 1)] };
@@ -312,6 +313,9 @@ function summary(step: string, d: AssistantDraft): { q: string; a: string } {
   return { q: '', a: '' };
 }
 
+// Perguntas de resposta única: corrigidas a partir do resumo, voltam direto ao resumo.
+const SINGLE_ANSWER = new Set(['name', 'trigger', 'outcome', 'decisions', 'volume', 'cost']);
+
 function Bubble({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-start gap-2">
@@ -472,8 +476,10 @@ function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, onNext,
           {items.map((it, i) => (
             <li key={it.key} className="flex items-center gap-2 rounded-lg border border-line/15 bg-surface2/40 py-1 pl-3 pr-1">
               <span className="w-5 text-xs font-semibold text-muted">{i + 1}.</span>
-              <input aria-label={`Item ${i + 1}`} value={it.label} onChange={(e) => onChange(items.map((x) => (x.key === it.key ? { ...x, label: e.target.value } : x)))} className="min-h-[36px] min-w-0 flex-1 bg-transparent text-sm text-ink outline-none focus-visible:outline-none" />
-              {it.meta && <span className="hidden shrink-0 text-xs text-muted sm:inline">{it.meta}</span>}
+              <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-2">
+                <input aria-label={`Item ${i + 1}`} value={it.label} onChange={(e) => onChange(items.map((x) => (x.key === it.key ? { ...x, label: e.target.value } : x)))} className="min-h-[36px] min-w-0 flex-1 bg-transparent text-sm text-ink outline-none focus-visible:outline-none" />
+                {it.meta && <span className="-mt-1 pb-1 text-xs text-muted sm:mt-0 sm:shrink-0 sm:pb-0">{it.meta}</span>}
+              </span>
               <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-ink disabled:opacity-30" aria-label={`Mover ${it.label} para cima`} disabled={i === 0} onClick={() => move(i, -1)}>
                 <ArrowUp className="h-4 w-4" />
               </button>

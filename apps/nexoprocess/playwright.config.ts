@@ -21,9 +21,14 @@ export default defineConfig({
     launchOptions: { executablePath },
   },
   projects: [
+    // Suíte funcional completa no desktop.
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 }, launchOptions: { executablePath } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'], launchOptions: { executablePath } }, testMatch: /responsive|mobile/ },
-    { name: 'tablet', use: { ...devices['Desktop Chrome'], viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, launchOptions: { executablePath } }, testMatch: /responsive/ },
+    // Larguras de referência da V4: 1440 · 768 · 390 (iPhone) · 320, além de Android (Pixel 7).
+    { name: 'w1440', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, launchOptions: { executablePath } }, testMatch: /responsive/ },
+    { name: 'w768', use: { ...devices['Desktop Chrome'], viewport: { width: 768, height: 1024 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, launchOptions: { executablePath } }, testMatch: /responsive/ },
+    { name: 'iphone-390', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium', launchOptions: { executablePath } }, testMatch: /responsive|mobile/ },
+    { name: 'w320', use: { ...devices['Desktop Chrome'], viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, launchOptions: { executablePath } }, testMatch: /responsive|mobile/ },
+    { name: 'android', use: { ...devices['Pixel 7'], launchOptions: { executablePath } }, testMatch: /responsive|mobile/ },
   ],
   webServer: {
     command: 'npx vite build --config apps/nexoprocess/vite.config.ts && npx vite preview --config apps/nexoprocess/vite.config.ts --port 4180 --host 127.0.0.1 --strictPort',

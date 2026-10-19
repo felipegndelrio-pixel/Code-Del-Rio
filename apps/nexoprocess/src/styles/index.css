@@ -18,14 +18,14 @@
   --line: 15 23 42;
   --ink: 14 22 38; /* #0E1626 */
   --ink-2: 52 64 84; /* #344054 */
-  --muted: 84 96 116; /* #546074 */
+  --muted: 78 90 110; /* #4e5a6e — ≥ 4,5:1 inclusive sobre fundos tingidos */
   --brand: 23 50 99; /* #173263 — estrutura e ação primária */
   --brand-ink: 255 255 255;
-  --accent: 0 118 136; /* #007688 — acento Nexo (texto seguro em branco) */
+  --accent: 0 100 116; /* #006474 — acento Nexo; ≥ 4,5:1 em selos sobre o próprio tom */
   --accent-strong: 0 168 188; /* #00A8BC — marcas e barras */
   --violet: 91 33 182;
   --amber: 146 64 14;
-  --ok: 21 112 66;
+  --ok: 17 96 56;
   --warn: 133 77 14;
   --bad: 176 26 26;
   --nav: 13 28 56; /* barra superior do app */
