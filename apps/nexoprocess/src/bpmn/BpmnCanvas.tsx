@@ -198,25 +198,30 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-line/15 bg-surface2/30">
-      <div className="no-print absolute left-2 top-2 z-10 flex flex-wrap gap-1">
-        {stage && (
-          <button type="button" onClick={() => onStageChange(null)} className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-line/20 bg-surface px-3 text-sm font-semibold text-ink shadow-card hover:border-brand/60">
-            <ChevronLeft className="h-4 w-4" aria-hidden /> Visão macro
-          </button>
-        )}
-      </div>
-      <div className="no-print absolute right-2 top-2 z-10 flex gap-1">
-        <CtrlBtn label="Aproximar" onClick={() => zoom(1.25)}>
-          <Plus className="h-4 w-4" />
-        </CtrlBtn>
-        <CtrlBtn label="Afastar" onClick={() => zoom(0.8)}>
-          <Minus className="h-4 w-4" />
-        </CtrlBtn>
-        <CtrlBtn label="Ajustar à tela" onClick={() => zoom('fit')}>
-          <Maximize2 className="h-4 w-4" />
-        </CtrlBtn>
-      </div>
       <div ref={host} className="np-canvas w-full" style={{ height }} role="region" aria-label={stage ? `Mapa detalhado da etapa ${stage}` : 'Mapa macro do processo'} data-testid="bpmn-canvas" />
+      {/* Abaixo de 768 px (zoom travado, diagrama ancorado no topo) os controles ficam numa
+          barra abaixo do quadro: não cobrem o diagrama nem a marca do bpmn.io (canto inferior
+          direito, exigida pela licença). A partir de md, sobrepostos aos cantos superiores. */}
+      <div className="no-print flex items-center justify-between gap-2 border-t border-line/10 px-2 py-1.5 md:contents" data-testid="bpmn-controls">
+        <div className="flex flex-wrap gap-1 md:absolute md:left-2 md:top-2 md:z-10">
+          {stage && (
+            <button type="button" onClick={() => onStageChange(null)} className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-line/20 bg-surface px-3 text-sm font-semibold text-ink shadow-card hover:border-brand/60">
+              <ChevronLeft className="h-4 w-4" aria-hidden /> Visão macro
+            </button>
+          )}
+        </div>
+        <div className="flex gap-1 md:absolute md:right-2 md:top-2 md:z-10">
+          <CtrlBtn label="Aproximar" onClick={() => zoom(1.25)}>
+            <Plus className="h-4 w-4" />
+          </CtrlBtn>
+          <CtrlBtn label="Afastar" onClick={() => zoom(0.8)}>
+            <Minus className="h-4 w-4" />
+          </CtrlBtn>
+          <CtrlBtn label="Ajustar à tela" onClick={() => zoom('fit')}>
+            <Maximize2 className="h-4 w-4" />
+          </CtrlBtn>
+        </div>
+      </div>
       <p className="no-print border-t border-line/10 px-3 py-1.5 text-xs text-muted">Arraste para mover · roda do mouse, pinça ou + / − para zoom · “Ajustar à tela” mostra tudo.</p>
       {!ready && !error && <p className="absolute inset-0 flex items-center justify-center text-sm text-muted">Desenhando o mapa…</p>}
       {error && (
