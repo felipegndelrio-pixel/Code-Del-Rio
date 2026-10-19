@@ -23,6 +23,8 @@ jobs:
       - run: npm run nexo:test
       - run: npx vite build --config apps/nexoprocess/vite.config.ts
       - run: npm run nexo:check-bundle
+      # CSP e cabeçalhos reais do public/_headers, servidos pelo wrangler pages dev
+      - run: npm run nexo:test:csp
   nexoprocess-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -37,3 +39,5 @@ jobs:
       - run: npm run nexo:e2e
         env:
           CI: 'true'
+      # Todas as rotas e exportações com a CSP real e service worker ativo (usa o dist do E2E)
+      - run: npm run nexo:test:csp:rotas
