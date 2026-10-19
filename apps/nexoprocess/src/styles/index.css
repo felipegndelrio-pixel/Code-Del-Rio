@@ -28,6 +28,9 @@
   --ok: 17 96 56;
   --warn: 133 77 14;
   --bad: 176 26 26;
+  /* Texto sobre o fundo do tom (selos do mapa). Medido em src/styles/contrast.test.ts. */
+  --on-bad: 255 255 255;
+  --on-amber: 255 255 255;
   --nav: 13 28 56; /* barra superior do app */
   --nav-ink: 236 241 248;
   --shadow-card: 0 1px 2px rgb(14 22 38 / 0.05), 0 1px 1px rgb(14 22 38 / 0.03);
@@ -56,6 +59,8 @@
     --ok: 86 214 140;
     --warn: 245 178 40;
     --bad: 248 120 120;
+    --on-bad: 17 17 17;
+    --on-amber: 17 17 17;
     --nav: 10 13 19;
     --nav-ink: 232 236 242;
     --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset;
@@ -83,6 +88,8 @@
   --ok: 86 214 140;
   --warn: 245 178 40;
   --bad: 248 120 120;
+  --on-bad: 17 17 17;
+  --on-amber: 17 17 17;
   --nav: 10 13 19;
   --nav-ink: 232 236 242;
   --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset;
@@ -214,16 +221,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 .np-badge-bad {
   background: rgb(var(--bad));
-  color: #fff;
+  color: rgb(var(--on-bad));
 }
 .np-badge-amber {
   background: rgb(var(--amber));
-  color: #111;
-}
-.np-badge-info {
-  background: rgb(var(--surface-2));
-  color: rgb(var(--ink));
-  border: 1px solid rgb(var(--line) / 0.25);
+  color: rgb(var(--on-amber));
 }
 /* A barra de navegação própria substitui o breadcrumb do bpmn-js. */
 .np-canvas .bjs-breadcrumbs {

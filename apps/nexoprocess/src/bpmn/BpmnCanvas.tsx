@@ -11,7 +11,7 @@ import type { BpmnBuild } from './model';
 
 export interface Decoration {
   classes: string[];
-  badges: { text: string; tone: 'bad' | 'amber' | 'info' }[];
+  badges: { text: string; tone: 'bad' | 'amber' }[];
 }
 
 export interface BpmnCanvasHandle {
