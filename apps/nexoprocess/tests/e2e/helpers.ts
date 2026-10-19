@@ -1,8 +1,17 @@
 import { expect, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 
-/** Mesma CSP do public/_headers, aplicada no preview para detectar violações. */
-export const CSP =
-  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+/**
+ * CSP lida do próprio public/_headers (fonte única), aplicada no preview para detectar
+ * violações. Limite: navegações servidas pelo service worker não passam por page.route;
+ * a varredura com cabeçalho real é scripts/csp-routes.mjs (wrangler pages dev).
+ */
+export const CSP = (() => {
+  const headers = readFileSync(new URL('../../public/_headers', import.meta.url), 'utf8');
+  const m = /^\s+Content-Security-Policy:\s*(.+)$/m.exec(headers);
+  if (!m) throw new Error('Content-Security-Policy não encontrada em public/_headers');
+  return m[1].trim();
+})();
 
 export async function prepare(page: Page, opts: { theme?: 'dark' | 'light' } = {}) {
   const errors: string[] = [];

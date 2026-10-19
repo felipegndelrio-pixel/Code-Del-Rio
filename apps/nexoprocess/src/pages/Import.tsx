@@ -199,6 +199,11 @@ export default function ImportPage() {
               </div>
             </Callout>
           )}
+          {file.fileName.toLowerCase().endsWith('.xlsm') && (
+            <Callout tone="info" title="Macros do arquivo são ignoradas; só os valores das células são lidos">
+              O NexoProcess não executa macros (VBA): o arquivo é aberto só para ler os valores das células.
+            </Callout>
+          )}
           <Card title="De onde vêm os dados?" subtitle={file.fileName}>
             <div className="grid gap-4 sm:grid-cols-3">
               {file.sheets.length > 1 && (

@@ -17,3 +17,6 @@ dist-pages
 
 # Relatórios locais de build do NexoProcess
 .reports
+
+# Estado local do wrangler pages dev (teste de CSP)
+.wrangler

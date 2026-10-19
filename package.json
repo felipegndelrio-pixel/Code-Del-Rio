@@ -30,7 +30,9 @@
     "nexo:build:preview-file": "npm run nexo:build:single",
     "nexo:lint": "eslint apps/nexoprocess",
     "nexo:test:unit": "vitest run -c apps/nexoprocess/vitest.config.ts",
-    "nexo:check-bundle": "node apps/nexoprocess/scripts/check-bundle.mjs"
+    "nexo:check-bundle": "node apps/nexoprocess/scripts/check-bundle.mjs",
+    "nexo:test:csp": "node apps/nexoprocess/scripts/test-csp.mjs",
+    "nexo:test:csp:rotas": "node apps/nexoprocess/scripts/csp-routes.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
@@ -70,6 +72,7 @@
     "vite": "^8.3.4",
     "vite-plugin-pwa": "^2.0.0",
     "vite-plugin-singlefile": "^2.3.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "^4.151.2"
   }
 }
