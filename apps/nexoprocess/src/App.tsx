@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import AppShell from './components/AppShell';
 
 const Wizard = lazy(() => import('./pages/Wizard'));
+const Assistant = lazy(() => import('./pages/Assistant'));
 const ImportPage = lazy(() => import('./pages/Import'));
 const WorkspacePage = lazy(() => import('./pages/WorkspacePage'));
 const Help = lazy(() => import('./pages/Help'));
@@ -17,7 +18,8 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route element={<AppShell />}>
           <Route path="/app" element={<Home />} />
-          <Route path="/app/novo" element={<Wizard />} />
+          <Route path="/app/novo" element={<Assistant />} />
+          <Route path="/app/novo/formulario" element={<Wizard />} />
           <Route path="/app/importar" element={<ImportPage />} />
           <Route path="/app/ajuda" element={<Help />} />
           <Route path="/app/p/:id/*" element={<WorkspacePage />} />

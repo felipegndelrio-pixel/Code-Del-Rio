@@ -18,7 +18,7 @@ export function Card({ title, subtitle, action, children, className, id, tone = 
     <section
       id={id}
       className={clsx(
-        'avoid-break rounded-2xl border bg-surface p-4 shadow-card sm:p-5',
+        'avoid-break rounded-2xl border bg-surface p-4 shadow-card sm:p-6',
         tone === 'default' && 'border-line/15',
         tone === 'warn' && 'border-warn/50',
         tone === 'bad' && 'border-bad/50',
@@ -29,8 +29,8 @@ export function Card({ title, subtitle, action, children, className, id, tone = 
       {(title || action) && (
         <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            {subtitle && <p className="text-[11px] font-semibold uppercase tracking-wider text-brand">{subtitle}</p>}
-            {title && <h2 className="text-base font-bold text-ink sm:text-lg">{title}</h2>}
+            {subtitle && <p className="eyebrow">{subtitle}</p>}
+            {title && <h2 className="mt-0.5 text-base font-semibold text-ink sm:text-lg">{title}</h2>}
           </div>
           {action}
         </header>
@@ -48,12 +48,12 @@ export function Button({ variant = 'primary', loading, size = 'md', className, c
       {...rest}
       disabled={rest.disabled || loading}
       className={clsx(
-        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex select-none items-center justify-center gap-2 rounded-lg font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
         size === 'sm' && 'min-h-[36px] px-3 text-xs',
         size === 'md' && 'min-h-[44px] px-4 text-sm',
         size === 'lg' && 'min-h-[52px] px-5 text-base',
-        variant === 'primary' && 'bg-brand text-brandInk shadow-glow hover:brightness-110',
-        variant === 'secondary' && 'border border-line/20 bg-surface2 text-ink hover:border-brand/60',
+        variant === 'primary' && 'bg-brand text-brandInk shadow-glow hover:bg-brand/90 active:bg-brand/80',
+        variant === 'secondary' && 'border border-line/20 bg-surface text-ink hover:border-line/40 hover:bg-surface2',
         variant === 'danger' && 'bg-bad text-white hover:brightness-110',
         variant === 'ghost' && 'text-ink2 hover:bg-surface2 hover:text-ink',
         className,
@@ -76,7 +76,7 @@ const TONES = {
 } as const;
 export type Tone = keyof typeof TONES;
 export function Badge({ tone = 'muted', children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
-  return <span className={clsx('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1', TONES[tone], className)}>{children}</span>;
+  return <span className={clsx('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ring-1', TONES[tone], className)}>{children}</span>;
 }
 
 const BASIS: Record<Basis, { label: string; tone: Tone; help: string }> = {

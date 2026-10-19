@@ -17,6 +17,10 @@ interface Ctx {
   snapshotAsIs: (label: string) => void;
   save: SaveState;
   savedAt?: string;
+  /** Rótulo da última alteração que pode ser desfeita (null = nada a desfazer). */
+  undoLabel: string | null;
+  undo: () => string | null;
+  retrySave: () => void;
   metrics: ProcessMetrics;
   issues: Issue[];
   recs: Recommendation[];
@@ -32,6 +36,7 @@ export function useWorkspace(): Ctx {
 
 const MAX_SNAPSHOTS = 15;
 const MAX_HISTORY = 300;
+const MAX_UNDO = 30;
 
 export function WorkspaceProvider({ initial, children }: { initial: Workspace; children: ReactNode }) {
   const [w, setW] = useState(initial);
@@ -75,26 +80,57 @@ export function WorkspaceProvider({ initial, children }: { initial: Workspace; c
     };
   }, [flush]);
 
-  const update = useCallback<Ctx['update']>(
-    (fn, history) => {
-      setW((prev) => {
-        const next = structuredClone(prev);
-        fn(next);
-        next.updatedAt = nowIso();
-        if (history) next.history = [...next.history, { at: next.updatedAt, ...history }].slice(-MAX_HISTORY);
-        pending.current = next;
-        return next;
-      });
+  // Estado corrente síncrono (as alterações partem sempre do último estado) +
+  // pilha de desfazer em memória. Edições sem rótulo em sequência rápida
+  // (digitação) são agrupadas numa única entrada.
+  const cur = useRef(initial);
+  const undoStack = useRef<{ w: Workspace; label: string; labeled: boolean; at: number }[]>([]);
+  const [undoLabel, setUndoLabel] = useState<string | null>(null);
+
+  const commit = useCallback(
+    (next: Workspace) => {
+      cur.current = next;
+      pending.current = next;
+      setW(next);
       setSave('salvando');
       queueMicrotask(() => void flush());
     },
     [flush],
   );
 
-  // O updater do setState pode rodar só no render: garante a gravação após cada commit.
-  useEffect(() => {
-    if (pending.current) void flush();
-  }, [w, flush]);
+  const update = useCallback<Ctx['update']>(
+    (fn, history) => {
+      const prev = cur.current;
+      const next = structuredClone(prev);
+      fn(next);
+      next.updatedAt = nowIso();
+      if (history) next.history = [...next.history, { at: next.updatedAt, ...history }].slice(-MAX_HISTORY);
+      const now = Date.now();
+      const top = undoStack.current[undoStack.current.length - 1];
+      if (!history && top && !top.labeled && now - top.at < 1500) top.at = now;
+      else undoStack.current = [...undoStack.current, { w: prev, label: history?.message ?? 'Edição de campos', labeled: !!history, at: now }].slice(-MAX_UNDO);
+      setUndoLabel(undoStack.current[undoStack.current.length - 1]?.label ?? null);
+      commit(next);
+    },
+    [commit],
+  );
+
+  const undo = useCallback(() => {
+    const e = undoStack.current.pop();
+    if (!e) return null;
+    const at = nowIso();
+    const restored = { ...structuredClone(e.w), updatedAt: at };
+    restored.history = [...restored.history, { at, area: 'Desfazer', message: `Desfeito: ${e.label}` }].slice(-MAX_HISTORY);
+    setUndoLabel(undoStack.current[undoStack.current.length - 1]?.label ?? null);
+    commit(restored);
+    return e.label;
+  }, [commit]);
+
+  const retrySave = useCallback(() => {
+    pending.current = cur.current;
+    setSave('salvando');
+    void flush();
+  }, [flush]);
 
   const snapshotAsIs = useCallback(
     (label: string) =>
@@ -108,6 +144,9 @@ export function WorkspaceProvider({ initial, children }: { initial: Workspace; c
   const issues = useMemo(() => validateProcess(w.asIs), [w.asIs]);
   const recs = useMemo(() => recommend(w.asIs, w.bottleneck.criterion, w.bottleneck.thresholdPct, metrics), [w.asIs, w.bottleneck, metrics]);
 
-  const value = useMemo(() => ({ w, update, snapshotAsIs, save, savedAt, metrics, issues, recs }), [w, update, snapshotAsIs, save, savedAt, metrics, issues, recs]);
+  const value = useMemo(
+    () => ({ w, update, snapshotAsIs, save, savedAt, undoLabel, undo, retrySave, metrics, issues, recs }),
+    [w, update, snapshotAsIs, save, savedAt, undoLabel, undo, retrySave, metrics, issues, recs],
+  );
   return <WorkspaceCtx.Provider value={value}>{children}</WorkspaceCtx.Provider>;
 }

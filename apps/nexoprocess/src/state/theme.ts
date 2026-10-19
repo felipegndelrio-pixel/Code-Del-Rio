@@ -33,21 +33,21 @@ export function chartColors(theme: Theme) {
     ? {
         series: ['#3987e5', '#d95926', '#199e70', '#c98500', '#9085e9'],
         lean: { VA: '#199e70', NNVA: '#c98500', W: '#d03b3b', U: '#6b7280' },
-        grid: '#24324d',
-        axis: '#8694ac',
-        ink: '#e8eef8',
-        surface: '#0d1830',
-        asIs: '#8694ac',
-        toBe: '#22d3ee',
+        grid: '#2a313d',
+        axis: '#8e98a8',
+        ink: '#e8ecf2',
+        surface: '#161a22',
+        asIs: '#8e98a8',
+        toBe: '#40c8d6',
       }
     : {
         series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#6250d6'],
         lean: { VA: '#1baf7a', NNVA: '#eda100', W: '#d03b3b', U: '#9ca3af' },
-        grid: '#e2e8f0',
-        axis: '#5a6880',
-        ink: '#0b1220',
+        grid: '#e3e7ee',
+        axis: '#546074',
+        ink: '#0e1626',
         surface: '#ffffff',
         asIs: '#94a3b8',
-        toBe: '#0e7490',
+        toBe: '#007688',
       };
 }

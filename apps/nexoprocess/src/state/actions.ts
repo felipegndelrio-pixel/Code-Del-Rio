@@ -57,3 +57,21 @@ export async function downloadTemplateCsv() {
   const { templateCsv } = await import('../io/workbook');
   download('modelo-nexoprocess-exemplo.csv', templateCsv(), 'text/csv;charset=utf-8');
 }
+
+/**
+ * Gera o arquivo do projeto (.nexoprocess.json, mesmo formato do backup) para
+ * continuar em outro aparelho. Usa o compartilhamento nativo quando o navegador
+ * aceita arquivos (iOS/Android); senão, baixa o arquivo.
+ */
+export async function shareProject(w: Workspace): Promise<'shared' | 'downloaded'> {
+  const name = `${slug(w.asIs.name)}.nexoprocess.json`;
+  const json = JSON.stringify({ format: 'nexoprocess-backup', version: 1, exportedAt: new Date().toISOString(), workspaces: [w] }, null, 2);
+  const file = typeof File !== 'undefined' ? new File([json], name, { type: 'application/json' }) : null;
+  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+  if (file && nav.canShare?.({ files: [file] }) && nav.share) {
+    await nav.share({ files: [file], title: w.asIs.name });
+    return 'shared';
+  }
+  download(name, json, 'application/json');
+  return 'downloaded';
+}

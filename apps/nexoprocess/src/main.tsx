@@ -4,6 +4,11 @@ import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import { Providers } from './components/ui';
 import PwaUpdater from './components/PwaUpdater';
+import '@fontsource/ibm-plex-sans/latin-400.css';
+import '@fontsource/ibm-plex-sans/latin-500.css';
+import '@fontsource/ibm-plex-sans/latin-600.css';
+import '@fontsource/ibm-plex-sans/latin-700.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
 import './styles/index.css';
 
 // Rotas por hash para hospedagens estáticas sem fallback de SPA.

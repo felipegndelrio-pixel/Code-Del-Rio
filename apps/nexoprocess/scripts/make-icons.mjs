@@ -12,7 +12,7 @@ const shot = async (size, name, pad, bg) => {
 };
 await shot(192, 'icon-192.png', 0, 'transparent');
 await shot(512, 'icon-512.png', 0, 'transparent');
-await shot(512, 'icon-maskable-512.png', 72, '#0b1630');
-await shot(180, 'apple-touch-icon.png', 14, '#0b1630');
+await shot(512, 'icon-maskable-512.png', 72, '#173263');
+await shot(180, 'apple-touch-icon.png', 14, '#173263');
 await browser.close();
 console.log('ícones gerados');

@@ -29,6 +29,8 @@
     "nexo:build:preview-file": "SINGLEFILE=true VITE_ROUTER=hash vite build --config apps/nexoprocess/vite.config.ts"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "@supabase/supabase-js": "^2.118.0",
     "bpmn-js": "^18.31.0",
     "bpmn-moddle": "^10.3.1",

@@ -2,51 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tokens de design (RGB sem alfa, para uso com / <alpha> no Tailwind). */
+/*
+ * Design system NexoProcess V4 — "engenharia premium".
+ * Estrutura em azul profundo/grafite, base clara neutra levemente fria e um
+ * único acento próprio (ciano "Nexo"), usado com moderação: seleção, progresso,
+ * links e foco. Estados semânticos (ok/atenção/erro) são separados do acento.
+ * Valores em RGB sem alfa, para uso com `/ <alpha>` no Tailwind.
+ */
 :root,
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: 7 13 28;
-  --surface: 13 24 48;
-  --surface-2: 20 34 64;
-  --line: 148 163 184;
-  --ink: 232 238 248;
-  --ink-2: 172 186 208;
-  --muted: 134 148 172;
-  --brand: 34 211 238;
-  --brand-ink: 4 18 36;
-  --accent: 96 165 250;
-  --violet: 167 139 250;
-  --amber: 251 191 36;
-  --ok: 52 211 153;
-  --warn: 250 178 25;
-  --bad: 248 113 113;
-  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 10px 30px rgb(0 0 0 / 0.25);
-  --bpmn-fill: #0f1b33;
-  --bpmn-stroke: #9fb3d1;
-  --bpmn-label: #e8eef8;
-}
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: 244 247 251;
+  --bg: 245 247 250; /* #F5F7FA */
   --surface: 255 255 255;
-  --surface-2: 236 241 248;
+  --surface-2: 238 241 246; /* #EEF1F6 */
   --line: 15 23 42;
-  --ink: 11 18 32;
-  --ink-2: 55 68 92;
-  --muted: 78 90 112;
-  --brand: 12 98 122;
+  --ink: 14 22 38; /* #0E1626 */
+  --ink-2: 52 64 84; /* #344054 */
+  --muted: 84 96 116; /* #546074 */
+  --brand: 23 50 99; /* #173263 — estrutura e ação primária */
   --brand-ink: 255 255 255;
-  --accent: 29 78 216;
+  --accent: 0 118 136; /* #007688 — acento Nexo (texto seguro em branco) */
+  --accent-strong: 0 168 188; /* #00A8BC — marcas e barras */
   --violet: 91 33 182;
   --amber: 146 64 14;
-  --ok: 4 104 74;
+  --ok: 21 112 66;
   --warn: 133 77 14;
   --bad: 176 26 26;
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.06);
+  --nav: 13 28 56; /* barra superior do app */
+  --nav-ink: 236 241 248;
+  --shadow-card: 0 1px 2px rgb(14 22 38 / 0.05), 0 1px 1px rgb(14 22 38 / 0.03);
+  --shadow-pop: 0 12px 32px rgb(14 22 38 / 0.14), 0 2px 6px rgb(14 22 38 / 0.08);
+  --radius: 8px;
   --bpmn-fill: #ffffff;
   --bpmn-stroke: #334155;
-  --bpmn-label: #0b1220;
+  --bpmn-label: #0e1626;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: 14 17 23;
+    --surface: 22 26 34;
+    --surface-2: 30 35 45;
+    --line: 148 163 184;
+    --ink: 232 236 242;
+    --ink-2: 178 187 201;
+    --muted: 142 152 168;
+    --brand: 140 178 246;
+    --brand-ink: 10 18 34;
+    --accent: 64 200 214;
+    --accent-strong: 64 200 214;
+    --violet: 175 150 250;
+    --amber: 245 190 70;
+    --ok: 86 214 140;
+    --warn: 245 178 40;
+    --bad: 248 120 120;
+    --nav: 10 13 19;
+    --nav-ink: 232 236 242;
+    --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+    --shadow-pop: 0 16px 40px rgb(0 0 0 / 0.5);
+    --bpmn-fill: #161a22;
+    --bpmn-stroke: #9fb0c8;
+    --bpmn-label: #e8ecf2;
+  }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: 14 17 23;
+  --surface: 22 26 34;
+  --surface-2: 30 35 45;
+  --line: 148 163 184;
+  --ink: 232 236 242;
+  --ink-2: 178 187 201;
+  --muted: 142 152 168;
+  --brand: 140 178 246;
+  --brand-ink: 10 18 34;
+  --accent: 64 200 214;
+  --accent-strong: 64 200 214;
+  --violet: 175 150 250;
+  --amber: 245 190 70;
+  --ok: 86 214 140;
+  --warn: 245 178 40;
+  --bad: 248 120 120;
+  --nav: 10 13 19;
+  --nav-ink: 232 236 242;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --shadow-pop: 0 16px 40px rgb(0 0 0 / 0.5);
+  --bpmn-fill: #161a22;
+  --bpmn-stroke: #9fb0c8;
+  --bpmn-label: #e8ecf2;
 }
 
 html,
@@ -58,23 +101,35 @@ body {
   margin: 0;
   background: rgb(var(--bg));
   color: rgb(var(--ink));
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
 }
-:root[data-theme='dark'] body {
-  background:
-    radial-gradient(1100px 520px at 85% -10%, rgb(34 211 238 / 0.07), transparent 60%),
-    radial-gradient(900px 500px at -10% 10%, rgb(139 92 246 / 0.06), transparent 60%),
-    rgb(var(--bg));
-  background-attachment: fixed;
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+  letter-spacing: -0.01em;
 }
 :focus-visible {
-  outline: 2px solid rgb(var(--brand));
+  outline: 2px solid rgb(var(--accent));
   outline-offset: 2px;
 }
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+.font-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--accent));
 }
 .safe-x {
   padding-left: max(1rem, env(safe-area-inset-left));
@@ -86,11 +141,9 @@ body {
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
+/* Mantida por compatibilidade: título sem gradiente (V4). */
 .headline {
-  background: linear-gradient(90deg, rgb(var(--brand)), rgb(var(--accent)) 55%, rgb(var(--violet)));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: rgb(var(--ink));
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -152,7 +205,7 @@ input[type='date']::-webkit-calendar-picker-indicator {
   stroke-dasharray: 2 4;
 }
 .np-badge {
-  font: 600 10px/1 Inter, system-ui, sans-serif;
+  font: 600 11px/1 'IBM Plex Sans', system-ui, sans-serif;
   padding: 3px 6px;
   border-radius: 999px;
   white-space: nowrap;

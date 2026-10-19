@@ -362,7 +362,7 @@ export default function ReportPage() {
         )}
       </Section>
 
-      <footer className="mt-6 border-t border-line/25 pt-2 text-[11px] text-muted">
+      <footer className="mt-6 border-t border-line/25 pt-2 text-xs text-muted">
         Metodologia: cálculos determinísticos documentados no app (“Como calculamos”). Valores ausentes não são substituídos por zero. Diagramas BPMN gerados automaticamente e renderizados com bpmn-js (bpmn.io). {BRAND.name} não é afiliado ao PMI®.
       </footer>
     </div>

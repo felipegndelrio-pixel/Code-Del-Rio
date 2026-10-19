@@ -2,8 +2,8 @@
 import type { Theme } from '../state/theme';
 
 export const RENDER_COLORS: Record<Theme, { fill: string; stroke: string; label: string }> = {
-  dark: { fill: '#0f1b33', stroke: '#9fb3d1', label: '#e8eef8' },
-  light: { fill: '#ffffff', stroke: '#334155', label: '#0b1220' },
+  dark: { fill: '#161a22', stroke: '#9fb0c8', label: '#e8ecf2' },
+  light: { fill: '#ffffff', stroke: '#334155', label: '#0e1626' },
 };
 
 export async function createViewer(container: HTMLElement, theme: Theme, navigated = true) {
@@ -13,7 +13,7 @@ export async function createViewer(container: HTMLElement, theme: Theme, navigat
   return new Viewer({
     container,
     bpmnRenderer: { defaultFillColor: c.fill, defaultStrokeColor: c.stroke, defaultLabelColor: c.label },
-    textRenderer: { defaultStyle: { fontFamily: 'Inter, system-ui, Arial, sans-serif', fontSize: 12 } },
+    textRenderer: { defaultStyle: { fontFamily: "'IBM Plex Sans', system-ui, Arial, sans-serif", fontSize: 12 } },
   });
 }
 

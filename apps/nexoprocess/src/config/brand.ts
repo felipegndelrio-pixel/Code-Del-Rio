@@ -5,9 +5,9 @@ export const BRAND = {
   shortName: 'NexoProcess',
   tagline:
     'Transforme uma planilha simples em um mapa visual do processo, encontre gargalos e receba um plano prático de melhoria — sem precisar saber BPMN ou Lean.',
-  colors: { navy: '#070d1c', brand: '#22d3ee' },
+  colors: { navy: '#0d1c38', brand: '#00a8bc' },
   /** Versão exibida em relatórios e exportações. */
-  version: '0.3.0',
+  version: '0.4.0',
 } as const;
 
 // CTA comercial configurável. Deixe `url` vazio para ocultar o botão.
