@@ -19,12 +19,21 @@
     "build:demo": "VITE_DEMO=true vite build --outDir dist-demo",
     "build:preview-file": "VITE_DEMO=true SINGLEFILE=true vite build --outDir dist-single",
     "dev:demo": "VITE_DEMO=true vite",
-    "setup-sql": "node scripts/build-setup-sql.mjs"
+    "setup-sql": "node scripts/build-setup-sql.mjs",
+    "nexo:dev": "vite --config apps/nexoprocess/vite.config.ts",
+    "nexo:build": "npm run nexo:typecheck && vite build --config apps/nexoprocess/vite.config.ts",
+    "nexo:preview": "vite preview --config apps/nexoprocess/vite.config.ts",
+    "nexo:typecheck": "tsc -p apps/nexoprocess/tsconfig.json --noEmit",
+    "nexo:test": "vitest run -c apps/nexoprocess/vitest.config.ts",
+    "nexo:e2e": "playwright test -c apps/nexoprocess/playwright.config.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
+    "bpmn-js": "^18.31.0",
+    "bpmn-moddle": "^10.3.1",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",
+    "jszip": "^3.10.2",
     "lucide-react": "^1.57.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
