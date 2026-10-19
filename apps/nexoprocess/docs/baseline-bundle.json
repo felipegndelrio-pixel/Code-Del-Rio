@@ -1,0 +1,338 @@
+{
+ "geradoEm": "2026-10-19",
+ "commit": "79014f4",
+ "metodo": "vite build --sourcemap + source-map-explorer@2.5.3 (bytes minificados por pacote)",
+ "chunks": [
+  {
+   "arquivo": "exceljs-DoAus6Wm.js",
+   "bytes": 929446,
+   "gzip": 255567,
+   "pacotes": {
+    "exceljs": 921221
+   }
+  },
+  {
+   "arquivo": "charts-DKf4loSl.js",
+   "bytes": 399050,
+   "gzip": 112999,
+   "pacotes": {
+    "recharts": 261115,
+    "es-toolkit": 14403,
+    "d3-scale": 14276,
+    "d3-shape": 13632,
+    "decimal.js-light": 12914,
+    "@reduxjs/toolkit": 10880
+   }
+  },
+  {
+   "arquivo": "index-YvaEyUMs.js",
+   "bytes": 319710,
+   "gzip": 101248,
+   "pacotes": {
+    "react-dom": 203071,
+    "[código do app]": 59755,
+    "react-router": 38234,
+    "lucide-react": 9638,
+    "scheduler": 3510
+   }
+  },
+  {
+   "arquivo": "bpmn-Bhb4wyRL.js",
+   "bytes": 195930,
+   "gzip": 55631,
+   "pacotes": {
+    "bpmn-js": 60279,
+    "diagram-js": 48980,
+    "bpmn-moddle": 34911,
+    "moddle-xml": 17974,
+    "moddle": 8757,
+    "saxen": 6879
+   }
+  },
+  {
+   "arquivo": "jszip.min-DHI56sS5.js",
+   "bytes": 95983,
+   "gzip": 28350,
+   "pacotes": {
+    "jszip": 95837
+   }
+  },
+  {
+   "arquivo": "WorkspacePage--0pXDBf8.js",
+   "bytes": 41688,
+   "gzip": 14352,
+   "pacotes": {
+    "[código do app]": 37904,
+    "lucide-react": 1754
+   }
+  },
+  {
+   "arquivo": "Assistant-Dm-SlAWB.js",
+   "bytes": 30314,
+   "gzip": 9619,
+   "pacotes": {
+    "[código do app]": 29093,
+    "lucide-react": 302
+   }
+  },
+  {
+   "arquivo": "Import-DGFKKQZi.js",
+   "bytes": 26670,
+   "gzip": 10160,
+   "pacotes": {
+    "[código do app]": 25616,
+    "lucide-react": 251
+   }
+  },
+  {
+   "arquivo": "ui-Dkn4xurs.js",
+   "bytes": 22107,
+   "gzip": 8179,
+   "pacotes": {
+    "[código do app]": 17022,
+    "lucide-react": 4240,
+    "react": 336
+   }
+  },
+  {
+   "arquivo": "ReportPage-B3XsM-IJ.js",
+   "bytes": 19232,
+   "gzip": 6057,
+   "pacotes": {
+    "[código do app]": 17764,
+    "lucide-react": 293
+   }
+  },
+  {
+   "arquivo": "ToBeTab-Dpi0vYTZ.js",
+   "bytes": 19103,
+   "gzip": 6198,
+   "pacotes": {
+    "[código do app]": 17902,
+    "lucide-react": 410
+   }
+  },
+  {
+   "arquivo": "CompareTab-B8twUnxq.js",
+   "bytes": 18795,
+   "gzip": 5671,
+   "pacotes": {
+    "[código do app]": 18126
+   }
+  },
+  {
+   "arquivo": "MapTab-05E5jo9f.js",
+   "bytes": 16718,
+   "gzip": 5845,
+   "pacotes": {
+    "[código do app]": 15698,
+    "lucide-react": 299
+   }
+  },
+  {
+   "arquivo": "Wizard-quOwwU3g.js",
+   "bytes": 15429,
+   "gzip": 5316,
+   "pacotes": {
+    "[código do app]": 14807
+   }
+  },
+  {
+   "arquivo": "DiagnosisTab-Dn8ycZXJ.js",
+   "bytes": 12904,
+   "gzip": 4405,
+   "pacotes": {
+    "[código do app]": 12306
+   }
+  },
+  {
+   "arquivo": "DataTab-CVYRoPvX.js",
+   "bytes": 11849,
+   "gzip": 4131,
+   "pacotes": {
+    "[código do app]": 10924,
+    "lucide-react": 240
+   }
+  },
+  {
+   "arquivo": "charts-BakdOWD0.js",
+   "bytes": 10440,
+   "gzip": 2991,
+   "pacotes": {
+    "[código do app]": 9685,
+    "lucide-react": 230
+   }
+  },
+  {
+   "arquivo": "PlanTab-Dzi6AJCz.js",
+   "bytes": 10414,
+   "gzip": 3534,
+   "pacotes": {
+    "[código do app]": 9779
+   }
+  },
+  {
+   "arquivo": "model-CxorkM23.js",
+   "bytes": 10000,
+   "gzip": 3917,
+   "pacotes": {
+    "[código do app]": 9853
+   }
+  },
+  {
+   "arquivo": "workbook-BwOGoEFr.js",
+   "bytes": 9992,
+   "gzip": 4160,
+   "pacotes": {
+    "[código do app]": 9499
+   }
+  },
+  {
+   "arquivo": "OverviewTab-Yh_xPNge.js",
+   "bytes": 9518,
+   "gzip": 3317,
+   "pacotes": {
+    "[código do app]": 8558,
+    "lucide-react": 331
+   }
+  },
+  {
+   "arquivo": "RecsTab-BfZ7PrHX.js",
+   "bytes": 8822,
+   "gzip": 3195,
+   "pacotes": {
+    "[código do app]": 7902,
+    "lucide-react": 309
+   }
+  },
+  {
+   "arquivo": "ResultsTab-19PNWE-N.js",
+   "bytes": 8151,
+   "gzip": 3120,
+   "pacotes": {
+    "[código do app]": 7547
+   }
+  },
+  {
+   "arquivo": "compare-vkmfIGbF.js",
+   "bytes": 7573,
+   "gzip": 2923,
+   "pacotes": {
+    "[código do app]": 7367
+   }
+  },
+  {
+   "arquivo": "ActivityForm-DN355WZ1.js",
+   "bytes": 7513,
+   "gzip": 2441,
+   "pacotes": {
+    "[código do app]": 7171
+   }
+  },
+  {
+   "arquivo": "fields-BBX6NmG9.js",
+   "bytes": 7469,
+   "gzip": 2666,
+   "pacotes": {
+    "[código do app]": 7399
+   }
+  },
+  {
+   "arquivo": "Help-COFFIU61.js",
+   "bytes": 7107,
+   "gzip": 2593,
+   "pacotes": {
+    "[código do app]": 6874
+   }
+  },
+  {
+   "arquivo": "RisksTab-B_iLwhBY.js",
+   "bytes": 6825,
+   "gzip": 2463,
+   "pacotes": {
+    "[código do app]": 6223
+   }
+  },
+  {
+   "arquivo": "AutomationTab-D-YP_Ife.js",
+   "bytes": 6491,
+   "gzip": 2673,
+   "pacotes": {
+    "[código do app]": 6008
+   }
+  },
+  {
+   "arquivo": "ExportTab-Bz05i9bD.js",
+   "bytes": 6116,
+   "gzip": 2760,
+   "pacotes": {
+    "[código do app]": 4319,
+    "lucide-react": 728
+   }
+  },
+  {
+   "arquivo": "workbox-window.prod.es5-Bd17z0YL.js",
+   "bytes": 5714,
+   "gzip": 2246,
+   "pacotes": {
+    "workbox-window": 5548
+   }
+  },
+  {
+   "arquivo": "advanced-CWoSGxMH.js",
+   "bytes": 5678,
+   "gzip": 2656,
+   "pacotes": {
+    "[código do app]": 5389
+   }
+  },
+  {
+   "arquivo": "factory-BuHCzqiv.js",
+   "bytes": 5647,
+   "gzip": 2285,
+   "pacotes": {
+    "[código do app]": 5433
+   }
+  },
+  {
+   "arquivo": "ValidateTab-oR5mOZcZ.js",
+   "bytes": 5453,
+   "gzip": 2096,
+   "pacotes": {
+    "[código do app]": 4944
+   }
+  }
+ ],
+ "totalPorPacote": {
+  "exceljs": 921221,
+  "[código do app]": 412946,
+  "recharts": 261115,
+  "react-dom": 206833,
+  "jszip": 95837,
+  "bpmn-js": 60279,
+  "diagram-js": 48980,
+  "react-router": 38234,
+  "bpmn-moddle": 34911,
+  "lucide-react": 20393,
+  "moddle-xml": 17974,
+  "es-toolkit": 14403,
+  "d3-scale": 14276,
+  "d3-shape": 13632,
+  "decimal.js-light": 12914,
+  "@reduxjs/toolkit": 10880,
+  "immer": 9432,
+  "d3-time-format": 8961,
+  "moddle": 8757,
+  "react": 8137,
+  "d3-color": 7205,
+  "saxen": 6879,
+  "workbox-window": 5548,
+  "tiny-svg": 4898,
+  "d3-format": 4888,
+  "d3-time": 4536,
+  "d3-array": 3550,
+  "scheduler": 3510,
+  "didi": 3384,
+  "redux": 2765
+ }
+}
