@@ -230,18 +230,22 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
 
 /**
  * Enquadra o diagrama sem deixá-lo ilegível: se "ajustar à tela" exigir zoom
- * menor que 60% (telas pequenas), usa 60% ancorado no início (esquerda) e o
- * usuário navega com arrastar/pinça. Nunca amplia além de 110%.
+ * menor que 60% (telas pequenas), usa 60% ancorado no início (esquerda e topo,
+ * com margem de 16 px na tela) e o usuário navega com arrastar/pinça. Ancorar no
+ * topo, e não no centro, mantém o diagrama na primeira dobra do celular: centrado,
+ * um diagrama baixo ficava no meio de um quadro alto, abaixo da dobra.
+ * Nunca amplia além de 110%.
  */
 function fitReadable(canvas: any, el: HTMLElement) {
   const MIN = 0.6;
+  const MARGIN_PX = 16;
   canvas.zoom('fit-viewport', 'auto');
   const vb = canvas.viewbox();
   if (vb.scale > 1.1) canvas.zoom(1.1, 'auto');
   else if (vb.scale < MIN) {
     const w = el.clientWidth / MIN;
     const h = el.clientHeight / MIN;
-    canvas.viewbox({ x: vb.inner.x - 16, y: vb.inner.y + vb.inner.height / 2 - h / 2, width: w, height: h });
+    canvas.viewbox({ x: vb.inner.x - 16, y: vb.inner.y - MARGIN_PX / MIN, width: w, height: h });
   }
   el.dataset.zoom = String(canvas.zoom());
 }
