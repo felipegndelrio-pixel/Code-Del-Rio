@@ -41,7 +41,7 @@ Checks antes de cada PR (saída anexada ao PR):
 | **Teste do cabeçalho em CI** | O `vite preview` passa a servir os cabeçalhos do próprio `public/_headers` (mesma fonte publicada). Script `check-headers` faz `curl -I` e **falha** se a CSP faltar ou divergir da política esperada (arquivo único de referência). Ver P1 para o deploy real. |
 | Scripts inline | Já não há. `theme-init.js` continua externo e antes do bundle. |
 | `<meta name="referrer">` e `<noscript>` com privacidade | Implementar. |
-| Entrada maliciosa | O SVG do relatório deixa o `dangerouslySetInnerHTML` e passa a ser exibido como `<img src="blob:…">` (o navegador não executa script de SVG como imagem). E2E com CSV e XLSX contendo `<script>`, `<img onerror>`, `javascript:` e `=cmd|'/C calc'!A0`: nada executa, nenhuma violação de CSP no console, interface íntegra. |
+| Entrada maliciosa | **Decisão B (Fase 2):** o SVG do relatório continua inline (`dangerouslySetInnerHTML` justificado no código e coberto por teste), porque as tabelas do relatório não repetem os textos do diagrama e `<img>` os tiraria dos leitores de tela; `<img>` + tabela ficam para a Fase 7. E2E com CSV e XLSX contendo `<script>`, `<img onerror>`, `javascript:`, `=cmd|'/C calc'!A0`, aba e cabeçalho maliciosos, e `.xlsm` com macro: nada executa, nada é injetado no DOM, texto literal. |
 | `docs/security-headers.md` | Cabeçalhos, motivo de CSP só no cabeçalho, verificação em CI, SRI omitido e quando revisitar (CDN, script de terceiros, polyfill externo). |
 
 **Check:** `check-headers` verde no CI; console sem violação de CSP em todas as rotas; `<noscript>` visível com JS desligado; E2E de entrada maliciosa verde.
@@ -79,7 +79,7 @@ Checks antes de cada PR (saída anexada ao PR):
 
 ## Fase 7 — UX/UI · PR 8
 
-Corrigir D2, D3, D4; um `<h1>` por rota (teste); foco visível; tokens de contraste; estado offline; importação grande sem travar (medir antes de mover para Web Worker); estados de carregamento/vazio/erro com os componentes existentes. Testes em Safari iOS e Chrome Android: **por você**.
+Corrigir D2, D3, D4; **relatório: tabela "Atividades por etapa" (nome, etapa, tipo, responsável, duração, Lean), SVG do mapa como `<img>` com `alt`, `style=` do SVG inline para classes e CSP com `style-src 'self'` (follow-up da decisão B da Fase 2)**; um `<h1>` por rota (teste); foco visível; tokens de contraste; estado offline; importação grande sem travar (medir antes de mover para Web Worker); estados de carregamento/vazio/erro com os componentes existentes. Testes em Safari iOS e Chrome Android: **por você**.
 
 **Check:** Lighthouse móvel home — Desempenho ≥ 90, Acessibilidade ≥ 95, Boas práticas ≥ 95, SEO ≥ 90; mapa — Desempenho ≥ 80, Acessibilidade ≥ 95.
 

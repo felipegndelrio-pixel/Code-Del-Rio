@@ -92,9 +92,28 @@ Proposta:
   - Atividades: Conferir dados do cliente, Solicitar correção ao cliente, Consultar limite de crédito, Conferir itens separados, Embalar pedido, Emitir nota fiscal, Despachar pedido…
   - Decisões: Dados completos?, Crédito aprovado?, Aprovado na análise manual?, Itens corretos?
 
-**Conclusão:** a regra da decisão 2 aponta para a **opção B**, e a condição de parada ("tabelas não contêm todas as informações do diagrama → discutir A vs B antes de codar") foi atingida. A implementação aguarda essa conversa.
+**Conclusão:** a regra da decisão 2 aponta para a **opção B**, e a condição de parada ("tabelas não contêm todas as informações do diagrama → discutir A vs B antes de codar") foi atingida. A implementação aguardou essa conversa (ver §8).
 
 **Elementos para a conversa** (fatos, sem nova recomendação):
 - **Com A**, o texto do diagrama sai da árvore de acessibilidade. Hoje o SVG inline expõe esses 22 textos a leitores de tela; dentro de `<img>`, só o `alt`.
 - **Com B**, permanece `style-src 'unsafe-inline'` e o único `dangerouslySetInnerHTML`. O conteúdo é DOM serializado do bpmn-js, com nomes escapados (sonda da §1: zero execução).
 - **A + tabela "Atividades por etapa"** (nome, etapa, tipo, responsável, duração, Lean) cobriria o diagrama e os dados citados na decisão 2. É **escopo novo**: muda o relatório e o PDF.
+
+## 8. Decisão B (dono do produto) e follow-up para a Fase 7
+
+**Decisão:** opção B. O SVG do relatório continua inline, com `dangerouslySetInnerHTML` justificado em comentário no código (`ReportPage.tsx`), e `style-src 'unsafe-inline'` permanece.
+
+**Motivo:** é a única opção que respeita as duas restrições da fase ao mesmo tempo.
+- A Fase 2 é só segurança: não muda o relatório nem o PDF.
+- Não pode reduzir acessibilidade: `<img>` tiraria 22 textos da árvore de acessibilidade.
+
+**Risco residual:** o vetor real seria script via `innerHTML`, e está contido. Os nomes saem escapados, a sonda deu zero execução, e `tests/e2e/security.spec.ts` cobre:
+- script inline;
+- `<img onerror>` e `<svg onload>`;
+- `javascript:` como texto e como hyperlink;
+- verificação de que nada aparece como elemento ou atributo no DOM do relatório.
+
+**Follow-up registrado na Fase 7 (UX), em `plano-fases.md`:**
+1. Tabela "Atividades por etapa" no relatório (nome, etapa, tipo, responsável, duração, Lean), que cobre o diagrama e os dados que hoje faltam.
+2. Com a tabela, o SVG passa a `<img>` com `alt` (sem perda para leitores de tela) e o `dangerouslySetInnerHTML` sai.
+3. Os atributos `style=` do SVG inline viram classes CSS, e a CSP aperta para `style-src 'self'`. Atualizar `EXPECTED_CSP` em `scripts/test-csp.mjs` e `docs/security-headers.md`.
