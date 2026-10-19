@@ -1,0 +1,37 @@
+{
+  "ferramenta": "lighthouse 12.8.2, perfil móvel padrão (4G lento simulado, CPU 4x)",
+  "pagina": "/app/p/:id/mapa (perfil do Chromium com a demonstração, --disable-storage-reset)",
+  "referencia": "execução 1 (cache frio, comparável à linha de base); 2 e 3 reaproveitam o cache do perfil",
+  "execucoes": [
+    {
+      "execucao": 1,
+      "performance": 89,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 91,
+      "LCP": "3.3 s",
+      "TBT": "130 ms",
+      "CLS": "0"
+    },
+    {
+      "execucao": 2,
+      "performance": 98,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 91,
+      "LCP": "0.4 s",
+      "TBT": "170 ms",
+      "CLS": "0"
+    },
+    {
+      "execucao": 3,
+      "performance": 99,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 91,
+      "LCP": "0.4 s",
+      "TBT": "130 ms",
+      "CLS": "0"
+    }
+  ]
+}

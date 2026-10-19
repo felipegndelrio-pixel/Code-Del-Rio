@@ -71,3 +71,18 @@ O desempenho do mapa já está em 89 (meta ≥ 80) desde a Fase 1.
 - **P3 — `link-name` (D2):** sem ele, o mapa chega a 95,86 (folga de 0,86 ponto) e o axe em 390 px continua com 1 violação *serious*. A correção são 2 `aria-label` no cabeçalho. Incluo na Fase 1.5 ou deixo para a Fase 7?
 - **Base dos PRs:** os PRs 1 e 2 estão **abertos, sem merge**. A branch `fase-1.5` saiu de `fase-1-build`. Quer fazer o merge dos dois antes, ou mantenho o PR da Fase 1.5 empilhado sobre o da Fase 1?
 - **Safari iOS:** não há aparelho nem simulador neste ambiente. O teste manual em iOS fica com você.
+
+## Resultado da correção (após aprovação de P1–P4)
+
+| Medida | Antes | Depois |
+|---|---|---|
+| Diagrama (topo–base) a 390×844 / 360×800, dobra 787 / 743 | 796 / 781 (abaixo da dobra) | **588–714** nas duas larguras, dois temas |
+| Controles sobre o diagrama ou a marca do bpmn.io | sim (sobrepostos) | não (barra abaixo do quadro abaixo de 768 px) |
+| 768 e 1366 px | — | inalterados (zoom 0,655 e 0,924) |
+| Contraste texto × selo | 2,66 (claro, retrabalho) · 2,64 (escuro, gargalo) | 7,09 · 7,15 (`contrast.test.ts`, 26 pares) |
+| axe sem exclusão: desktop / 390 px, por tema | 1 / 2 *serious* | **0 / 0** |
+| Lighthouse móvel do mapa (cache frio) | Perf 89 · A11y 92 | **Perf 89 · A11y 100** |
+
+O diagrama cabe inteiro **na vertical**. Na horizontal ele continua além da borda direita: o zoom mínimo de 60% (legibilidade) foi mantido, e o restante se vê arrastando ou com pinça.
+
+Evidências: [`comparacao-antes-depois.png`](evidencias/fase-1.5/comparacao-antes-depois.png), `depois-{390x844,360x800}-{light,dark}.png` e [`lighthouse-mapa-depois.json`](evidencias/fase-1.5/lighthouse-mapa-depois.json).
