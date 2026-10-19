@@ -14,3 +14,6 @@ dist-e2e
 dist-demo
 dist-single
 dist-pages
+
+# Relatórios locais de build do NexoProcess
+.reports
