@@ -236,6 +236,30 @@ input[type='date']::-webkit-calendar-picker-indicator {
   z-index: 5;
 }
 
+/* Aviso sem JavaScript (index.html). Sem JS não há data-theme: os tokens seguem o
+   tema do sistema. Classe em vez de style inline, para não depender de 'unsafe-inline'. */
+.np-noscript {
+  min-height: 100vh;
+  padding: 2rem;
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+}
+.np-noscript h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.np-noscript p {
+  margin: 0 0 0.75rem;
+  max-width: 40rem;
+  color: rgb(var(--ink-2));
+}
+.np-noscript strong {
+  color: rgb(var(--ink));
+}
+
 /* ---------- Impressão / PDF ---------- */
 @media print {
   :root {
