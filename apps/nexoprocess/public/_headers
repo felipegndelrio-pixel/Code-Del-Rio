@@ -1,11 +1,13 @@
 # Cloudflare Pages — cabeçalhos de segurança e cache (arquivo estático, sem Functions).
 # O app não chama APIs externas: connect-src fica restrito à própria origem.
+# Cada diretiva está justificada em docs/security-headers.md e é verificada em CI
+# por scripts/test-csp.mjs (npm run nexo:test:csp, via wrangler pages dev).
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
 
 /sw.js
   Cache-Control: no-cache
