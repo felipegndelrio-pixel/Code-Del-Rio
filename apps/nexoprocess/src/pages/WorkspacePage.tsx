@@ -246,7 +246,7 @@ function Shell() {
           )}
         </nav>
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line/10 pb-4">
-          <h1 className="min-w-0 flex-1 truncate text-lg font-semibold sm:text-xl">{w.asIs.name}</h1>
+          <h1 className="w-full min-w-0 text-lg font-semibold leading-snug sm:w-auto sm:flex-1 sm:truncate sm:text-xl">{w.asIs.name}</h1>
           {w.isDemo && (
             <Badge tone="amber" className="text-xs">
               Exemplo fictício — dados ilustrativos

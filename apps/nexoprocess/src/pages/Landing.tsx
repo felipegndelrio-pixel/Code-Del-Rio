@@ -48,7 +48,7 @@ export default function Landing() {
                 {COMMERCIAL.primaryCta} <ArrowRight className="h-5 w-5" aria-hidden />
               </Button>
               <Button size="lg" variant="secondary" onClick={demo}>
-                Testar com um exemplo
+                Ver demonstração fictícia
               </Button>
               {COMMERCIAL.secondaryCta.url && (
                 <a href={COMMERCIAL.secondaryCta.url} className="inline-flex min-h-[52px] items-center rounded-xl px-4 font-semibold text-brand underline-offset-4 hover:underline" rel="noopener">
@@ -81,7 +81,7 @@ export default function Landing() {
             Duas formas de começar
           </h2>
           <div className="rounded-2xl border border-line/15 bg-surface p-6 shadow-card">
-            <Wand2 className="h-7 w-7 text-violet" aria-hidden />
+            <Wand2 className="h-7 w-7 text-accent" aria-hidden />
             <h3 className="mt-3 text-lg font-bold">Sem planilha</h3>
             <p className="mt-1 text-sm text-ink2">Um assistente faz perguntas simples: quais as etapas, o que acontece em cada uma, quanto tempo leva.</p>
             <Button className="mt-4" variant="secondary" onClick={() => nav('/app/novo')}>
@@ -116,15 +116,15 @@ export default function Landing() {
           </ul>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-brand/30 bg-surface p-6 text-center shadow-glow">
+        <section className="mt-6 rounded-2xl border border-brand/30 bg-surface p-6 text-center ">
           <h2 className="text-2xl font-bold">Seu processo. Seu mapa. Seus gargalos.</h2>
-          <p className="mx-auto mt-2 max-w-xl text-ink2">Comece com o exemplo e depois traga o seu processo — leva poucos minutos.</p>
+          <p className="mx-auto mt-2 max-w-xl text-ink2">Explore a demonstração fictícia ou traga o seu processo agora.</p>
           <div className="mt-4 flex flex-wrap justify-center gap-3">
             <Button size="lg" onClick={() => nav('/app')}>
               Começar agora
             </Button>
             <Button size="lg" variant="secondary" onClick={demo}>
-              Ver exemplo
+              Ver demonstração fictícia
             </Button>
           </div>
         </section>

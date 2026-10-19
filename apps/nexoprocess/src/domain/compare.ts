@@ -1,7 +1,7 @@
 // Comparação AS-IS × TO-BE e business case. Tudo aqui é ESTIMATIVA
 // condicionada a premissas; nada vira "economia realizada" automaticamente.
 import { computeMetrics, costOf, isWork, type ProcessMetrics } from './metrics';
-import type { ProcessModel, Scenario } from './types';
+import type { ProcessModel, Scenario, Sensitivity } from './types';
 import { isNum, reductionPct } from './units';
 
 export type Basis = 'informado' | 'calculado' | 'estimado' | 'a_validar' | 'realizado';
@@ -209,4 +209,108 @@ export function compareScenarios(asIsP: ProcessModel, sc: Scenario): Comparison 
       confidence: { level, reasons: confReasons },
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Casos conservador / base / otimista (premissas editáveis no cenário).
+// Fórmulas (documentadas em docs/CALCULOS.md):
+//   horas_caso     = horas liberadas (base) × realização%
+//   bruto_caso     = benefício bruto (base) × realização%
+//   líquido_caso   = bruto_caso − custo recorrente
+//   invest_caso    = investimento × investimento%
+//   payback_caso   = invest_caso ÷ líquido_caso   (só se líquido_caso > 0)
+//   ROI_caso       = (líquido_caso × horizonte − invest_caso) ÷ invest_caso
+export const DEFAULT_SENSITIVITY: Sensitivity = {
+  conservative: { realizationPct: 50, investmentPct: 130 },
+  optimistic: { realizationPct: 110, investmentPct: 90 },
+};
+
+export type CaseKey = 'conservative' | 'base' | 'optimistic';
+export const CASE_LABEL: Record<CaseKey, string> = { conservative: 'Conservador', base: 'Base', optimistic: 'Otimista' };
+export interface CaseFigures {
+  key: CaseKey;
+  realizationPct: number;
+  investmentPct: number;
+  freedHoursMonth: number | null;
+  grossBenefitMonth: number | null;
+  netBenefitMonth: number | null;
+  investment: number | null;
+  paybackMonths: number | null;
+  roiPct: number | null;
+  /** Motivo de payback/ROI ausentes. */
+  reason?: string;
+}
+
+export function businessCases(b: BusinessCase, sens: Sensitivity = DEFAULT_SENSITIVITY): CaseFigures[] {
+  const mk = (key: CaseKey, realizationPct: number, investmentPct: number): CaseFigures => {
+    const r = realizationPct / 100;
+    const freed = b.freedHoursMonth !== null ? b.freedHoursMonth * r : null;
+    const gross = b.grossBenefitMonth !== null ? b.grossBenefitMonth * r : null;
+    const net = gross !== null && b.recurringCostPerMonth !== null ? gross - b.recurringCostPerMonth : null;
+    const inv = b.investment !== null ? b.investment * (investmentPct / 100) : null;
+    let payback: number | null = null;
+    let roi: number | null = null;
+    let reason: string | undefined;
+    if (inv === null) reason = b.reasons.payback ?? 'Informe o investimento inicial (pode ser 0).';
+    else if (net === null) reason = b.reasons.net ?? 'Informe custo-hora, volume e custo recorrente.';
+    else if (net <= 0) reason = 'Benefício líquido não é positivo neste caso: sem payback.';
+    else {
+      payback = inv / net;
+      roi = inv > 0 ? ((net * b.horizonMonths - inv) / inv) * 100 : null;
+      if (inv === 0) reason = 'Investimento zero: ROI não se aplica.';
+    }
+    return { key, realizationPct, investmentPct, freedHoursMonth: freed, grossBenefitMonth: gross, netBenefitMonth: net, investment: inv, paybackMonths: payback, roiPct: roi, reason };
+  };
+  return [mk('conservative', sens.conservative.realizationPct, sens.conservative.investmentPct), mk('base', 100, 100), mk('optimistic', sens.optimistic.realizationPct, sens.optimistic.investmentPct)];
+}
+
+// ---------------------------------------------------------------------------
+// Responsabilidades alteradas entre AS-IS e TO-BE.
+export interface ResponsibilityChange {
+  activityId: string;
+  activity: string;
+  kind: 'transferida' | 'removida' | 'nova' | 'definida';
+  from?: string;
+  to?: string;
+}
+export interface RoleLoad {
+  role: string;
+  asIsMonthH: number | null;
+  toBeMonthH: number | null;
+  diffMonthH: number | null;
+}
+
+export function responsibilityChanges(asIsP: ProcessModel, toBeP: ProcessModel): ResponsibilityChange[] {
+  const owner = (s?: string) => s?.trim() || undefined;
+  const asWork = new Map(asIsP.activities.filter(isWork).map((a) => [a.id, a]));
+  const toWork = new Map(toBeP.activities.filter(isWork).map((a) => [a.id, a]));
+  const out: ResponsibilityChange[] = [];
+  for (const [id, a] of asWork) {
+    const b = toWork.get(id);
+    if (!b) {
+      if (owner(a.owner)) out.push({ activityId: id, activity: a.name, kind: 'removida', from: owner(a.owner) });
+    } else if (owner(a.owner) !== owner(b.owner)) {
+      out.push({ activityId: id, activity: b.name, kind: owner(a.owner) ? 'transferida' : 'definida', from: owner(a.owner), to: owner(b.owner) });
+    }
+  }
+  for (const [id, b] of toWork) if (!asWork.has(id)) out.push({ activityId: id, activity: b.name, kind: 'nova', to: owner(b.owner) });
+  return out;
+}
+
+/** Esforço mensal por responsável nos dois cenários (null = não calculável). */
+export function roleLoads(asIs: Figures, toBe: Figures): RoleLoad[] {
+  const monthly = (fig: Figures) => {
+    const f = fig.metrics.monthFactor;
+    return new Map(fig.metrics.byOwner.map((g) => [g.key, g.effortPeriodH !== null && f !== null ? g.effortPeriodH * f : null]));
+  };
+  const a = monthly(asIs);
+  const b = monthly(toBe);
+  const roles = [...new Set([...a.keys(), ...b.keys()])];
+  return roles
+    .map((role) => {
+      const x = a.has(role) ? a.get(role)! : 0;
+      const y = b.has(role) ? b.get(role)! : 0;
+      return { role, asIsMonthH: x, toBeMonthH: y, diffMonthH: x !== null && y !== null ? y - x : null };
+    })
+    .sort((p, q) => Math.abs(q.diffMonthH ?? 0) - Math.abs(p.diffMonthH ?? 0));
 }

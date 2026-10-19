@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { ListPlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Badge, Button, Callout, Card, Drawer, Empty, Field, Input, Segmented, Select, Table, td, Textarea, th, useConfirm, useToast } from '../../components/ui';
 import type { ActionItem, ActionStatus, Priority } from '../../domain/types';
+import { completionIssue, relatedProblemOf } from '../../domain/plan';
 import { fmtDate, nowIso, uid } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
 
@@ -25,6 +26,11 @@ export default function PlanTab() {
       toast('bad', 'Descreva a ação.');
       return;
     }
+    const issue = completionIssue(edit);
+    if (issue) {
+      toast('bad', issue);
+      return;
+    }
     const exists = w.actions.some((a) => a.id === edit.id);
     update(
       (d) => {
@@ -35,6 +41,24 @@ export default function PlanTab() {
       { area: 'Plano de ação', message: `${exists ? 'Editada' : 'Criada'} ação: ${edit.description}` },
     );
     setEdit(null);
+  };
+
+  const setStatus = (a: ActionItem, status: ActionStatus) => {
+    if (status === 'concluida' && !a.observedResult?.trim()) {
+      // Conclusão exige registro: abre o formulário em vez de marcar direto.
+      setEdit({ ...structuredClone(a), status, completedAt: a.completedAt ?? today });
+      toast('info', 'Para concluir, registre o resultado observado.');
+      return;
+    }
+    update(
+      (d) => {
+        const x = d.actions.find((y) => y.id === a.id)!;
+        x.status = status;
+        if (status === 'concluida') x.completedAt = x.completedAt ?? today;
+        else x.completedAt = undefined;
+      },
+      { area: 'Plano de ação', message: `${a.description}: ${ACTION_STATUS[status]}` },
+    );
   };
 
   const fromChanges = () => {
@@ -108,7 +132,13 @@ export default function PlanTab() {
                     <tr key={a.id} className={clsx(overdue(a) && 'bg-bad/5')}>
                       <td className={clsx(td, 'text-ink')}>
                         {a.description}
+                        {relatedProblemOf(a, w) && <span className="block text-xs text-ink2">Problema: {relatedProblemOf(a, w)}</span>}
                         {a.origin?.kind !== 'manual' && <span className="block text-xs text-muted">origem: {a.origin?.kind === 'recommendation' ? 'recomendação' : 'mudança do TO-BE'}</span>}
+                        {a.status === 'concluida' && a.observedResult && (
+                          <span className="block text-xs text-ok">
+                            Resultado observado{a.completedAt ? ` (${fmtDate(a.completedAt)})` : ''}: {a.observedResult}
+                          </span>
+                        )}
                       </td>
                       <td className={td}>{a.owner || <Badge tone="amber">pendente</Badge>}</td>
                       <td className={td}>{a.due ? <span className={clsx(overdue(a) && 'font-semibold text-bad')}>{fmtDate(a.due)}{overdue(a) && ' · atrasada'}</span> : <Badge tone="amber">pendente</Badge>}</td>
@@ -116,7 +146,7 @@ export default function PlanTab() {
                         <Badge tone={a.priority === 'alta' ? 'bad' : a.priority === 'media' ? 'amber' : 'muted'}>{PRIO[a.priority]}</Badge>
                       </td>
                       <td className={td}>
-                        <Select aria-label={`Situação de ${a.description}`} value={a.status} onChange={(e) => update((d) => void (d.actions.find((x) => x.id === a.id)!.status = e.target.value as ActionStatus), { area: 'Plano de ação', message: `${a.description}: ${ACTION_STATUS[e.target.value as ActionStatus]}` })}>
+                        <Select aria-label={`Situação de ${a.description}`} value={a.status} onChange={(e) => setStatus(a, e.target.value as ActionStatus)}>
                           {Object.entries(ACTION_STATUS).map(([k, v]) => (
                             <option key={k} value={k}>
                               {v}
@@ -150,6 +180,7 @@ export default function PlanTab() {
                 <li key={a.id}>
                   <button type="button" onClick={() => setEdit(structuredClone(a))} className={clsx('w-full rounded-xl border p-3 text-left', overdue(a) ? 'border-bad/40' : 'border-line/15')}>
                     <p className="font-semibold text-ink">{a.description}</p>
+                    {relatedProblemOf(a, w) && <p className="mt-0.5 text-xs text-ink2">Problema: {relatedProblemOf(a, w)}</p>}
                     <div className="mt-1 flex flex-wrap gap-1 text-xs">
                       <Badge tone="accent">{ACTION_STATUS[a.status]}</Badge>
                       <Badge tone={a.priority === 'alta' ? 'bad' : 'muted'}>{PRIO[a.priority]}</Badge>
@@ -181,6 +212,9 @@ export default function PlanTab() {
         {edit && (
           <div className="space-y-3">
             <Field label="Descrição" required>{(f) => <Textarea {...f} value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} />}</Field>
+            <Field label="Problema relacionado" help="Qual problema do diagnóstico esta ação resolve.">
+              {(f) => <Textarea {...f} className="min-h-[60px]" value={edit.relatedProblem ?? relatedProblemOf(edit, w) ?? ''} onChange={(e) => setEdit({ ...edit, relatedProblem: e.target.value || undefined })} />}
+            </Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Responsável">{(f) => <Input {...f} value={edit.owner ?? ''} onChange={(e) => setEdit({ ...edit, owner: e.target.value || undefined })} />}</Field>
               <Field label="Prazo">{(f) => <Input {...f} type="date" value={edit.due ?? ''} onChange={(e) => setEdit({ ...edit, due: e.target.value || undefined })} />}</Field>
@@ -197,7 +231,7 @@ export default function PlanTab() {
               </Field>
               <Field label="Situação">
                 {(f) => (
-                  <Select {...f} value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value as ActionStatus })}>
+                  <Select {...f} value={edit.status} onChange={(e) => { const status = e.target.value as ActionStatus; setEdit({ ...edit, status, completedAt: status === 'concluida' ? edit.completedAt ?? today : undefined }); }}>
                     {Object.entries(ACTION_STATUS).map(([k, v]) => (
                       <option key={k} value={k}>
                         {v}
@@ -209,10 +243,19 @@ export default function PlanTab() {
             </div>
             <Field label="Dependências">{(f) => <Input {...f} value={edit.dependencies ?? ''} onChange={(e) => setEdit({ ...edit, dependencies: e.target.value || undefined })} />}</Field>
             <Field label="Indicador de sucesso">{(f) => <Input {...f} value={edit.successIndicator ?? ''} onChange={(e) => setEdit({ ...edit, successIndicator: e.target.value || undefined })} />}</Field>
-            <Field label="Valor esperado" help="Ex.: −80 pessoa-h/mês (estimado no TO-BE).">
+            <Field label="Resultado esperado" help="Ex.: −80 pessoa-h/mês (estimado no TO-BE).">
               {(f) => <Input {...f} value={edit.expectedValue ?? ''} onChange={(e) => setEdit({ ...edit, expectedValue: e.target.value || undefined })} />}
             </Field>
-            <Field label="Critério de conclusão">{(f) => <Input {...f} value={edit.doneCriteria ?? ''} onChange={(e) => setEdit({ ...edit, doneCriteria: e.target.value || undefined })} />}</Field>
+            <Field label="Critério de sucesso" help="Como saber, de forma verificável, que a ação funcionou.">{(f) => <Input {...f} value={edit.doneCriteria ?? ''} onChange={(e) => setEdit({ ...edit, doneCriteria: e.target.value || undefined })} />}</Field>
+            {edit.status === 'concluida' && (
+              <fieldset className="space-y-3 rounded-lg border border-ok/40 p-3" data-testid="completion-record">
+                <legend className="px-1 text-sm font-semibold text-ink">Registro de conclusão</legend>
+                <Field label="Resultado observado" required help="O que de fato mudou, com a fonte. Sem registro, a ação não pode ser concluída.">
+                  {(f) => <Textarea {...f} value={edit.observedResult ?? ''} onChange={(e) => setEdit({ ...edit, observedResult: e.target.value || undefined })} />}
+                </Field>
+                <Field label="Data de conclusão" required>{(f) => <Input {...f} type="date" value={edit.completedAt ?? ''} onChange={(e) => setEdit({ ...edit, completedAt: e.target.value || undefined })} />}</Field>
+              </fieldset>
+            )}
           </div>
         )}
       </Drawer>

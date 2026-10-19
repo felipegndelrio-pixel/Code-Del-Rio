@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { LeanBar, ParetoChart, SimpleBars, StackedLoad } from '../../components/charts';
 import { Badge, Callout, Card, Field, HowCalc, NumberInput, Select, Stat, Term } from '../../components/ui';
 import { bottlenecks, CRITERION_LABEL, dataGaps, pareto } from '../../domain/metrics';
-import { PERIOD_LABEL, type BottleneckCriterion } from '../../domain/types';
+import { LEAN_LABEL, LEAN_REASON_LABEL, MANDATORY_REASONS, PERIOD_LABEL, type BottleneckCriterion, type LeanClass, type LeanReason } from '../../domain/types';
 import { fmtBRL, fmtHours, fmtNum, fmtPct, nowIso } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
 
@@ -162,6 +162,8 @@ export default function DiagnosisTab() {
         </Card>
       </div>
 
+      <LeanReview />
+
       <Card title="Quem carrega o processo?" subtitle="Esforço por responsável">
         {ownerEffort.length ? (
           <SimpleBars title="Pessoa-hora por execução, por responsável" data={ownerEffort} unit="pessoa-h/execução" note="Esforço ponderado pela frequência. Volume e custo por responsável aparecem quando há volume e custo-hora." />
@@ -188,5 +190,79 @@ export default function DiagnosisTab() {
         </Card>
       )}
     </div>
+  );
+}
+
+/** Revisão da classificação Lean: separa desperdício de atividades exigidas. */
+function LeanReview() {
+  const { w, update } = useWorkspace();
+  const tasks = w.asIs.activities.filter((a) => a.type === 'task');
+  if (!tasks.length) return null;
+  const groups: { key: string; title: string; hint: string; items: typeof tasks }[] = [
+    { key: 'W', title: 'Desperdício', hint: 'Candidatas a eliminar ou reduzir — confirme com quem executa.', items: tasks.filter((a) => a.lean === 'W') },
+    { key: 'req', title: 'Necessárias por exigência', hint: 'Regulatório, controle ou segurança: simplificar ou automatizar, nunca eliminar sem validação.', items: tasks.filter((a) => a.lean === 'NNVA' && a.leanReason && MANDATORY_REASONS.includes(a.leanReason)) },
+    { key: 'nnva', title: 'Necessárias — motivo a confirmar', hint: 'Informe por que são necessárias para separar exigência de hábito.', items: tasks.filter((a) => a.lean === 'NNVA' && !(a.leanReason && MANDATORY_REASONS.includes(a.leanReason))) },
+    { key: 'U', title: 'Não classificadas', hint: 'Sem classificação, a atividade não entra na análise Lean.', items: tasks.filter((a) => !a.lean) },
+  ];
+  const setLean = (id: string, lean: LeanClass | undefined) =>
+    update(
+      (d) => {
+        const a = d.asIs.activities.find((x) => x.id === id)!;
+        a.lean = lean;
+        if (lean !== 'NNVA') {
+          a.leanReason = undefined;
+          a.leanReasonNote = undefined;
+        }
+      },
+      { area: 'Diagnóstico', message: `Classificação Lean revisada: ${tasks.find((a) => a.id === id)?.name} → ${LEAN_LABEL[lean ?? 'U']}` },
+    );
+  const setReason = (id: string, r: LeanReason | undefined) =>
+    update((d) => void (d.asIs.activities.find((x) => x.id === id)!.leanReason = r), { area: 'Diagnóstico', message: `Motivo da necessidade: ${tasks.find((a) => a.id === id)?.name} → ${r ? LEAN_REASON_LABEL[r] : 'não informado'}` });
+  return (
+    <Card title="Revisão da classificação Lean" subtitle="Exigência não é desperdício">
+      <p className="mb-3 max-w-3xl text-sm text-ink2">
+        Confira a classificação com quem executa o processo. Atividades exigidas por lei, controle interno ou segurança são <strong>necessárias</strong>: o objetivo é simplificá-las, não eliminá-las.
+      </p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {groups
+          .filter((g) => g.items.length)
+          .map((g) => (
+            <section key={g.key} aria-label={g.title} className="rounded-lg border border-line/15 p-3">
+              <h4 className="text-sm font-semibold text-ink">
+                {g.title} <span className="font-normal text-muted">({g.items.length})</span>
+              </h4>
+              <p className="mb-2 text-xs text-muted">{g.hint}</p>
+              <ul className="divide-y divide-line/10">
+                {g.items.map((a) => (
+                  <li key={a.id} className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center">
+                    <span className="min-w-0 flex-1 text-sm text-ink">
+                      {a.name}
+                      <span className="block text-xs text-muted">{a.stage}{a.owner ? ` · ${a.owner}` : ''}</span>
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      <Select aria-label={`Classificação Lean de ${a.name}`} className="sm:!w-auto" value={a.lean ?? ''} onChange={(e) => setLean(a.id, (e.target.value || undefined) as LeanClass | undefined)}>
+                        <option value="">Não classificada</option>
+                        <option value="VA">Agrega valor</option>
+                        <option value="NNVA">Necessária</option>
+                        <option value="W">Desperdício</option>
+                      </Select>
+                      {a.lean === 'NNVA' && (
+                        <Select aria-label={`Motivo de ${a.name} ser necessária`} className="sm:!w-auto" value={a.leanReason ?? ''} onChange={(e) => setReason(a.id, (e.target.value || undefined) as LeanReason | undefined)}>
+                          <option value="">Motivo: não sei</option>
+                          {Object.entries(LEAN_REASON_LABEL).map(([k, v]) => (
+                            <option key={k} value={k}>
+                              {v}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+      </div>
+    </Card>
   );
 }

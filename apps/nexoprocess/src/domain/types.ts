@@ -6,6 +6,8 @@ export type ElementType = 'start' | 'task' | 'decision' | 'end';
 /** VA = agrega valor · NNVA = necessário sem agregar valor · W = desperdício */
 export type LeanClass = 'VA' | 'NNVA' | 'W';
 export type Period = 'dia' | 'semana' | 'mes' | 'ano';
+/** Por que uma atividade “necessária” (NNVA) não pode simplesmente ser eliminada. */
+export type LeanReason = 'regulatorio' | 'controle' | 'seguranca' | 'restricao' | 'outro';
 
 export interface Activity {
   id: string;
@@ -30,6 +32,9 @@ export interface Activity {
   nextYes?: string;
   nextNo?: string;
   lean?: LeanClass;
+  /** Motivo de uma atividade NNVA ser exigida (só faz sentido com lean = 'NNVA'). */
+  leanReason?: LeanReason;
+  leanReasonNote?: string;
   /** Atividade marcada como retrabalho (refazer algo). */
   rework?: boolean;
   /** % das execuções que passam por esta atividade (0–100). Ausente = não informado. */
@@ -117,7 +122,20 @@ export interface Scenario {
   assumptions: Assumption[];
   dependencies?: string;
   risks?: string;
+  /** Premissas editáveis dos casos conservador e otimista (o caso base é 100%/100%). */
+  sensitivity?: Sensitivity;
   approvedTarget?: { description: string; value?: number; unit?: string; approvedBy?: string; approvedAt?: string };
+}
+
+export interface SensitivityCase {
+  /** % do ganho estimado (horas e custo) que se espera realizar. */
+  realizationPct: number;
+  /** % do investimento estimado que se espera gastar. */
+  investmentPct: number;
+}
+export interface Sensitivity {
+  conservative: SensitivityCase;
+  optimistic: SensitivityCase;
 }
 
 export type ActionStatus = 'a_fazer' | 'em_andamento' | 'bloqueada' | 'concluida' | 'cancelada';
@@ -133,6 +151,11 @@ export interface ActionItem {
   successIndicator?: string;
   expectedValue?: string;
   doneCriteria?: string;
+  /** Problema que a ação resolve (texto do diagnóstico/recomendação). */
+  relatedProblem?: string;
+  /** Registro de conclusão: obrigatório para marcar como concluída. */
+  observedResult?: string;
+  completedAt?: string;
   origin?: { kind: 'recommendation' | 'change' | 'manual'; ref?: string };
   createdAt: string;
 }
@@ -238,6 +261,16 @@ export const LEAN_LABEL: Record<LeanClass | 'U', string> = {
   W: 'Desperdício',
   U: 'Não classificado',
 };
+
+export const LEAN_REASON_LABEL: Record<LeanReason, string> = {
+  regulatorio: 'Exigência legal ou regulatória',
+  controle: 'Controle interno ou auditoria',
+  seguranca: 'Segurança (pessoas, dados ou produto)',
+  restricao: 'Restrição técnica ou contratual',
+  outro: 'Outro motivo',
+};
+/** Motivos que tornam a atividade obrigatória: não pode ser eliminada, apenas simplificada. */
+export const MANDATORY_REASONS: LeanReason[] = ['regulatorio', 'controle', 'seguranca'];
 
 export const TYPE_LABEL: Record<ElementType, string> = {
   start: 'Início',

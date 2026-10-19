@@ -1,7 +1,7 @@
 // Formulário de atividade com modo básico e campos avançados sob demanda.
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { Activity, DurationUnit, ElementType, LeanClass } from '../domain/types';
+import { LEAN_REASON_LABEL, type Activity, type DurationUnit, type ElementType, type LeanClass, type LeanReason } from '../domain/types';
 import { Field, Input, NumberInput, Select, Term, Textarea } from './ui';
 
 export function ActivityForm({ value, onChange, all, stages, errors = {} }: { value: Activity; onChange: (a: Activity) => void; all: Activity[]; stages: string[]; errors?: Record<string, string> }) {
@@ -76,7 +76,14 @@ export function ActivityForm({ value, onChange, all, stages, errors = {} }: { va
             </Field>
             <Field label={<>Classificação Lean <Term k="lean" iconOnly /></>} className="sm:col-span-2">
               {(p) => (
-                <Select {...p} value={value.lean ?? ''} onChange={(e) => set({ lean: (e.target.value || undefined) as LeanClass | undefined })}>
+                <Select
+                  {...p}
+                  value={value.lean ?? ''}
+                  onChange={(e) => {
+                    const lean = (e.target.value || undefined) as LeanClass | undefined;
+                    set(lean === 'NNVA' ? { lean } : { lean, leanReason: undefined, leanReasonNote: undefined });
+                  }}
+                >
                   <option value="">Não classificado</option>
                   <option value="VA">Agrega valor — o cliente pagaria por isso</option>
                   <option value="NNVA">Necessário, mas não agrega valor</option>
@@ -84,6 +91,25 @@ export function ActivityForm({ value, onChange, all, stages, errors = {} }: { va
                 </Select>
               )}
             </Field>
+            {value.lean === 'NNVA' && (
+              <>
+                <Field label="Por que é necessária?" help="Exigências legais, de controle ou de segurança não são desperdício: podem ser simplificadas, não eliminadas.">
+                  {(p) => (
+                    <Select {...p} value={value.leanReason ?? ''} onChange={(e) => set({ leanReason: (e.target.value || undefined) as LeanReason | undefined })}>
+                      <option value="">Ainda não sei</option>
+                      {Object.entries(LEAN_REASON_LABEL).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+                <Field label="Referência (opcional)" help="Ex.: norma, política interna, cláusula contratual.">
+                  {(p) => <Input {...p} value={value.leanReasonNote ?? ''} onChange={(e) => set({ leanReasonNote: e.target.value || undefined })} />}
+                </Field>
+              </>
+            )}
           </>
         )}
       </div>

@@ -5,7 +5,8 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import { BRAND } from '../../config/brand';
 import { buildBpmn } from '../../bpmn/model';
 import { Badge, BasisTag, Button, Field, Select } from '../../components/ui';
-import { compareScenarios } from '../../domain/compare';
+import { businessCases, CASE_LABEL, compareScenarios, responsibilityChanges } from '../../domain/compare';
+import { relatedProblemOf } from '../../domain/plan';
 import { bottlenecks, CRITERION_LABEL, dataGaps } from '../../domain/metrics';
 import { GROUP_LABEL } from '../../domain/recommendations';
 import { CHANGE_LABEL } from '../../domain/tobe';
@@ -280,6 +281,28 @@ export default function ReportPage() {
                 {sc.approvedTarget && <Row k="Meta aprovada" v={`${sc.approvedTarget.description}${sc.approvedTarget.value !== undefined ? `: ${fmtNum(sc.approvedTarget.value)} ${sc.approvedTarget.unit ?? ''}` : ''} (por ${sc.approvedTarget.approvedBy ?? '—'}, ${fmtDate(sc.approvedTarget.approvedAt)})`} />}
               </tbody>
             </table>
+            <table className={`${tbl} mt-2`}>
+              <thead>
+                <tr>
+                  <th className={h}>Caso</th>
+                  <th className={h}>Premissas</th>
+                  <th className={h}>Benefício líquido</th>
+                  <th className={h}>Payback</th>
+                </tr>
+              </thead>
+              <tbody>
+                {businessCases(cmp.business, sc.sensitivity).map((x) => (
+                  <tr key={x.key}>
+                    <td className={c}>{CASE_LABEL[x.key]}</td>
+                    <td className={c}>
+                      realização {fmtNum(x.realizationPct)}% · investimento {fmtNum(x.investmentPct)}%
+                    </td>
+                    <td className={c}>{x.netBenefitMonth === null ? '—' : `${fmtBRL(x.netBenefitMonth)}/mês`}</td>
+                    <td className={c}>{x.paybackMonths === null ? 'sem payback' : x.paybackMonths === 0 ? 'imediato' : `${fmtNum(x.paybackMonths, 1)} meses`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             <p className="mt-1 text-[12px] text-ink2">Fórmulas: benefício bruto = custo comparável AS-IS − TO-BE; líquido = bruto − custo recorrente; payback = investimento ÷ líquido mensal; ROI = (líquido × horizonte − investimento) ÷ investimento.</p>
           </Section>
           <Section n={9} title="Premissas, riscos e pontos a validar">
@@ -287,6 +310,12 @@ export default function ReportPage() {
               {sc.assumptions.map((a) => (
                 <li key={a.id}>
                   {a.text} — <em>{a.status === 'a_validar' ? 'a validar' : a.status}</em>
+                </li>
+              ))}
+              {responsibilityChanges(w.asIs, sc.process).map((r) => (
+                <li key={r.activityId + r.kind}>
+                  Responsabilidade ({r.kind}): {r.activity}
+                  {r.from || r.to ? ` — ${r.from ?? '—'} → ${r.to ?? '—'}` : ''}
                 </li>
               ))}
               {sc.dependencies && <li>Dependências: {sc.dependencies}</li>}
@@ -317,7 +346,11 @@ export default function ReportPage() {
             <tbody>
               {w.actions.map((a) => (
                 <tr key={a.id}>
-                  <td className={c}>{a.description}</td>
+                  <td className={c}>
+                    {a.description}
+                    {relatedProblemOf(a, w) && <span className="block text-[12px] text-ink2">Problema: {relatedProblemOf(a, w)}</span>}
+                    {a.status === 'concluida' && a.observedResult && <span className="block text-[12px]">Resultado observado: {a.observedResult}</span>}
+                  </td>
                   <td className={c}>{a.owner ?? 'pendente'}</td>
                   <td className={c}>{a.due ? fmtDate(a.due) : 'pendente'}</td>
                   <td className={c}>{ACTION_STATUS[a.status]}</td>

@@ -2,7 +2,7 @@
 // explícitas sobre os dados. Não há IA generativa aqui; a interface rotula
 // como "análise automática baseada nos dados e regras".
 import { bottlenecks, computeMetrics, type ProcessMetrics } from './metrics';
-import type { Activity, BottleneckCriterion, ProcessModel } from './types';
+import { LEAN_REASON_LABEL, MANDATORY_REASONS, type Activity, type BottleneckCriterion, type ProcessModel } from './types';
 import { fmtHours, fmtNum, fmtPct, isNum } from './units';
 
 export type RecGroup = 'resolver' | 'investigar' | 'automatizar' | 'monitorar';
@@ -38,14 +38,24 @@ export interface Recommendation {
   risks: string;
   dataNeeded?: string;
   nextStep: string;
+  /** Impacto esperado (teto teórico ou motivo de não ser quantificável). */
+  impact: string;
+  /** O que precisa existir antes da intervenção. */
+  dependencies: string[];
+  /** Dados que faltam para decidir com segurança. */
+  missingInfo: string[];
+  /** Alerta quando a atividade é exigida (regulatório, controle, segurança). */
+  caution?: string;
   /** Tipo de mudança sugerida no TO-BE. */
   changeKind?: 'remove' | 'simplify' | 'automate' | 'reduce_wait' | 'reduce_rework';
 }
 
 const P = (s: number): Recommendation['priority'] => (s >= 70 ? 'alta' : s >= 40 ? 'media' : 'baixa');
 
+type RawRec = Omit<Recommendation, 'impact' | 'dependencies' | 'missingInfo' | 'caution'>;
+
 export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'duration', thresholdPct = 15, m: ProcessMetrics = computeMetrics(p)): Recommendation[] {
-  const recs: Recommendation[] = [];
+  const recs: RawRec[] = [];
   const work = m.workItems;
   const totalActive = m.activeSumH.value ?? 0;
   const per = (a: Activity) => m.per.get(a.id)!;
@@ -293,7 +303,48 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       nextStep: 'Cadastrar o risco e a mitigação.',
     });
   }
-  return recs.sort((a, b) => b.score - a.score);
+  return recs.map((r) => enrich(r, p, m)).sort((a, b) => b.score - a.score);
+}
+
+const DEPS: Record<NonNullable<Recommendation['changeKind']>, string> = {
+  remove: 'Acordo do dono do processo e de quem usa o resultado da atividade.',
+  simplify: 'Padrão de trabalho revisado e comunicado a quem executa.',
+  automate: 'Acesso aos sistemas e dados de entrada estruturados; apoio de TI ou de quem mantém a ferramenta.',
+  reduce_wait: 'Acordo com a área que gera a fila (prazo de atendimento ou capacidade).',
+  reduce_rework: 'Registro das causas do retrabalho em uma amostra de casos.',
+};
+
+/** Completa a recomendação com impacto, dependências, dados ausentes e alertas — só a partir dos dados. */
+function enrich(r: RawRec, p: ProcessModel, m: ProcessMetrics): Recommendation {
+  const a = r.activityId ? p.activities.find((x) => x.id === r.activityId) : undefined;
+  const x = a ? m.per.get(a.id) : undefined;
+  const dependencies: string[] = [];
+  if (r.changeKind) dependencies.push(DEPS[r.changeKind]);
+  if (a && !a.owner?.trim()) dependencies.push('Definir o responsável pela atividade.');
+  if (r.group === 'investigar' || r.group === 'monitorar') dependencies.push('Tempo da equipe para levantar os fatos antes de mudar o processo.');
+  const missingInfo: string[] = [];
+  if (r.dataNeeded) missingInfo.push(r.dataNeeded);
+  if (a && x) {
+    if (x.activeH === null) missingInfo.push('Duração da atividade.');
+    if (x.effortH === null && x.activeH !== null) missingInfo.push('Pessoas envolvidas.');
+    if (x.execPerPeriod === null) missingInfo.push('Volume de execuções do processo.');
+    if (x.costPerHour === null) missingInfo.push('Custo-hora de quem executa (para estimar valor em R$).');
+    if (a.rework && !isNum(a.frequencyPct)) missingInfo.push('Frequência do retrabalho (%).');
+  }
+  let caution: string | undefined;
+  if (a?.lean === 'NNVA' && a.leanReason && MANDATORY_REASONS.includes(a.leanReason)) {
+    caution = `Atividade exigida (${LEAN_REASON_LABEL[a.leanReason].toLowerCase()}${a.leanReasonNote ? `: ${a.leanReasonNote}` : ''}). Não elimine: simplifique ou automatize preservando o requisito, com validação de quem responde por ele.`;
+    dependencies.push('Validação da área responsável pelo requisito (jurídico, compliance, qualidade ou segurança).');
+  } else if (a?.lean === 'NNVA' && !a.leanReason) {
+    missingInfo.push('Motivo de a atividade ser necessária (regulatório, controle, segurança…).');
+  }
+  return {
+    ...r,
+    impact: r.ceiling ?? (r.activityId ? 'Não quantificável com os dados atuais.' : 'Melhora a qualidade da análise; sem ganho direto estimado.'),
+    dependencies: [...new Set(dependencies)],
+    missingInfo: [...new Set(missingInfo)],
+    caution,
+  };
 }
 
 function criterionLabel(c: BottleneckCriterion) {

@@ -26,7 +26,7 @@ export interface ChangeMeta {
   author?: string;
 }
 
-const FIELDS_TRACKED: (keyof Activity)[] = ['name', 'duration', 'unit', 'wait', 'people', 'owner', 'lean', 'rework', 'frequencyPct', 'costPerHour', 'variableCost', 'minDuration', 'maxDuration', 'order', 'stage', 'next', 'nextYes', 'nextNo', 'critical', 'volume', 'notes'];
+const FIELDS_TRACKED: (keyof Activity)[] = ['name', 'duration', 'unit', 'wait', 'people', 'owner', 'lean', 'leanReason', 'rework', 'frequencyPct', 'costPerHour', 'variableCost', 'minDuration', 'maxDuration', 'order', 'stage', 'next', 'nextYes', 'nextNo', 'critical', 'volume', 'notes'];
 
 export function diffActivity(before: Activity, after: Activity): { before: Partial<Activity>; after: Partial<Activity> } {
   const b: Partial<Activity> = {};

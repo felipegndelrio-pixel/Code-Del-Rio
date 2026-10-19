@@ -46,6 +46,9 @@ export default function RecsTab() {
           priority: r.priority,
           status: 'a_fazer',
           successIndicator: r.successIndicator,
+          dependencies: r.dependencies.join(' ') || undefined,
+          relatedProblem: `${r.title} — ${r.problem}`,
+          expectedValue: r.ceiling,
           origin: { kind: 'recommendation', ref: r.id },
           createdAt: nowIso(),
         });
@@ -121,11 +124,14 @@ export default function RecsTab() {
                         <span className="text-ink2">{r.hypothesis}</span>
                       </p>
                       <p>
-                        <span className="font-semibold text-ink">Ação sugerida:</span> <span className="text-ink2">{dec?.editedAction ?? r.action}</span>
+                        <span className="font-semibold text-ink">Intervenção sugerida:</span> <span className="text-ink2">{dec?.editedAction ?? r.action}</span>
                       </p>
-                      {r.ceiling && (
-                        <p className="text-xs text-ink2">
-                          <strong>Benefício possível:</strong> {r.ceiling}
+                      <p className="text-xs text-ink2">
+                        <strong>Impacto:</strong> {r.impact}
+                      </p>
+                      {r.caution && (
+                        <p className="rounded-md border border-amber/40 bg-amber/5 p-2 text-xs text-ink2" role="note">
+                          <strong className="text-amber">Atenção:</strong> {r.caution}
                         </p>
                       )}
                       <p className="text-xs text-ink2">
@@ -137,10 +143,29 @@ export default function RecsTab() {
                           </>
                         )}
                       </p>
+                      {r.dependencies.length > 0 && (
+                        <div className="text-xs text-ink2">
+                          <strong>Dependências:</strong>
+                          <ul className="ml-4 list-disc">
+                            {r.dependencies.map((d) => (
+                              <li key={d}>{d}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       <p className="text-xs text-ink2">
                         <strong>Riscos/efeitos colaterais:</strong> {r.risks}
                       </p>
-                      {r.dataNeeded && <p className="text-xs text-amber">{r.dataNeeded}</p>}
+                      {r.missingInfo.length > 0 && (
+                        <div className="text-xs text-ink2">
+                          <strong className="text-amber">Informações ausentes:</strong>
+                          <ul className="ml-4 list-disc">
+                            {r.missingInfo.map((d) => (
+                              <li key={d}>{d}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       <p className="text-xs text-ink2">
                         <strong>Próximo passo:</strong> {r.nextStep}
                       </p>

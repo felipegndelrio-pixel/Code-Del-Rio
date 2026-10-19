@@ -159,7 +159,7 @@ describe('cenário ilustrativo do exemplo', () => {
     const asIs = demoProcess();
     const snapshot = JSON.stringify(asIs);
     const sc = demoScenario(asIs);
-    expect(sc.changes.map((c) => c.kind)).toEqual(['reduce_wait', 'automate', 'reduce_rework']);
+    expect(sc.changes.map((c) => c.kind)).toEqual(['reduce_wait', 'automate', 'reduce_rework', 'edit']);
     const c = compareScenarios(asIs, sc);
     expect(c.business.freedHoursMonth!).toBeGreaterThan(0);
     expect(c.business.netBenefitMonth!).toBeGreaterThan(0);

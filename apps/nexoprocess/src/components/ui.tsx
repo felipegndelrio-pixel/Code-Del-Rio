@@ -98,8 +98,8 @@ export function BasisTag({ basis }: { basis: Basis }) {
 export function Stat({ label, value, sub, basis, missing, term, tone }: { label: ReactNode; value: ReactNode; sub?: ReactNode; basis?: Basis; missing?: string; term?: GlossaryKey; tone?: 'bad' | 'ok' | 'amber' }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-line/15 bg-surface2/60 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium text-ink2">
+      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+        <span className="min-w-0 text-xs font-medium text-ink2">
           {label}
           {term && <Term k={term} iconOnly />}
         </span>
@@ -108,7 +108,7 @@ export function Stat({ label, value, sub, basis, missing, term, tone }: { label:
       {missing ? (
         <p className="text-sm text-muted">{missing}</p>
       ) : (
-        <p className={clsx('text-2xl font-bold tracking-tight', tone === 'bad' ? 'text-bad' : tone === 'ok' ? 'text-ok' : tone === 'amber' ? 'text-amber' : 'text-ink')}>{value}</p>
+        <p className={clsx('break-words text-xl font-bold tracking-tight sm:text-2xl', tone === 'bad' ? 'text-bad' : tone === 'ok' ? 'text-ok' : tone === 'amber' ? 'text-amber' : 'text-ink')}>{value}</p>
       )}
       {sub && !missing && <p className="text-xs text-muted">{sub}</p>}
     </div>
