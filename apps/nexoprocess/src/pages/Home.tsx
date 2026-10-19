@@ -60,7 +60,7 @@ export default function Home() {
 
   const backup = async () => {
     const b = await exportBackup();
-    download(`nexoprocess-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(b, null, 2), 'application/json');
+    await download(`nexoprocess-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(b, null, 2), 'application/json');
     toast('ok', `Backup com ${b.workspaces.length} projeto(s) baixado.`);
   };
 

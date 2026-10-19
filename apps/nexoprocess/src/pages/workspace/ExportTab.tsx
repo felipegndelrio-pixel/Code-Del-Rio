@@ -43,17 +43,17 @@ export default function ExportTab() {
         if (fmt === 'svg') zip.file(`${name}.svg`, s.svg);
         else zip.file(`${name}.png`, await svgToPng(s.svg, '#ffffff'));
       }
-      download(`${base}-mapas-${fmt}.zip`, await zip.generateAsync({ type: 'uint8array' }) as Uint8Array<ArrayBuffer>, 'application/zip');
+      await download(`${base}-mapas-${fmt}.zip`, await zip.generateAsync({ type: 'uint8array' }) as Uint8Array<ArrayBuffer>, 'application/zip');
     });
   const xlsx = () =>
     run('xlsx', async () => {
       const { buildWorkbook } = await import('../../io/workbook');
-      download(`${base}.xlsx`, await buildWorkbook({ process: proc, includeExample: false }), XLSX_MIME);
+      await download(`${base}.xlsx`, await buildWorkbook({ process: proc, includeExample: false }), XLSX_MIME);
     });
   const csv = () =>
     run('csv', async () => {
       const { processToCsv } = await import('../../io/workbook');
-      download(`${base}.csv`, processToCsv(proc), 'text/csv;charset=utf-8');
+      await download(`${base}.csv`, processToCsv(proc), 'text/csv;charset=utf-8');
     });
   const json = () => run('json', () => download(`${slug(w.asIs.name)}-backup.json`, JSON.stringify({ format: 'nexoprocess-backup', version: 1, exportedAt: new Date().toISOString(), workspaces: [w] }, null, 2), 'application/json'));
 
