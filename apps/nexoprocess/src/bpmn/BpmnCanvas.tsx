@@ -93,9 +93,7 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
     const canvas = v.get('canvas');
     const target = stage ? canvas.findRoot(`${build.stageToSub.get(stage)}_plane`) : macroRoot.current;
     if (target && canvas.getRootElement() !== target) canvas.setRootElement(target);
-    canvas.zoom('fit-viewport', 'auto');
-    const vb = canvas.viewbox();
-    if (vb.scale > 1.1) canvas.zoom(1.1, 'auto');
+    fitReadable(canvas, host.current!);
   }, [stage, ready, build]);
 
   // Marcadores e selos.
@@ -195,6 +193,7 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
     if (!canvas) return;
     if (f === 'fit') canvas.zoom('fit-viewport', 'auto');
     else canvas.zoom(Math.min(3, Math.max(0.2, canvas.zoom() * f)));
+    host.current!.dataset.zoom = String(canvas.zoom());
   };
 
   return (
@@ -217,7 +216,8 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
           <Maximize2 className="h-4 w-4" />
         </CtrlBtn>
       </div>
-      <div ref={host} className="np-canvas w-full" style={{ height }} role="img" aria-label={stage ? `Mapa detalhado da etapa ${stage}` : 'Mapa macro do processo'} data-testid="bpmn-canvas" />
+      <div ref={host} className="np-canvas w-full" style={{ height }} role="region" aria-label={stage ? `Mapa detalhado da etapa ${stage}` : 'Mapa macro do processo'} data-testid="bpmn-canvas" />
+      <p className="no-print border-t border-line/10 px-3 py-1.5 text-xs text-muted">Arraste para mover · roda do mouse, pinça ou + / − para zoom · “Ajustar à tela” mostra tudo.</p>
       {!ready && !error && <p className="absolute inset-0 flex items-center justify-center text-sm text-muted">Desenhando o mapa…</p>}
       {error && (
         <p role="alert" className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-bad">
@@ -227,6 +227,24 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
     </div>
   );
 });
+
+/**
+ * Enquadra o diagrama sem deixá-lo ilegível: se "ajustar à tela" exigir zoom
+ * menor que 60% (telas pequenas), usa 60% ancorado no início (esquerda) e o
+ * usuário navega com arrastar/pinça. Nunca amplia além de 110%.
+ */
+function fitReadable(canvas: any, el: HTMLElement) {
+  const MIN = 0.6;
+  canvas.zoom('fit-viewport', 'auto');
+  const vb = canvas.viewbox();
+  if (vb.scale > 1.1) canvas.zoom(1.1, 'auto');
+  else if (vb.scale < MIN) {
+    const w = el.clientWidth / MIN;
+    const h = el.clientHeight / MIN;
+    canvas.viewbox({ x: vb.inner.x - 16, y: vb.inner.y + vb.inner.height / 2 - h / 2, width: w, height: h });
+  }
+  el.dataset.zoom = String(canvas.zoom());
+}
 
 function CtrlBtn({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
   return (

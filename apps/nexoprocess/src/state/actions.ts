@@ -1,4 +1,4 @@
-import { demoProcess } from '../domain/demo';
+import { demoProcess, demoScenario } from '../domain/demo';
 import { newWorkspace } from '../domain/factory';
 import type { ProcessModel, Workspace } from '../domain/types';
 import { db } from '../storage/db';
@@ -10,6 +10,9 @@ export async function openDemo(reset = false): Promise<Workspace> {
   if (existing && !reset) return existing;
   if (existing) await db.deleteWorkspace(existing.id);
   const w = newWorkspace(demoProcess(), { kind: 'demo' }, true);
+  const sc = demoScenario(w.asIs);
+  w.scenarios = [sc];
+  w.activeScenarioId = sc.id;
   await db.putWorkspace(w);
   return w;
 }

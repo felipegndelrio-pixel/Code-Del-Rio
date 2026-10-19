@@ -151,3 +151,19 @@ describe('jornada', () => {
     expect(j.steps.find((s) => s.key === 'plano')!.state).toBe('bloqueado');
   });
 });
+
+describe('cenário ilustrativo do exemplo', () => {
+  it('gera benefício estimado positivo, registra mudanças e não altera o AS-IS', async () => {
+    const { demoScenario } = await import('./demo');
+    const { compareScenarios } = await import('./compare');
+    const asIs = demoProcess();
+    const snapshot = JSON.stringify(asIs);
+    const sc = demoScenario(asIs);
+    expect(sc.changes.map((c) => c.kind)).toEqual(['reduce_wait', 'automate', 'reduce_rework']);
+    const c = compareScenarios(asIs, sc);
+    expect(c.business.freedHoursMonth!).toBeGreaterThan(0);
+    expect(c.business.netBenefitMonth!).toBeGreaterThan(0);
+    expect(c.business.paybackMonths!).toBeGreaterThan(0);
+    expect(JSON.stringify(asIs)).toBe(snapshot);
+  });
+});

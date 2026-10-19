@@ -43,8 +43,11 @@ export async function readWorkspaces(page: Page): Promise<any[]> {
 }
 
 export async function expectNoHorizontalScroll(page: Page) {
-  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(over, 'rolagem horizontal da página').toBeLessThanOrEqual(1);
+  const vp = page.viewportSize()!;
+  const m = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
+  // innerWidth > largura do aparelho = o navegador móvel "afastou" a página por conteúdo largo demais.
+  expect(m.iw, 'página reduzida por conteúdo mais largo que a tela').toBeLessThanOrEqual(vp.width + 1);
+  expect(m.sw - m.iw, 'rolagem horizontal da página').toBeLessThanOrEqual(1);
 }
 
 export async function waitSaved(page: Page) {

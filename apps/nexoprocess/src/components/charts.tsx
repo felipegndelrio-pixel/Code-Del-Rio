@@ -114,7 +114,7 @@ export function LeanBar({ hours, pct }: { hours: Record<LeanClass | 'U', number>
       <div className="flex h-9 w-full overflow-hidden rounded-lg" role="img" aria-label={keys.map((k) => `${LEAN_LABEL[k]} ${fmtPct(pct[k])}`).join(', ')}>
         {keys.map((k) =>
           pct[k] ? (
-            <div key={k} className="flex items-center justify-center text-xs font-bold text-white" style={{ width: `${pct[k]}%`, background: c.lean[k], borderRight: `2px solid ${c.surface}` }}>
+            <div key={k} className="flex items-center justify-center text-xs font-bold" style={{ width: `${pct[k]}%`, background: c.lean[k], color: k === 'W' ? '#ffffff' : '#0b1220', borderRight: `2px solid ${c.surface}` }}>
               {pct[k]! >= 8 ? fmtPct(pct[k]) : ''}
             </div>
           ) : null,

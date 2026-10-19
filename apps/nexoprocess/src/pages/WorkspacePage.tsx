@@ -123,7 +123,7 @@ function Shell() {
       </div>
 
       <nav aria-label="Jornada do processo" className="no-print">
-        <ol className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1 pb-2">
+        <ol className="no-scrollbar relative -mx-1 flex gap-1 overflow-x-auto px-1 pb-2">
           {j.steps.map((s) => {
             const to = s.key === 'iniciar' ? '/app' : `${base}/${STEP_PATH[s.key]}`;
             const isActive = STEP_PATH[s.key] === active && s.key !== 'iniciar';

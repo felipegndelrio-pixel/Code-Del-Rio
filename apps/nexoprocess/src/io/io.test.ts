@@ -84,6 +84,9 @@ describe('modelo XLSX protegido', () => {
     expect(sheets[idx].name).toBe('Atividades');
     const r = rowsToProcess(sheets[idx], autoMap(sheets[idx].headers).mapping, { defaultUnit: 'min' }, findSheet(sheets, 'Processo'), findSheet(sheets, 'Custos por função'));
     expect(r.ok).toBe(true);
+    // Linhas vazias do modelo (com fórmulas) não geram alertas nem viram atividades.
+    expect(r.issues).toEqual([]);
+    expect(r.process.activities).toHaveLength(p.activities.length);
     expect(r.process.name).toBe(p.name);
     expect(r.process.volume).toBe(1200);
     expect(r.process.costPerHourByRole).toEqual(p.costPerHourByRole);

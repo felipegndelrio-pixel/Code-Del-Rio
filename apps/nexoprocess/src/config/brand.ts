@@ -13,7 +13,7 @@ export const BRAND = {
 // CTA comercial configurável. Deixe `url` vazio para ocultar o botão.
 // Não inclua preços, depoimentos ou números sem comprovação.
 export const COMMERCIAL = {
-  primaryCta: 'Começar agora — é grátis no navegador',
+  primaryCta: 'Começar agora',
   secondaryCta: { label: 'Fale com a gente', url: '' as string },
   contactEmail: '' as string,
 } as const;

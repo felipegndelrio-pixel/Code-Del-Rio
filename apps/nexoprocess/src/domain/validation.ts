@@ -157,13 +157,21 @@ export function validateProcess(p: ProcessModel): Issue[] {
     const q = [to];
     while (q.length) {
       const id = q.shift()!;
-      for (const x of g.out.get(id)!) if (!x.back && !fwd.has(x.to)) (fwd.add(x.to), q.push(x.to));
+      for (const x of g.out.get(id)!)
+        if (!x.back && !fwd.has(x.to)) {
+          fwd.add(x.to);
+          q.push(x.to);
+        }
     }
     const rev = new Set<string>([from]);
     const r = [from];
     while (r.length) {
       const id = r.shift()!;
-      for (const x of g.inc.get(id)!) if (!x.back && !rev.has(x.from)) (rev.add(x.from), r.push(x.from));
+      for (const x of g.inc.get(id)!)
+        if (!x.back && !rev.has(x.from)) {
+          rev.add(x.from);
+          r.push(x.from);
+        }
     }
     return [...fwd].some((id) => rev.has(id) && g.byId.get(id)!.type === 'decision');
   };

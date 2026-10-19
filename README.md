@@ -1,3 +1,14 @@
+# Code Del Rio — aplicações
+
+| App | Pasta | Descrição |
+|---|---|---|
+| **NexoProcess** (novo) | [`apps/nexoprocess`](apps/nexoprocess/README.md) | Processos BPMN + Lean, local-first: planilha/assistente → mapa → diagnóstico → TO-BE → plano. `npm run nexo:dev` |
+| Gestão Executiva de Projetos | raiz (`src/`, `supabase/`) | Plataforma multiusuário descrita abaixo |
+
+Decisões técnicas do NexoProcess: [docs/DECISOES_TECNICAS.md](docs/DECISOES_TECNICAS.md).
+
+---
+
 # Plataforma Executiva de Gestão de Projetos
 
 Projetos, planos de ação e governança (PMI/PMBOK) com dashboard executivo,

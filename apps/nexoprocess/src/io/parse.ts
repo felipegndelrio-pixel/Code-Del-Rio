@@ -32,7 +32,8 @@ function plainCell(v: ExcelJS.CellValue): unknown {
   if (v instanceof Date) return v;
   if (typeof v === 'object') {
     const o = v as any;
-    if ('result' in o) return o.result ?? null;
+    // Fórmulas sem resultado em cache (arquivo gerado por biblioteca) não são dados.
+    if ('result' in o || 'formula' in o || 'sharedFormula' in o) return o.result ?? null;
     if ('richText' in o) return (o.richText as { text: string }[]).map((t) => t.text).join('');
     if ('text' in o) return o.text;
     if ('error' in o) return null;

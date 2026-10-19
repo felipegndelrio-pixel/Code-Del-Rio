@@ -165,7 +165,9 @@ export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: Import
     const noRaw = get(v, 'proxima_se_nao');
     if (!type) type = yesRaw || noRaw ? 'decision' : 'task';
     if (!name && !stage) {
-      issues.push({ row, severity: 'warning', message: 'Linha sem atividade nem etapa foi ignorada.' });
+      // Linha sem nenhum campo mapeado preenchido = linha vazia do modelo: ignora sem alerta.
+      const anyMapped = Object.values(mapping).some((i) => i !== undefined && str(v[i]) !== '');
+      if (anyMapped) issues.push({ row, severity: 'warning', message: 'Linha sem atividade nem etapa foi ignorada.' });
       return;
     }
     let id = get(v, 'id_atividade');

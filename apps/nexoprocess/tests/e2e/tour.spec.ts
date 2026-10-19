@@ -18,6 +18,7 @@ for (const theme of ['dark', 'light'] as const) {
       await page.goto(`${base}/${t}`);
       await expect(page.locator('main')).toBeVisible();
       if (t === 'mapa') await page.waitForSelector('.djs-element');
+      await expect(page.getByText('Carregando…')).toHaveCount(0);
       await page.waitForTimeout(400);
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/${info.project.name}-${theme}-${t}.png`, fullPage: true });
     }

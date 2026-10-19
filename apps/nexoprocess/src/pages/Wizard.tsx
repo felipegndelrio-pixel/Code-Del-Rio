@@ -206,7 +206,7 @@ export default function Wizard() {
             </span>
             <span>Salvo neste dispositivo</span>
           </div>
-          <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label="Progresso do assistente" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>

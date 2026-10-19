@@ -1,7 +1,8 @@
 // Processo demonstrativo FICTÍCIO. Os números são ilustrativos, não
 // representam nenhuma empresa real e ficam isolados (workspace.isDemo = true).
-import { newActivity, newProcess } from './factory';
-import type { Activity, ProcessModel } from './types';
+import { newActivity, newProcess, newScenario } from './factory';
+import { updateActivity } from './tobe';
+import type { Activity, ProcessModel, Scenario } from './types';
 
 export const DEMO_NAME = 'Processamento de pedido (exemplo fictício)';
 
@@ -46,4 +47,24 @@ export function demoProcess(): ProcessModel {
   ];
   p.stageOrder = ['Recebimento', 'Análise de crédito', 'Separação', 'Expedição'];
   return p;
+}
+
+/**
+ * Cenário TO-BE ILUSTRATIVO do exemplo (fictício): mostra a comparação sem
+ * exigir preenchimento. Todas as mudanças têm hipótese marcada "a validar".
+ */
+export function demoScenario(asIs: ProcessModel): Scenario {
+  let sc = newScenario(asIs, 'Cenário ilustrativo (exemplo)');
+  const meta = (justification: string, hypothesis: string) => ({ justification, hypothesis, validator: 'Gerente de operações (exemplo)' });
+  sc = updateActivity(sc, 'B2', { wait: 120 }, 'reduce_wait', meta('Fila longa antes da análise manual.', 'SLA de 2 h para a análise manual é viável com a equipe atual.'))!;
+  sc = updateActivity(sc, 'A1', { duration: 4, minDuration: 3, maxDuration: 8 }, 'automate', meta('Digitação repetitiva do pedido.', 'Integração com o portal reduz o registro para 4 min (conferência humana mantida).'))!;
+  sc = updateActivity(sc, 'C3', { frequencyPct: 5 }, 'reduce_rework', meta('Erros de separação geram retrabalho.', 'Leitor de código de barras reduz o retrabalho de 10% para 5%.'))!;
+  sc.investment = 25000;
+  sc.recurringCostPerMonth = 800;
+  sc.horizonMonths = 12;
+  sc.assumptions = [
+    { id: 'as_demo1', text: 'Portal de pedidos já disponível para integração (exemplo).', status: 'a_validar' },
+    { id: 'as_demo2', text: 'Custo-hora por função informado pela área (exemplo).', status: 'a_validar' },
+  ];
+  return sc;
 }
