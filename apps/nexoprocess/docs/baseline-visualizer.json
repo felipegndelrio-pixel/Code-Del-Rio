@@ -1,0 +1,158 @@
+{
+ "geradoEm": "2026-10-19",
+ "commit": "79014f4",
+ "ferramenta": "vite-bundle-visualizer@1.2.1 (rollup-plugin-visualizer, template raw-data)",
+ "observacao": "renderizado = código após tree-shaking e antes da minificação; gzip por módulo isolado (soma maior que o gzip do arquivo)",
+ "pacotes": [
+  {
+   "pacote": "exceljs",
+   "renderizado": 1318433,
+   "gzipPorModulo": 284291
+  },
+  {
+   "pacote": "[código do app]",
+   "renderizado": 704348,
+   "gzipPorModulo": 185154
+  },
+  {
+   "pacote": "recharts",
+   "renderizado": 588441,
+   "gzipPorModulo": 185622
+  },
+  {
+   "pacote": "react-dom",
+   "renderizado": 536767,
+   "gzipPorModulo": 101421
+  },
+  {
+   "pacote": "jszip",
+   "renderizado": 135543,
+   "gzipPorModulo": 32088
+  },
+  {
+   "pacote": "bpmn-js",
+   "renderizado": 117085,
+   "gzipPorModulo": 29175
+  },
+  {
+   "pacote": "diagram-js",
+   "renderizado": 94668,
+   "gzipPorModulo": 32562
+  },
+  {
+   "pacote": "react-router",
+   "renderizado": 93104,
+   "gzipPorModulo": 22955
+  },
+  {
+   "pacote": "bpmn-moddle",
+   "renderizado": 55498,
+   "gzipPorModulo": 6142
+  },
+  {
+   "pacote": "lucide-react",
+   "renderizado": 39350,
+   "gzipPorModulo": 23350
+  },
+  {
+   "pacote": "es-toolkit",
+   "renderizado": 34293,
+   "gzipPorModulo": 15321
+  },
+  {
+   "pacote": "moddle-xml",
+   "renderizado": 33165,
+   "gzipPorModulo": 8031
+  },
+  {
+   "pacote": "d3-scale",
+   "renderizado": 27643,
+   "gzipPorModulo": 10604
+  },
+  {
+   "pacote": "@reduxjs/toolkit",
+   "renderizado": 26625,
+   "gzipPorModulo": 6912
+  },
+  {
+   "pacote": "decimal.js-light",
+   "renderizado": 25446,
+   "gzipPorModulo": 7048
+  },
+  {
+   "pacote": "d3-shape",
+   "renderizado": 24173,
+   "gzipPorModulo": 10525
+  },
+  {
+   "pacote": "immer",
+   "renderizado": 20420,
+   "gzipPorModulo": 5629
+  },
+  {
+   "pacote": "d3-time-format",
+   "renderizado": 17759,
+   "gzipPorModulo": 3839
+  },
+  {
+   "pacote": "react",
+   "renderizado": 17246,
+   "gzipPorModulo": 4994
+  },
+  {
+   "pacote": "saxen",
+   "renderizado": 15841,
+   "gzipPorModulo": 4254
+  },
+  {
+   "pacote": "moddle",
+   "renderizado": 14926,
+   "gzipPorModulo": 3844
+  },
+  {
+   "pacote": "d3-time",
+   "renderizado": 11252,
+   "gzipPorModulo": 4022
+  },
+  {
+   "pacote": "d3-format",
+   "renderizado": 10425,
+   "gzipPorModulo": 4996
+  },
+  {
+   "pacote": "d3-color",
+   "renderizado": 10354,
+   "gzipPorModulo": 3626
+  },
+  {
+   "pacote": "[outros]",
+   "renderizado": 9488,
+   "gzipPorModulo": 3683
+  },
+  {
+   "pacote": "scheduler",
+   "renderizado": 9252,
+   "gzipPorModulo": 2456
+  },
+  {
+   "pacote": "tiny-svg",
+   "renderizado": 8268,
+   "gzipPorModulo": 2774
+  },
+  {
+   "pacote": "didi",
+   "renderizado": 8060,
+   "gzipPorModulo": 2343
+  },
+  {
+   "pacote": "d3-array",
+   "renderizado": 7955,
+   "gzipPorModulo": 3674
+  },
+  {
+   "pacote": "workbox-window",
+   "renderizado": 7378,
+   "gzipPorModulo": 2566
+  }
+ ]
+}
