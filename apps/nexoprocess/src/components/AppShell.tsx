@@ -59,11 +59,12 @@ export default function AppShell() {
           </Link>
           <Connectivity />
           <nav aria-label="Principal" className="flex items-center gap-1">
-            <NavLink to="/app" end className={link}>
+            {/* No celular o texto some; o aria-label mantém o nome acessível. */}
+            <NavLink to="/app" end className={link} aria-label="Meus projetos">
               <LayoutGrid className="h-4 w-4" aria-hidden />
               <span className="hidden sm:inline">Meus projetos</span>
             </NavLink>
-            <NavLink to="/app/ajuda" className={link}>
+            <NavLink to="/app/ajuda" className={link} aria-label="Ajuda">
               <HelpCircle className="h-4 w-4" aria-hidden />
               <span className="hidden sm:inline">Ajuda</span>
             </NavLink>
