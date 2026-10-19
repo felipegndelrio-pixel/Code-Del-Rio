@@ -26,7 +26,11 @@
     "nexo:typecheck": "tsc -p apps/nexoprocess/tsconfig.json --noEmit",
     "nexo:test": "vitest run -c apps/nexoprocess/vitest.config.ts",
     "nexo:e2e": "playwright test -c apps/nexoprocess/playwright.config.ts",
-    "nexo:build:preview-file": "SINGLEFILE=true VITE_ROUTER=hash vite build --config apps/nexoprocess/vite.config.ts"
+    "nexo:build:single": "SINGLEFILE=true VITE_ROUTER=hash vite build --config apps/nexoprocess/vite.config.ts",
+    "nexo:build:preview-file": "npm run nexo:build:single",
+    "nexo:lint": "eslint apps/nexoprocess",
+    "nexo:test:unit": "vitest run -c apps/nexoprocess/vitest.config.ts",
+    "nexo:check-bundle": "node apps/nexoprocess/scripts/check-bundle.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

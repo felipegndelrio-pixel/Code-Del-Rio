@@ -22,6 +22,7 @@ jobs:
       - run: npm run nexo:typecheck
       - run: npm run nexo:test
       - run: npx vite build --config apps/nexoprocess/vite.config.ts
+      - run: npm run nexo:check-bundle
   nexoprocess-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 25
