@@ -141,6 +141,13 @@ export default function ReportPage() {
           svgs.map((s, i) => (
             <figure key={i} className="avoid-break mb-4">
               <figcaption className="mb-1 text-sm font-semibold">{s.label}</figcaption>
+              {/* Único dangerouslySetInnerHTML do app, mantido de propósito (Fase 2, decisão B).
+                  O HTML não vem do usuário: é o DOM do bpmn-js serializado por saveSVG(). Os nomes
+                  digitados entram como texto de <tspan> e saem escapados (&lt;script&gt;…), sem
+                  <script>, <foreignObject> nem atributos on* — coberto por tests/e2e/security.spec.ts.
+                  Inline (e não <img>) para os textos do diagrama seguirem acessíveis a leitores de
+                  tela: o relatório não os repete em tabela. Exige style-src 'unsafe-inline' (o SVG
+                  usa atributos style=). Ver docs/security-headers.md. */}
               <div className="overflow-hidden rounded border border-line/20 bg-white p-2 [&>svg]:h-auto [&>svg]:max-h-[420px] [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: s.svg.replace(/<\?xml[^>]*>/, '').replace(/<!DOCTYPE[^>]*>/, '') }} />
             </figure>
           ))
