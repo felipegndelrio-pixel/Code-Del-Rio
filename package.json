@@ -25,7 +25,8 @@
     "nexo:preview": "vite preview --config apps/nexoprocess/vite.config.ts",
     "nexo:typecheck": "tsc -p apps/nexoprocess/tsconfig.json --noEmit",
     "nexo:test": "vitest run -c apps/nexoprocess/vitest.config.ts",
-    "nexo:e2e": "playwright test -c apps/nexoprocess/playwright.config.ts"
+    "nexo:e2e": "playwright test -c apps/nexoprocess/playwright.config.ts",
+    "nexo:build:preview-file": "SINGLEFILE=true VITE_ROUTER=hash vite build --config apps/nexoprocess/vite.config.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

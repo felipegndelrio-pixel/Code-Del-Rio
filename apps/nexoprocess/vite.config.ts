@@ -3,13 +3,18 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwind from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
+import { viteSingleFile } from 'vite-plugin-singlefile';
+import { readFileSync } from 'node:fs';
 import { BRAND_MANIFEST } from './src/config/manifest';
 
 // NexoProcess — app estático, local-first (sem backend). Variáveis de build:
 //   VITE_BASE=/sub/   subcaminho de hospedagem (padrão: /)
 //   VITE_ROUTER=hash  rotas por hash (hospedagem sem fallback de SPA)
+//   SINGLEFILE=true   um único index.html (prévia), sem service worker
 export default defineConfig(({ mode }) => {
   const env = { ...process.env, ...loadEnv(mode, import.meta.dirname, '') };
+  const single = env.SINGLEFILE === 'true';
+  const themeInit = readFileSync(import.meta.dirname + '/public/theme-init.js', 'utf8');
   return {
     root: import.meta.dirname,
     base: env.VITE_BASE || '/',
@@ -18,6 +23,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
+        disable: single,
         registerType: 'prompt',
         includeAssets: ['icons/favicon.svg', 'icons/apple-touch-icon.png'],
         manifest: BRAND_MANIFEST,
@@ -31,12 +37,24 @@ export default defineConfig(({ mode }) => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
       }),
+      ...(single
+        ? [
+            viteSingleFile(),
+            {
+              name: 'inline-theme-init',
+              transformIndexHtml: (html: string) =>
+                html.replace(/<link rel="(icon|apple-touch-icon)"[^>]*>/g, '').replace(/<script src="[^"]*theme-init\.js"><\/script>/, `<script>${themeInit}</script>`),
+            },
+          ]
+        : []),
     ],
     build: {
-      outDir: 'dist',
+      outDir: single ? 'dist-single' : 'dist',
       emptyOutDir: true,
       chunkSizeWarningLimit: 2500,
-      rollupOptions: {
+      rollupOptions: single
+        ? {}
+        : {
         output: {
           manualChunks(id: string) {
             if (id.includes('exceljs')) return 'exceljs';
