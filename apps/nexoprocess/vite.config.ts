@@ -74,12 +74,14 @@ export default defineConfig(({ mode }) => {
           // do próprio navegador e não passam pelo service worker.
           globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
           navigateFallback: 'index.html',
+          // A API de licença (/api/*) nunca recebe o index.html do app shell.
+          navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [],
           cleanupOutdatedCaches: true,
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
       }),
-      ...(single ? [] : [bundleReport()]),
+      ...(single || env.BUNDLE_REPORT === 'false' ? [] : [bundleReport()]),
       ...(single
         ? [
             viteSingleFile(),

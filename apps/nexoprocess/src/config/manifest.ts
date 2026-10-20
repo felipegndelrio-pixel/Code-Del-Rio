@@ -6,10 +6,11 @@ export const BRAND_MANIFEST = {
   short_name: BRAND.shortName,
   description: BRAND.tagline,
   lang: 'pt-BR',
+  id: './app',
   start_url: './app',
   scope: './',
   display: 'standalone' as const,
-  orientation: 'any' as const,
+  // Sem 'orientation': o app funciona em retrato e paisagem (decisão 2).
   background_color: BRAND.colors.navy,
   theme_color: BRAND.colors.navy,
   icons: [
