@@ -37,9 +37,11 @@ describe('vercel.json × public/_headers', () => {
 
   it('fallback de SPA não captura a API', () => {
     const cfg = JSON.parse(readFileSync(new URL('vercel.json', root), 'utf8')) as { rewrites: { source: string; destination: string }[] };
-    const re = new RegExp(`^${cfg.rewrites[0].source.replace(/\((?!\?)/g, '(?:')}$`);
+    const spa = cfg.rewrites.find((r) => r.destination === '/index.html')!;
+    const re = new RegExp(`^${spa.source.replace(/\((?!\?)/g, '(?:')}$`);
     expect(re.test('/app/p/x/mapa')).toBe(true);
     expect(re.test('/api/license')).toBe(false);
     expect(re.test('/api/hotmart-webhook')).toBe(false);
+    expect(cfg.rewrites[0]).toEqual({ source: '/manifest.json', destination: '/manifest.webmanifest' }); // alias antes do fallback
   });
 });

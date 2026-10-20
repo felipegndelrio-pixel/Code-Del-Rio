@@ -236,6 +236,15 @@ input[type='date']::-webkit-calendar-picker-indicator {
   z-index: 5;
 }
 
+/* Seta dos selects (componente Select e RACI). appearance:none dá a mesma altura,
+   o mesmo padding e a mesma seta em Chrome, Safari e Firefox; a seta não come o texto. */
+.np-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2364748b' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 1.1rem;
+}
+
 /* Aviso sem JavaScript (index.html). Sem JS não há data-theme: os tokens seguem o
    tema do sistema. Classe em vez de style inline, para não depender de 'unsafe-inline'. */
 .np-noscript {

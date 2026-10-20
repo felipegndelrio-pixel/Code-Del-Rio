@@ -151,7 +151,7 @@ export default function ToBeTab() {
     <div className="space-y-4">
       <Card title="Cenário futuro" subtitle="TO-BE — hipótese até ser implantado e medido">
         <div className="flex flex-wrap items-end gap-2">
-          <Field label="Cenário em edição" className="min-w-[220px] flex-1">
+          <Field label="Cenário em edição" className="min-w-[min(100%,280px)] flex-1">
             {(f) => (
               <Select {...f} value={sc.id} onChange={(e) => update((d) => void (d.activeScenarioId = e.target.value))}>
                 {w.scenarios.map((s) => (

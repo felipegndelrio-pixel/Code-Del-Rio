@@ -234,8 +234,9 @@ export function Field({ label, help, error, children, required, className }: { l
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={clsx(inputCls, props.className)} />;
 }
+/** Seta própria (np-select): a nativa ocupa o padding e, no Safari, muda altura e espaçamento. */
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={clsx(inputCls, 'pr-8', props.className)} />;
+  return <select {...props} className={clsx(inputCls, 'np-select appearance-none pr-9 leading-5', props.className)} />;
 }
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={clsx(inputCls, 'min-h-[80px]', props.className)} />;
@@ -458,15 +459,20 @@ export function Skeleton({ className }: { className?: string }) {
   return <div className={clsx('animate-pulse rounded-xl bg-surface2', className)} aria-hidden />;
 }
 
-export function Table({ children, caption }: { children: ReactNode; caption?: string }) {
+/**
+ * Tabela com rolagem horizontal própria. `minWidth` (px) evita colunas espremidas:
+ * abaixo dele a tabela rola dentro do cartão em vez de encolher. Selects nunca ficam
+ * mais estreitos que a opção escolhida (sem "Em and…").
+ */
+export function Table({ children, caption, minWidth = 560 }: { children: ReactNode; caption?: string; minWidth?: number }) {
   return (
     <div className="-mx-1 overflow-x-auto px-1">
-      <table className="w-full min-w-[560px] border-separate border-spacing-0 text-sm">
+      <table className="w-full border-separate border-spacing-0 text-sm [&_select]:min-w-max" style={{ minWidth }}>
         {caption && <caption className="sr-only">{caption}</caption>}
         {children}
       </table>
     </div>
   );
 }
-export const th = 'sticky top-0 border-b border-line/20 bg-surface px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted';
+export const th = 'sticky top-0 border-b border-line/20 bg-surface px-2 py-2 text-left align-bottom text-xs font-semibold uppercase tracking-wide text-muted';
 export const td = 'border-b border-line/10 px-2 py-2 align-top text-ink2';

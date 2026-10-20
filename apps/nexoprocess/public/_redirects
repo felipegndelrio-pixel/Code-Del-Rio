@@ -1,0 +1,3 @@
+# Cloudflare Pages. O manifesto do PWA é /manifest.webmanifest (vite-plugin-pwa);
+# /manifest.json responde o mesmo arquivo para ferramentas que procuram esse nome.
+/manifest.json /manifest.webmanifest 200

@@ -78,9 +78,9 @@ export default function ResultsTab() {
       </Callout>
 
       <Card title="Registrar resultado real" subtitle={sc ? `Cenário: ${sc.name}` : 'Sem cenário TO-BE'}>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Field label="Período (mês)">{(f) => <Input {...f} type="month" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} />}</Field>
-          <Field label="Indicador">
+          <Field label="Indicador" className="sm:col-span-2 xl:col-span-1">
             {(f) => (
               <Select
                 {...f}
@@ -113,7 +113,7 @@ export default function ResultsTab() {
           <Field label="Fonte" help="Ex.: relatório do ERP, apontamento de horas.">
             {(f) => <Input {...f} value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} />}
           </Field>
-          <Field label="Observação / explicação de desvios" className="md:col-span-3">
+          <Field label="Observação / explicação de desvios" className="sm:col-span-2 xl:col-span-3">
             {(f) => <Textarea {...f} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />}
           </Field>
         </div>

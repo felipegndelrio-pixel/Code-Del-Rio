@@ -116,13 +116,22 @@ export default function PlanTab() {
           <Empty title="Nenhuma ação ainda">Gere ações a partir das mudanças do TO-BE, crie a partir de recomendações aceitas, ou adicione manualmente.</Empty>
         ) : (
           <>
-            <div className="hidden md:block">
-              <Table caption="Ações do plano">
+            {/* Tabela só a partir de 1280 px; abaixo disso, cartões (sem colunas espremidas). */}
+            <div className="hidden xl:block">
+              <Table caption="Ações do plano" minWidth={960}>
                 <thead>
                   <tr>
-                    {['Ação', 'Responsável', 'Prazo', 'Prioridade', 'Situação', 'Indicador de sucesso', ''].map((h) => (
-                      <th key={h} className={th}>
-                        {h}
+                    {[
+                      ['Ação', 'min-w-[15rem]'],
+                      ['Responsável', 'min-w-[8rem]'],
+                      ['Prazo', ''],
+                      ['Prioridade', ''],
+                      ['Situação', 'min-w-[10rem]'],
+                      ['Indicador de sucesso', 'min-w-[12rem]'],
+                      ['', ''],
+                    ].map(([h, w]) => (
+                      <th key={h} className={clsx(th, 'whitespace-nowrap', w)}>
+                        {h ? h : <span className="sr-only">Ações</span>}
                       </th>
                     ))}
                   </tr>
@@ -141,7 +150,7 @@ export default function PlanTab() {
                         )}
                       </td>
                       <td className={td}>{a.owner || <Badge tone="amber">pendente</Badge>}</td>
-                      <td className={td}>{a.due ? <span className={clsx(overdue(a) && 'font-semibold text-bad')}>{fmtDate(a.due)}{overdue(a) && ' · atrasada'}</span> : <Badge tone="amber">pendente</Badge>}</td>
+                      <td className={clsx(td, 'whitespace-nowrap')}>{a.due ? <span className={clsx(overdue(a) && 'font-semibold text-bad')}>{fmtDate(a.due)}{overdue(a) && ' · atrasada'}</span> : <Badge tone="amber">pendente</Badge>}</td>
                       <td className={td}>
                         <Badge tone={a.priority === 'alta' ? 'bad' : a.priority === 'media' ? 'amber' : 'muted'}>{PRIO[a.priority]}</Badge>
                       </td>
@@ -175,7 +184,7 @@ export default function PlanTab() {
                 </tbody>
               </Table>
             </div>
-            <ul className="space-y-2 md:hidden">
+            <ul className="space-y-2 xl:hidden">
               {list.map((a) => (
                 <li key={a.id}>
                   <button type="button" onClick={() => setEdit(structuredClone(a))} className={clsx('w-full rounded-xl border p-3 text-left', overdue(a) ? 'border-bad/40' : 'border-line/15')}>
@@ -187,6 +196,7 @@ export default function PlanTab() {
                       <span className="text-ink2">{a.owner ?? 'responsável pendente'}</span>
                       <span className={clsx('text-ink2', overdue(a) && 'text-bad')}>· {a.due ? fmtDate(a.due) : 'prazo pendente'}</span>
                     </div>
+                    {a.successIndicator && <p className="mt-1 text-xs text-ink2">Indicador: {a.successIndicator}</p>}
                   </button>
                 </li>
               ))}

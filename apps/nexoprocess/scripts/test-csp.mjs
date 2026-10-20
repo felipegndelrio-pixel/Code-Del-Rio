@@ -90,6 +90,20 @@ try {
     if (themeAt < 0 || entryAt < 0 || themeAt > entryAt) fail(where, 'theme-init.js ausente ou depois do bundle (flash de tema)');
     if (!/<meta name="referrer" content="strict-origin-when-cross-origin"/.test(html)) fail(where, '<meta name="referrer"> ausente');
     if (!/<noscript>/.test(html)) fail(where, '<noscript> ausente');
+    if (!/<link rel="manifest" href="\/manifest\.webmanifest"/.test(html)) fail(where, '<link rel="manifest"> ausente no <head>');
+  }
+  // Manifesto do PWA: o arquivo real e o alias /manifest.json devolvem o mesmo JSON.
+  for (const path of ['/manifest.webmanifest', '/manifest.json']) {
+    const r = await fetch(base + path);
+    const type = r.headers.get('content-type') ?? '';
+    let name = null;
+    try {
+      name = (await r.json()).name;
+    } catch {
+      /* não é JSON (ex.: index.html do fallback) */
+    }
+    console.log(`GET ${path} → HTTP ${r.status} · ${type} · name=${name}`);
+    if (r.status !== 200 || name !== 'NexoProcess') fail(`GET ${path}`, `manifesto inválido (HTTP ${r.status}, ${type}, name=${name})`);
   }
 } catch (e) {
   fail('servidor', e instanceof Error ? e.message : String(e));
@@ -102,4 +116,4 @@ if (failures.length) {
   console.error(`\nFALHA (${failures.length}):\n- ${failures.join('\n- ')}`);
   process.exit(1);
 }
-console.log(`\nOK: CSP e cabeçalhos conferem em ${PATHS.length} caminhos; HTML sem <script> inline; theme-init.js antes do bundle.`);
+console.log(`\nOK: CSP e cabeçalhos conferem em ${PATHS.length} caminhos; HTML sem <script> inline; theme-init.js antes do bundle; manifesto do PWA em /manifest.webmanifest e /manifest.json.`);

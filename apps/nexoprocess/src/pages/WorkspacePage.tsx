@@ -118,13 +118,13 @@ function ProjectNav({ base, active, steps, onNavigate }: { base: string; active:
                     onClick={onNavigate}
                     aria-current={isActive ? 'page' : undefined}
                     className={clsx(
-                      'group flex min-h-[40px] items-center gap-3 rounded-lg px-3 text-sm transition-colors',
+                      'group flex min-h-[40px] items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
                       isActive ? 'bg-brand/10 font-semibold text-ink' : 'text-ink2 hover:bg-surface2 hover:text-ink',
                     )}
                   >
                     <span className={clsx('h-5 w-0.5 rounded-full', isActive ? 'bg-accentStrong' : 'bg-transparent')} aria-hidden />
                     <Icon className={clsx('h-4 w-4 shrink-0', isActive ? 'text-brand' : 'text-muted group-hover:text-ink2')} aria-hidden />
-                    <span className="min-w-0 flex-1 truncate">{it.label}</span>
+                    <span className="min-w-0 flex-1 break-words leading-tight">{it.label}</span>
                     <StateIcon step={st} />
                   </NavLink>
                 </li>
@@ -246,7 +246,9 @@ function Shell() {
           )}
         </nav>
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line/10 pb-3 sm:mb-4 sm:pb-4">
-          <h1 className="w-full min-w-0 text-base font-semibold leading-snug sm:w-auto sm:flex-1 sm:truncate sm:text-xl">{w.asIs.name}</h1>
+          <h1 className="w-full min-w-0 break-words text-base font-semibold leading-snug sm:w-auto sm:flex-1 sm:line-clamp-2 sm:text-xl" title={w.asIs.name}>
+            {w.asIs.name}
+          </h1>
           {w.isDemo && (
             <Badge tone="amber" className="text-xs">
               Exemplo fictício<span className="sr-only sm:not-sr-only"> — dados ilustrativos</span>
@@ -317,7 +319,7 @@ function Shell() {
               <li key={p} className="min-w-0">
                 <Link to={`${base}/${p}`} aria-current={isActive ? 'page' : undefined} className={clsx('flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-xs font-medium', isActive ? 'text-brand' : 'text-muted')}>
                   <Icon className="h-5 w-5" aria-hidden />
-                  <span className="max-w-full truncate px-0.5">{p === 'visao-geral' ? 'Início' : it.short}</span>
+                  <span className="max-w-full truncate px-0.5 text-[11px] tracking-tight sm:text-xs">{p === 'visao-geral' ? 'Início' : it.short}</span>
                 </Link>
               </li>
             );

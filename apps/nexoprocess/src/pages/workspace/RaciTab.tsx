@@ -2,6 +2,9 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { Plus, Wand2 } from 'lucide-react';
 import { Badge, Button, Callout, Card, Input, Table, td, Term, th } from '../../components/ui';
+
+// Nome da atividade e selects alinhados ao centro da linha (td padrão é align-top).
+const cell = td.replace('align-top', 'align-middle');
 import { raciIssues, suggestRaci } from '../../domain/advanced';
 import type { RaciRole } from '../../domain/types';
 import { useWorkspace } from '../../state/workspace';
@@ -58,10 +61,11 @@ export default function RaciTab() {
           <p className="mt-4 text-sm text-muted">Adicione papéis ou use a sugestão a partir dos responsáveis.</p>
         ) : (
           <div className="mt-4">
-            <Table caption="Matriz RACI">
+            <Table caption="Matriz RACI" minWidth={240 + r.roles.length * 112}>
               <thead>
                 <tr>
-                  <th className={th}>Atividade</th>
+                  {/* Coluna da atividade fixa ao rolar os papéis no celular. */}
+                  <th className={clsx(th, 'left-0 z-20 min-w-[13rem]')}>Atividade</th>
                   {r.roles.map((role) => (
                     <th key={role} className={th}>
                       {role}
@@ -72,17 +76,17 @@ export default function RaciTab() {
               <tbody>
                 {acts.map((a) => (
                   <tr key={a.id}>
-                    <td className={clsx(td, 'text-ink')}>{a.name}</td>
+                    <td className={clsx(cell, 'sticky left-0 z-10 bg-surface font-medium text-ink')}>{a.name}</td>
                     {r.roles.map((role) => {
                       const v = r.cells[a.id]?.[role] ?? '';
                       const sug = r.suggested[a.id]?.[role];
                       return (
-                        <td key={role} className={td}>
+                        <td key={role} className={cell}>
                           <select
                             aria-label={`${a.name} — ${role}`}
                             value={v}
                             onChange={(e) => setCell(a.id, role, e.target.value as RaciRole | '')}
-                            className={clsx('min-h-[36px] w-16 rounded-lg border bg-surface2/70 px-1 text-center text-sm font-bold', sug ? 'border-dashed border-amber text-amber' : 'border-line/25 text-ink')}
+                            className={clsx('np-select min-h-[36px] w-16 appearance-none rounded-lg border bg-surface2/70 pl-2 pr-6 text-center text-sm font-bold', sug ? 'border-dashed border-amber text-amber' : 'border-line/25 text-ink')}
                             title={sug ? 'Sugerido a partir dos dados — confirme' : undefined}
                           >
                             {ROLES.map((x) => (
