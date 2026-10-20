@@ -1,0 +1,9 @@
+{
+  "name": "nexoprocess",
+  "private": true,
+  "description": "Pacote só de metadados: as dependências e os scripts (nexo:*) ficam no package.json da raiz. Define ESM e Node 22 para as funções da Vercel (Root Directory = apps/nexoprocess).",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  }
+}
