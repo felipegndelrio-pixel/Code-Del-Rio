@@ -7,6 +7,7 @@
 import { demoProcess } from '../domain/demo';
 import type { Activity, DurationUnit, ElementType, LeanClass, ProcessModel } from '../domain/types';
 import { CALC_HEADERS, FIELDS, PROCESS_FIELDS, type FieldKey } from './fields';
+import { csvCell } from './csv';
 
 export const INPUT_ROWS = 300;
 export const LEGEND = 'Campos coloridos: preencher. Campos cinza: calculados ou protegidos.';
@@ -302,14 +303,6 @@ async function lockStructure(xlsx: Uint8Array): Promise<Uint8Array<ArrayBuffer>>
 }
 
 // ---------- CSV
-/** Texto que começa com = + - @ (ou tab/CR) vira fórmula no Excel: recebe apóstrofo. */
-const FORMULA_START = /^[=+\-@\t\r]/;
-function csvCell(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  if (typeof v === 'number') return String(v).replace('.', ',');
-  const s = FORMULA_START.test(String(v)) ? `'${String(v)}` : String(v);
-  return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 /** CSV com separador ";" e BOM (abre corretamente no Excel em pt-BR). */
 export function processToCsv(p: ProcessModel): string {

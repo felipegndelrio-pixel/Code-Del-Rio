@@ -10,6 +10,9 @@ import { uid } from '../domain/units';
 import { validateProcess } from '../domain/validation';
 import { db } from '../storage/db';
 import { createWorkspace } from '../state/actions';
+import { demoBlocked } from '../license/demo';
+import { useHardwareBack } from '../state/backNav';
+import { localDraft } from '../storage/localDraft';
 
 interface WItem {
   key: string;
@@ -112,14 +115,19 @@ export default function Wizard() {
   const nav = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
-  const [s, setS] = useState<WState>(initial);
-  const [loaded, setLoaded] = useState(false);
-  const [restored, setRestored] = useState(false);
+  const [local] = useState(() => {
+    const d = localDraft.read<WState>(DRAFT);
+    return d && Array.isArray(d.stages) && (d.name || d.stages.some((st) => st.name)) ? d : undefined;
+  });
+  const [s, setS] = useState<WState>(() => local ?? initial());
+  const [loaded, setLoaded] = useState(!!local);
+  const [restored, setRestored] = useState(!!local);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
+    if (local) return;
     db.getDraft<WState>(DRAFT)
       .then((d) => {
         if (d && (d.name || d.stages.some((st) => st.name))) {
@@ -128,9 +136,10 @@ export default function Wizard() {
         }
       })
       .finally(() => setLoaded(true));
-  }, []);
+  }, [local]);
   useEffect(() => {
     if (!loaded) return;
+    if (s.name || s.stages.some((st) => st.name)) localDraft.write(DRAFT, s);
     const t = setTimeout(() => void db.putDraft(DRAFT, s).catch(() => {}), 300);
     return () => clearTimeout(t);
   }, [s, loaded]);
@@ -167,16 +176,20 @@ export default function Wizard() {
     window.scrollTo({ top: 0 });
   };
 
+  useHardwareBack('formulario', s.step > 0, () => go(-1), String(s.step));
+
   const finish = async () => {
     if (!check(0) || !check(1) || !check(2)) return;
     if (issues.some((i) => i.severity === 'error')) {
       toast('bad', 'Quase lá: falta ajustar os pontos destacados antes de criar o processo.');
       return;
     }
+    if (demoBlocked('salvar')) return;
     setBusy(true);
     try {
       const w = await createWorkspace(process, { kind: 'wizard' });
       await db.deleteDraft(DRAFT);
+      localDraft.remove(DRAFT);
       toast('ok', 'Pronto! Seu processo foi criado. Vamos conferir os dados?');
       nav(`/app/p/${w.id}/validar`);
     } catch {
@@ -189,6 +202,7 @@ export default function Wizard() {
   const discard = async () => {
     if (!(await confirm({ title: 'Começar do zero?', body: 'As respostas até aqui serão apagadas deste aparelho.', confirm: 'Apagar e recomeçar', danger: true }))) return;
     await db.deleteDraft(DRAFT);
+    localDraft.remove(DRAFT);
     setS(initial());
     setRestored(false);
   };

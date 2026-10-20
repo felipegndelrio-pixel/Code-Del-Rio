@@ -14,6 +14,7 @@ import { LEAN_LABEL, PERIOD_LABEL } from '../../domain/types';
 import { fmtBRL, fmtDate, fmtDateTime, fmtHours, fmtNum, fmtPct, nowIso } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
 import { ACTION_STATUS } from './PlanTab';
+import { demoBlocked } from '../../license/demo';
 
 const tbl = 'w-full border-collapse text-[12px]';
 const c = 'border border-line/25 px-2 py-1 text-left align-top';
@@ -71,7 +72,7 @@ export default function ReportPage() {
             )}
           </Field>
         )}
-        <Button onClick={() => window.print()} disabled={svgs === null}>
+        <Button onClick={() => !demoBlocked('exportar') && window.print()} disabled={svgs === null}>
           <Printer className="h-4 w-4" /> Imprimir / salvar PDF
         </Button>
         <p className="w-full text-xs text-muted">Dica: no diálogo de impressão escolha “Salvar como PDF”, papel A4, e ative “Gráficos de plano de fundo”.</p>

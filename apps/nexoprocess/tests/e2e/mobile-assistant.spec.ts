@@ -74,8 +74,12 @@ test('assistente cria projeto a partir de respostas curtas e texto livre', async
   await step.getByRole('button', { name: 'Voltar à revisão' }).click();
   await expect(step.getByText('200 por mês')).toBeVisible();
   await expectNoHorizontalScroll(page);
-  await step.getByRole('button', { name: 'Criar projeto e ver o mapa' }).click();
-  await expect(page).toHaveURL(/\/app\/p\/w_[^/]+\/(mapa|validar)$/);
+  await step.getByRole('button', { name: 'Criar meu projeto' }).click();
+  const success = page.getByTestId('assistant-success');
+  await expect(success.getByRole('heading', { level: 1 })).toHaveText('Excelente! Seu processo foi mapeado com 2 etapas.');
+  await expect(success).toContainText('3 atividades em ordem');
+  await success.getByRole('button', { name: 'Ver meu Plano de Ação' }).click();
+  await expect(page).toHaveURL(/\/app\/p\/w_[^/]+\/plano$/);
 
   const [w] = await readWorkspaces(page);
   expect(w.asIs.name).toBe('Aprovação de compras');

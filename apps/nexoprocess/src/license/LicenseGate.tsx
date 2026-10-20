@@ -3,8 +3,9 @@
 // plano; se a compra foi reembolsada, o acesso sai.
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Spinner } from '../components/ui';
+import { PageSkeleton } from '../components/ui';
 import { activate, clearToken, currentLicense, LICENSE } from './config';
+import { isDemo } from './demo';
 
 export default function LicenseGate() {
   const loc = useLocation();
@@ -19,6 +20,10 @@ export default function LicenseGate() {
       if (!alive) return;
       if (!lic) {
         clearToken();
+        if (isDemo()) {
+          setState('ok');
+          return;
+        }
         setState('denied');
         return;
       }
@@ -36,7 +41,7 @@ export default function LicenseGate() {
     };
   }, [nav]);
 
-  if (state === 'checking') return <Spinner label="Conferindo o acesso…" />;
+  if (state === 'checking') return <PageSkeleton label="Conferindo o acesso…" />;
   if (state === 'denied') return <Navigate to={`/entrar?volta=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   return <Outlet />;
 }

@@ -109,6 +109,10 @@ export function fmtDuration(v: number | undefined, unit: DurationUnit): string {
 
 export function fmtDate(iso: string | undefined): string {
   if (!iso) return '—';
+  // Data pura (prazo): mostra o dia digitado. new Date('aaaa-mm-dd') é meia-noite UTC
+  // e, no Brasil (UTC−3), apareceria como o dia anterior.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('pt-BR');

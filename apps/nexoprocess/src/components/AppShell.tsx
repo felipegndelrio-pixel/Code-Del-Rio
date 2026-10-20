@@ -6,6 +6,7 @@ import { BRAND } from '../config/brand';
 import { useTheme } from '../state/theme';
 import { Logo } from './Logo';
 import { ErrorBoundary } from './ErrorBoundary';
+import DemoBanner from './DemoBanner';
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggle } = useTheme();
@@ -72,6 +73,7 @@ export default function AppShell() {
           <ThemeToggle />
         </div>
       </header>
+      <DemoBanner />
       <main id="conteudo" className="flex-1">
         <ErrorBoundary resetKey={pathname}>
           <Outlet />

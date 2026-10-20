@@ -6,6 +6,7 @@ import { buildBpmn } from '../../bpmn/model';
 import type { ProcessModel } from '../../domain/types';
 import { download, slug, XLSX_MIME } from '../../state/actions';
 import { useWorkspace } from '../../state/workspace';
+import { demoBlocked } from '../../license/demo';
 
 export default function ExportTab() {
   const { w } = useWorkspace();
@@ -18,6 +19,7 @@ export default function ExportTab() {
   const base = `${slug(w.asIs.name)}-${label}`;
 
   const run = async (key: string, fn: () => Promise<void> | void) => {
+    if (demoBlocked('exportar')) return;
     setBusy(key);
     try {
       await fn();

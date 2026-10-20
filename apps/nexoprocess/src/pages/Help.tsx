@@ -3,11 +3,15 @@ import { Card, Callout } from '../components/ui';
 import { BRAND } from '../config/brand';
 import { GLOSSARY } from '../config/glossary';
 import { FIELDS } from '../io/fields';
+import { BackButton } from '../components/BackButton';
 
 export default function Help() {
   return (
     <div className="safe-x mx-auto max-w-4xl space-y-5 py-6">
-      <h1 className="text-2xl font-bold">Ajuda</h1>
+      <div>
+        <BackButton />
+        <h1 className="text-2xl font-bold">Ajuda</h1>
+      </div>
 
       <Card title="Como funciona" subtitle="Jornada">
         <ol className="list-decimal space-y-1 pl-5 text-sm text-ink2">

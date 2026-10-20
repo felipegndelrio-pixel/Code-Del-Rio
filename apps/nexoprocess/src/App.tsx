@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
-import { Empty, Spinner } from './components/ui';
+import { Empty, PageSkeleton } from './components/ui';
 import Landing from './pages/Landing';
 import Home from './pages/Home';
 import AppShell from './components/AppShell';
@@ -15,7 +15,7 @@ const Login = lazy(() => import('./pages/Login'));
 
 export default function App() {
   return (
-    <Suspense fallback={<Spinner />}>
+    <Suspense fallback={<PageSkeleton />}>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/entrar" element={<Login />} />

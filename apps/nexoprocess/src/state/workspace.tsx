@@ -7,8 +7,10 @@ import type { ProcessModel, Workspace } from '../domain/types';
 import { nowIso, uid } from '../domain/units';
 import { validateProcess, type Issue } from '../domain/validation';
 import { db } from '../storage/db';
+import { demoBlocked, isDemo } from '../license/demo';
 
-export type SaveState = 'salvo' | 'salvando' | 'erro';
+/** 'demo': modo de demonstração — as alterações ficam só na memória. */
+export type SaveState = 'salvo' | 'salvando' | 'erro' | 'demo';
 
 interface Ctx {
   w: Workspace;
@@ -40,11 +42,12 @@ const MAX_UNDO = 30;
 
 export function WorkspaceProvider({ initial, children }: { initial: Workspace; children: ReactNode }) {
   const [w, setW] = useState(initial);
-  const [save, setSave] = useState<SaveState>('salvo');
+  const [save, setSave] = useState<SaveState>(isDemo() ? 'demo' : 'salvo');
   const [savedAt, setSavedAt] = useState<string | undefined>(initial.updatedAt);
   // Gravação imediata e coalescida: no máximo uma escrita em andamento; a seguinte
   // sempre grava o estado mais recente. Minimiza a janela de perda ao fechar a aba.
   const pending = useRef<Workspace | null>(null);
+  const demoWarned = useRef(false);
   const writing = useRef(false);
 
   const flush = useCallback(async () => {
@@ -90,8 +93,14 @@ export function WorkspaceProvider({ initial, children }: { initial: Workspace; c
   const commit = useCallback(
     (next: Workspace) => {
       cur.current = next;
-      pending.current = next;
       setW(next);
+      if (isDemo()) {
+        // Demonstração: mostra o resultado, mas não grava. Avisa uma vez por projeto aberto.
+        if (!demoWarned.current) demoBlocked('salvar');
+        demoWarned.current = true;
+        return;
+      }
+      pending.current = next;
       setSave('salvando');
       queueMicrotask(() => void flush());
     },

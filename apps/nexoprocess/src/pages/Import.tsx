@@ -13,6 +13,9 @@ import { ImportError, readImportFile, type ParsedFile } from '../io/parse';
 import { autoMap, findSheet, pickActivitySheet, rowsToProcess, type Mapping } from '../io/toProcess';
 import { db } from '../storage/db';
 import { createWorkspace, downloadTemplateCsv, downloadTemplateXlsx } from '../state/actions';
+import { demoBlocked } from '../license/demo';
+import { useHardwareBack } from '../state/backNav';
+import { BackButton } from '../components/BackButton';
 
 const STEPS = ['Arquivo', 'Colunas', 'Validação'];
 
@@ -33,6 +36,7 @@ export default function ImportPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), [step]);
+  useHardwareBack('importar', step > 0, () => setStep((x) => Math.max(0, x - 1)), String(step));
 
   const sheet = file?.sheets[sheetIdx];
   const auto = useMemo(() => (sheet ? autoMap(sheet.headers) : null), [sheet]);
@@ -72,6 +76,7 @@ export default function ImportPage() {
 
   const create = async (mode: 'new' | 'replace') => {
     if (!result || !file) return;
+    if (demoBlocked('salvar')) return;
     try {
       const source = { kind: 'import' as const, fileName: file.fileName, fileHash: file.hash, importedAt: nowIso() };
       if (mode === 'replace' && dup) {
@@ -98,6 +103,7 @@ export default function ImportPage() {
   return (
     <div className="safe-x mx-auto max-w-5xl space-y-5 py-6">
       <div>
+        {step === 0 && <BackButton />}
         <p className="text-sm font-semibold text-brand">Importar planilha</p>
         <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold outline-none">
           {step === 0 ? 'Escolha o arquivo' : step === 1 ? 'Confirme as colunas' : 'Validação dos dados'}

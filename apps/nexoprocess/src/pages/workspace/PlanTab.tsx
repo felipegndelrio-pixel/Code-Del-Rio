@@ -1,14 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import clsx from 'clsx';
-import { ListPlus, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Badge, Button, Callout, Card, Drawer, Empty, Field, Input, Segmented, Select, Table, td, Textarea, th, useConfirm, useToast } from '../../components/ui';
+import { FileDown, FileSpreadsheet, FileUp, ListPlus, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Badge, Button, Callout, Card, Drawer, Empty, Field, Input, Modal, Segmented, Select, Table, td, Textarea, th, useConfirm, useToast } from '../../components/ui';
+import { Tour, type TourStep } from '../../components/Tour';
 import type { ActionItem, ActionStatus, Priority } from '../../domain/types';
 import { completionIssue, relatedProblemOf } from '../../domain/plan';
 import { fmtDate, nowIso, uid } from '../../domain/units';
+import { actionsToCsv, readPlanFile, type PlanImport } from '../../io/planCsv';
+import { ImportError } from '../../io/parse';
+import { demoBlocked } from '../../license/demo';
+import { download, slug } from '../../state/actions';
 import { useWorkspace } from '../../state/workspace';
+import { localDraft } from '../../storage/localDraft';
 
 export const ACTION_STATUS: Record<ActionStatus, string> = { a_fazer: 'A fazer', em_andamento: 'Em andamento', bloqueada: 'Bloqueada', concluida: 'Concluída', cancelada: 'Cancelada' };
 const PRIO: Record<Priority, string> = { alta: 'Alta', media: 'Média', baixa: 'Baixa' };
+
+const TOUR: TourStep[] = [
+  { target: '[data-tour="nova"]', title: 'Crie as ações do plano', body: 'Cada ação diz o que será feito. Responsável e prazo você define quando souber — nunca preenchemos por você.' },
+  { target: '[data-tour="gerar"]', title: 'Ou gere a partir do TO-BE', body: 'Cada mudança do processo futuro vira uma ação, sem digitar de novo.' },
+  { target: '[data-tour="importar"]', title: 'Já tem o plano numa planilha?', body: 'Importe um CSV com as colunas Ação, Responsável e Prazo.' },
+  { target: '[data-tour="exportar"]', title: 'Compartilhe com a equipe', body: 'Exporte em PDF para apresentar ou em planilha (CSV) para acompanhar no Excel.' },
+];
 
 const blank = (): ActionItem => ({ id: uid('act_'), description: '', priority: 'media', status: 'a_fazer', origin: { kind: 'manual' }, createdAt: nowIso() });
 
@@ -16,7 +30,20 @@ export default function PlanTab() {
   const { w, update } = useWorkspace();
   const toast = useToast();
   const confirm = useConfirm();
-  const [edit, setEdit] = useState<ActionItem | null>(null);
+  // Ação em edição sobrevive a um recarregamento (rascunho local por projeto).
+  const draftKey = `plano.${w.id}`;
+  const [edit, setEdit] = useState<ActionItem | null>(() => localDraft.read<ActionItem>(draftKey) ?? null);
+  const recovered = useRef(!!edit);
+  useEffect(() => {
+    if (recovered.current) toast('info', 'Recuperamos a ação que você estava editando.');
+    recovered.current = false;
+  }, [toast]);
+  useEffect(() => {
+    if (edit) localDraft.write(draftKey, edit);
+    else localDraft.remove(draftKey);
+  }, [edit, draftKey]);
+  const [imp, setImp] = useState<PlanImport | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [filter, setFilter] = useState<'todas' | 'abertas' | 'concluida'>('todas');
   const today = new Date().toISOString().slice(0, 10);
   const overdue = (a: ActionItem) => !!a.due && a.due < today && a.status !== 'concluida' && a.status !== 'cancelada';
@@ -87,33 +114,93 @@ export default function PlanTab() {
     toast('ok', `Pronto! Seu plano de ação está montado (${fresh.length} ${fresh.length === 1 ? 'ação' : 'ações'}). Agora é só definir responsáveis e prazos; dá para ajustar a qualquer momento.`);
   };
 
+  const exportPdf = () => {
+    if (demoBlocked('exportar')) return;
+    // O nome do arquivo sugerido pelo "Salvar como PDF" vem do título da página.
+    const prev = document.title;
+    document.title = `Plano de ação - ${w.asIs.name}`;
+    window.addEventListener('afterprint', () => (document.title = prev), { once: true });
+    window.print();
+  };
+  const exportCsv = async () => {
+    if (demoBlocked('exportar')) return;
+    try {
+      await download(`${slug(w.asIs.name)}-plano-de-acao.csv`, actionsToCsv(w), 'text/csv;charset=utf-8');
+      toast('ok', 'Planilha do plano gerada. Abra no Excel ou nas Planilhas Google para compartilhar.');
+    } catch (e) {
+      toast('bad', `Não conseguimos exportar: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  const pickFile = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      setImp(await readPlanFile(f));
+    } catch (e) {
+      toast('bad', e instanceof ImportError ? `${e.message} ${e.fix}` : 'Não conseguimos ler esse arquivo. Salve como CSV e tente de novo.');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+  const confirmImport = () => {
+    if (!imp) return;
+    const n = imp.actions.length;
+    update((d) => void d.actions.push(...imp.actions), { area: 'Plano de ação', message: `${n} ação(ões) importada(s) de planilha` });
+    setImp(null);
+    toast('ok', `${n} ${n === 1 ? 'ação adicionada' : 'ações adicionadas'} ao plano.`);
+  };
+
   const list = w.actions.filter((a) => (filter === 'todas' ? true : filter === 'concluida' ? a.status === 'concluida' : a.status !== 'concluida' && a.status !== 'cancelada'));
   const changeCount = (w.scenarios.find((s) => s.id === w.activeScenarioId) ?? w.scenarios[0])?.changes.length ?? 0;
 
   return (
     <div className="space-y-4">
       <Card
+        className="print:hidden"
         title="Plano de ação"
         subtitle="Quem faz o quê, até quando"
         action={
-          <div className="flex flex-wrap gap-2">
+          <div className="no-print flex flex-wrap gap-2">
             {changeCount > 0 && (
-              <Button size="sm" variant="secondary" onClick={fromChanges}>
+              <Button size="sm" variant="secondary" onClick={fromChanges} data-tour="gerar">
                 <ListPlus className="h-4 w-4" /> Gerar do TO-BE
               </Button>
             )}
-            <Button size="sm" onClick={() => setEdit(blank())}>
+            <Button size="sm" onClick={() => setEdit(blank())} data-tour="nova">
               <Plus className="h-4 w-4" /> Nova ação
             </Button>
           </div>
         }
       >
+        <div className="no-print mb-3 flex flex-wrap items-center gap-2 border-b border-line/10 pb-3">
+          <span className="flex flex-wrap gap-2" data-tour="exportar">
+            <Button size="sm" variant="secondary" onClick={exportPdf} disabled={!w.actions.length}>
+              <FileDown className="h-4 w-4" aria-hidden /> Exportar PDF
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void exportCsv()} disabled={!w.actions.length}>
+              <FileSpreadsheet className="h-4 w-4" aria-hidden /> Exportar planilha (CSV)
+            </Button>
+          </span>
+          <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()} data-tour="importar">
+            <FileUp className="h-4 w-4" aria-hidden /> Importar planilha (CSV)
+          </Button>
+          <input ref={fileRef} type="file" accept=".csv,text/csv" className="sr-only" tabIndex={-1} aria-hidden data-testid="plan-import-input" onChange={(e) => void pickFile(e.target.files?.[0])} />
+        </div>
+        <div className="print:hidden">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <Segmented label="Filtro" value={filter} onChange={setFilter} options={[{ value: 'todas', label: `Todas (${w.actions.length})` }, { value: 'abertas', label: 'Abertas' }, { value: 'concluida', label: 'Concluídas' }]} />
           <span className="text-xs text-muted">Responsável e prazo nunca são preenchidos automaticamente — ficam “pendente” até você definir.</span>
         </div>
         {!w.actions.length ? (
-          <Empty title="Ainda não temos ações por aqui">Vamos montar o plano? Gere as ações a partir das mudanças do TO-BE, aproveite as recomendações aceitas ou crie uma do zero.</Empty>
+          <Empty
+            title="Ainda não temos ações por aqui"
+            action={
+              <Link to="../recomendacoes" relative="path" className="inline-flex min-h-[36px] items-center font-semibold text-accent hover:underline">
+                Ver as oportunidades de melhoria
+              </Link>
+            }
+          >
+            Vamos montar o plano? Gere as ações a partir das mudanças do TO-BE, aproveite as recomendações aceitas, importe uma planilha ou crie uma do zero.
+          </Empty>
         ) : (
           <>
             {/* Tabela só a partir de 1280 px; abaixo disso, cartões (sem colunas espremidas). */}
@@ -203,8 +290,63 @@ export default function PlanTab() {
             </ul>
           </>
         )}
+        </div>
       </Card>
-      {w.actions.some(overdue) && <Callout tone="bad">{w.actions.filter(overdue).length} ação(ões) com prazo vencido.</Callout>}
+      <PrintPlan />
+      {w.actions.some(overdue) && (
+        <div className="print:hidden">
+          <Callout tone="bad">{w.actions.filter(overdue).length} ação(ões) com prazo vencido.</Callout>
+        </div>
+      )}
+
+      <Modal
+        open={!!imp}
+        onClose={() => setImp(null)}
+        title="Importar ações da planilha"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setImp(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmImport}>Adicionar {imp?.actions.length} {imp?.actions.length === 1 ? 'ação' : 'ações'}</Button>
+          </>
+        }
+      >
+        {imp && (
+          <div className="space-y-3 text-sm" data-testid="plan-import-preview">
+            <p className="text-ink2">
+              Encontramos <strong className="text-ink">{imp.actions.length}</strong> {imp.actions.length === 1 ? 'ação' : 'ações'}. Elas entram no fim do plano; nada do que já existe é alterado.
+            </p>
+            <ol className="list-decimal space-y-1 pl-5">
+              {imp.actions.slice(0, 6).map((a) => (
+                <li key={a.id}>
+                  <span className="text-ink">{a.description}</span>
+                  <span className="text-muted"> · {a.owner ?? 'responsável pendente'} · {a.due ? fmtDate(a.due) : 'prazo pendente'}</span>
+                </li>
+              ))}
+            </ol>
+            {imp.actions.length > 6 && <p className="text-muted">…e mais {imp.actions.length - 6}.</p>}
+            {(imp.missingOwner > 0 || imp.missingDue > 0) && (
+              <Callout tone="info">
+                {imp.missingOwner > 0 && `${imp.missingOwner} sem responsável`}
+                {imp.missingOwner > 0 && imp.missingDue > 0 && ' e '}
+                {imp.missingDue > 0 && `${imp.missingDue} sem prazo`}: ficam como “pendente” até você definir.
+              </Callout>
+            )}
+            {imp.notes.length > 0 && (
+              <Callout tone="warn" title="Ajustes na leitura">
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {imp.notes.slice(0, 8).map((n) => (
+                    <li key={n}>{n}</li>
+                  ))}
+                </ul>
+                {imp.notes.length > 8 && <p>…e mais {imp.notes.length - 8}.</p>}
+              </Callout>
+            )}
+          </div>
+        )}
+      </Modal>
+      <Tour storageKey="nexo.tour.plano" steps={TOUR} />
 
       <Drawer
         open={!!edit}
@@ -273,3 +415,49 @@ export default function PlanTab() {
   );
 }
 
+
+/** Versão para impressão/PDF: todas as ações, sem controles, com resumo no topo. */
+function PrintPlan() {
+  const { w } = useWorkspace();
+  const today = new Date().toISOString().slice(0, 10);
+  const open = w.actions.filter((a) => a.status !== 'concluida' && a.status !== 'cancelada');
+  const late = open.filter((a) => a.due && a.due < today);
+  return (
+    <div className="hidden print:block" data-testid="plan-print">
+      <h2 className="text-xl font-bold text-ink">Plano de ação — {w.asIs.name}</h2>
+      <p className="mt-1 text-sm text-ink2">
+        Gerado em {fmtDate(today)} · {w.actions.length} ações · {open.length} abertas · {w.actions.filter((a) => a.status === 'concluida').length} concluídas
+        {late.length > 0 && ` · ${late.length} com prazo vencido`}
+      </p>
+      <table className="mt-4 w-full border-collapse text-[11px] leading-snug">
+        <thead>
+          <tr className="border-b-2 border-line/60 text-left">
+            {['#', 'Ação', 'Responsável', 'Prazo', 'Prioridade', 'Situação', 'Indicador de sucesso'].map((h) => (
+              <th key={h} className="px-1.5 py-1 font-semibold text-ink">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {w.actions.map((a, i) => (
+            <tr key={a.id} className="border-b border-line/20 align-top">
+              <td className="px-1.5 py-1 text-ink2">{i + 1}</td>
+              <td className="px-1.5 py-1 text-ink">
+                {a.description}
+                {relatedProblemOf(a, w) && <span className="block text-ink2">Problema: {relatedProblemOf(a, w)}</span>}
+                {a.status === 'concluida' && a.observedResult && <span className="block text-ink2">Resultado observado: {a.observedResult}</span>}
+              </td>
+              <td className="px-1.5 py-1 text-ink2">{a.owner ?? 'pendente'}</td>
+              <td className="whitespace-nowrap px-1.5 py-1 text-ink2">{a.due ? fmtDate(a.due) : 'pendente'}</td>
+              <td className="px-1.5 py-1 text-ink2">{PRIO[a.priority]}</td>
+              <td className="px-1.5 py-1 text-ink2">{ACTION_STATUS[a.status]}</td>
+              <td className="px-1.5 py-1 text-ink2">{a.successIndicator ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-4 text-[10px] text-muted">“Pendente” = responsável ou prazo ainda não definidos pela equipe. Gerado pelo NexoProcess; os dados ficam no aparelho de quem gerou.</p>
+    </div>
+  );
+}

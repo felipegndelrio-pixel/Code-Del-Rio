@@ -11,6 +11,7 @@ import { fmtDateTime } from '../domain/units';
 import { db, exportBackup, parseBackup, restoreBackup, storageMode } from '../storage/db';
 import { download, downloadTemplateCsv, downloadTemplateXlsx, openDemo } from '../state/actions';
 import { STEP_PATH } from '../config/nav';
+import { demoBlocked } from '../license/demo';
 
 type Filter = 'todos' | 'andamento' | 'exemplo';
 
@@ -59,12 +60,14 @@ export default function Home() {
   };
 
   const backup = async () => {
+    if (demoBlocked('exportar')) return;
     const b = await exportBackup();
     await download(`nexoprocess-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(b, null, 2), 'application/json');
     toast('ok', `Backup com ${b.workspaces.length} projeto(s) baixado.`);
   };
 
   const restore = async (f: File, kind: 'projeto' | 'backup') => {
+    if (demoBlocked('salvar')) return;
     try {
       const ws = parseBackup(await f.text());
       const n = await restoreBackup(ws);

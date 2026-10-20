@@ -5,13 +5,14 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { AlertOctagon, ArrowRight, Check, ChevronRight, CircleDashed, CloudOff, Loader2, Lock, Menu, RotateCcw, Undo2 } from 'lucide-react';
-import { Badge, Button, Drawer, Empty, Spinner, useToast } from '../components/ui';
+import { Badge, Button, Drawer, Empty, PageSkeleton, useToast } from '../components/ui';
 import { MOBILE_TABS, NAV, NAV_ITEMS, STEP_PATH, type NavItem } from '../config/nav';
 import { journey, STEP_OBJECTIVE, stepRequirements, type JourneyStep } from '../domain/journey';
 import type { Workspace } from '../domain/types';
 import { fmtDateTime } from '../domain/units';
 import { db } from '../storage/db';
 import { useWorkspace, WorkspaceProvider } from '../state/workspace';
+import { BackButton } from '../components/BackButton';
 
 const OverviewTab = lazy(() => import('./workspace/OverviewTab'));
 const DataTab = lazy(() => import('./workspace/DataTab'));
@@ -39,7 +40,7 @@ export default function WorkspacePage() {
       .then((x) => setW(x ?? null))
       .catch(() => setW(null));
   }, [id]);
-  if (w === undefined) return <Spinner label="Abrindo projeto…" />;
+  if (w === undefined) return <PageSkeleton label="Abrindo projeto…" />;
   if (w === null)
     return (
       <div className="safe-x mx-auto max-w-xl py-10">
@@ -54,7 +55,7 @@ export default function WorkspacePage() {
         <Route
           path="relatorio"
           element={
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<PageSkeleton />}>
               <ReportPage />
             </Suspense>
           }
@@ -69,7 +70,11 @@ function SaveIndicator() {
   const { save, savedAt, retrySave } = useWorkspace();
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted" role="status" aria-live="polite" data-testid="save-state">
-      {save === 'salvando' ? (
+      {save === 'demo' ? (
+        <span className="inline-flex items-center gap-1 text-ink2">
+          <CloudOff className="h-3.5 w-3.5 text-amber" aria-hidden /> Demonstração · não salvo
+        </span>
+      ) : save === 'salvando' ? (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Salvando…
         </>
@@ -144,7 +149,7 @@ function StepHeader({ item, step, base }: { item: NavItem; step?: JourneyStep; b
   const missingRequired = reqs.filter((r) => r.kind === 'obrigatório' && !r.ok);
   const objective = step ? STEP_OBJECTIVE[step.key] : item.objective;
   return (
-    <header className="mb-4 sm:mb-5">
+    <header className="no-print mb-4 sm:mb-5">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-xl font-semibold text-ink sm:text-2xl">{item.label}</h2>
         {step && (
@@ -230,6 +235,7 @@ function Shell() {
 
       <div className="safe-x min-w-0 pb-28 pt-4 lg:px-8 lg:pb-12">
         {/* Breadcrumbs + projeto */}
+        <BackButton className="mb-1" />
         <nav aria-label="Você está em" className="no-print mb-2 flex min-w-0 items-center gap-1 text-xs text-muted">
           <Link to="/app" className="inline-flex min-h-[28px] shrink-0 items-center hover:text-ink">
             Meus projetos
@@ -245,7 +251,7 @@ function Shell() {
             </>
           )}
         </nav>
-        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line/10 pb-3 sm:mb-4 sm:pb-4">
+        <div className="no-print mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line/10 pb-3 sm:mb-4 sm:pb-4">
           <h1 className="w-full min-w-0 break-words text-base font-semibold leading-snug sm:w-auto sm:flex-1 sm:line-clamp-2 sm:text-xl" title={w.asIs.name}>
             {w.asIs.name}
           </h1>
@@ -285,7 +291,7 @@ function Shell() {
           </div>
         )}
 
-        <Suspense fallback={<Spinner />}>
+        <Suspense fallback={<PageSkeleton variant="tab" />}>
           <Routes>
             <Route index element={<Navigate to="visao-geral" replace />} />
             <Route path="visao-geral" element={<OverviewTab />} />

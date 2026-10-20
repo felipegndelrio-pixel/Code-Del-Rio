@@ -156,3 +156,36 @@ for (const theme of ['dark', 'light'] as const) {
     expect(await scan()).toEqual([]);
   });
 }
+
+test('modo demo: navega no exemplo, mas salvar e exportar mostram o convite de compra', async ({ page }) => {
+  const { errors } = await prepare(page);
+  await api(page, {});
+  await page.goto('/entrar');
+  await page.getByRole('button', { name: 'Experimentar a versão Demo' }).click();
+  await expect(page).toHaveURL(/\/app\/p\/[^/]+\/visao-geral$/);
+  await expect(page.getByText('Versão de demonstração.')).toBeVisible();
+  expect(await stored(page)).toBeNull(); // demo não cria acesso
+
+  const base = page.url().replace(/\/visao-geral$/, '');
+  await page.goto(`${base}/plano`);
+  await page.getByRole('button', { name: 'Exportar planilha (CSV)' }).click();
+  const blocked = page.getByTestId('demo-blocked');
+  await expect(blocked).toContainText('Modo de demonstração. Compre o acesso na Hotmart para salvar.');
+  await expect(blocked.getByRole('link', { name: 'Comprar acesso' })).toHaveAttribute('href', CHECKOUT);
+  await blocked.getByRole('button', { name: 'Fechar aviso' }).click();
+
+  // Editar funciona na tela, mas não grava: o indicador deixa isso claro.
+  await page.getByRole('combobox', { name: /^Situação de / }).first().selectOption('em_andamento');
+  await expect(page.getByTestId('save-state')).toContainText('Demonstração · não salvo');
+  await expect(blocked).toBeVisible();
+
+  // As telas de criação abrem na demonstração (o bloqueio é ao salvar).
+  await page.goto('/app/novo/formulario');
+  await expect(page).toHaveURL(/\/app\/novo\/formulario$/);
+
+  await page.getByRole('button', { name: 'Já comprei' }).first().click();
+  await expect(page).toHaveURL(/\/entrar$/);
+  await page.goto('/app');
+  await expect(page).toHaveURL(/\/entrar\?volta=%2Fapp$/); // saiu da demonstração
+  expect(errors).toEqual([]);
+});

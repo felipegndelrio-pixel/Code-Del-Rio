@@ -13,6 +13,7 @@ import { fmtBRL, fmtDateTime, fmtHours, fmtNum, fmtPct } from '../../domain/unit
 import { shareProject } from '../../state/actions';
 import { useWorkspace } from '../../state/workspace';
 import { STEP_PATH } from '../../config/nav';
+import { demoBlocked } from '../../license/demo';
 
 export default function OverviewTab() {
   const { w, metrics: m, issues } = useWorkspace();
@@ -33,6 +34,7 @@ export default function OverviewTab() {
   const top = bn.flagged[0];
 
   const share = async () => {
+    if (demoBlocked('exportar')) return;
     try {
       const how = await shareProject(w);
       toast('ok', how === 'shared' ? 'Arquivo do projeto enviado.' : 'Arquivo do projeto baixado. Abra-o no outro aparelho em Meus projetos → Importar projeto.');

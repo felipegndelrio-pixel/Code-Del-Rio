@@ -1,9 +1,9 @@
 // Assistente conversacional estruturado (V4): perguntas curtas + controles
 // adequados ao toque. Funciona igual no desktop; é o fluxo principal no celular.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Bot, Check, ChevronLeft, ChevronRight, ListPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Bot, Check, ChevronLeft, ChevronRight, ListPlus, Map as MapIcon, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { Badge, Button, Callout, Field, Input, NumberInput, Segmented, Select, Textarea, useConfirm, useToast } from '../components/ui';
 import { allActivities, draftActivityFrom, draftToProcess, emptyDraft, parseList, type AssistantDraft, type DraftActivity, type DraftStage } from '../domain/assistant';
 import type { DurationUnit, LeanClass, Period } from '../domain/types';
@@ -11,6 +11,11 @@ import { fmtNum, uid } from '../domain/units';
 import { validateProcess } from '../domain/validation';
 import { db } from '../storage/db';
 import { createWorkspace } from '../state/actions';
+import { useHardwareBack } from '../state/backNav';
+import { localDraft } from '../storage/localDraft';
+import { demoBlocked } from '../license/demo';
+import { recommend } from '../domain/recommendations';
+import type { Workspace } from '../domain/types';
 
 const DRAFT = 'assistant';
 const SECTIONS = ['Processo', 'Etapas', 'Atividades', 'Detalhes', 'Decisões', 'Volume e custo', 'Revisão'];
@@ -52,14 +57,22 @@ export default function Assistant() {
   const nav = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
-  const [d, setD] = useState<AssistantDraft>(emptyDraft);
-  const [loaded, setLoaded] = useState(false);
-  const [restored, setRestored] = useState(false);
+  // A cópia do localStorage é lida de forma síncrona: ao recarregar, a tela já abre
+  // na pergunta em que a pessoa estava (sem piscar na primeira pergunta).
+  const [local] = useState(() => {
+    const x = localDraft.read<AssistantDraft>(DRAFT);
+    return x && x.version === 1 && x.name ? x : undefined;
+  });
+  const [d, setD] = useState<AssistantDraft>(() => local ?? emptyDraft());
+  const [loaded, setLoaded] = useState(!!local);
+  const [restored, setRestored] = useState(!!local);
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<Workspace | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (local) return;
     db.getDraft<AssistantDraft>(DRAFT)
       .then((x) => {
         if (x && x.version === 1 && x.name) {
@@ -69,15 +82,17 @@ export default function Assistant() {
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
-  }, []);
+  }, [local]);
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || done) return;
+    // Auto-save: cópia imediata no localStorage + IndexedDB com debounce.
+    if (d.name) localDraft.write(DRAFT, d);
     const t = setTimeout(() => void db.putDraft(DRAFT, d).catch(() => {}), 250);
     return () => clearTimeout(t);
-  }, [d, loaded]);
+  }, [d, loaded, done]);
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
-    composerRef.current?.querySelector<HTMLElement>('input,textarea,button')?.focus({ preventScroll: true });
+    composerRef.current?.querySelector<HTMLElement>('input,textarea,button:not([data-back])')?.focus({ preventScroll: true });
   }, [d.step]);
 
   const order = stepOrder(d);
@@ -94,6 +109,31 @@ export default function Assistant() {
       const i = o.indexOf(merged.step);
       return { ...merged, step: o[Math.min(o.length - 1, i + 1)] };
     });
+  /** Um passo para trás, mantendo as respostas: atividade anterior nos detalhes, resumo ao corrigir, ou pergunta anterior. */
+  const canBack = !done && (idx > 0 || (d.step === 'details' && d.detailIndex > 0) || !!d.returnToReview);
+  const back = () => {
+    if (d.step === 'details' && d.detailIndex > 0) set({ detailIndex: d.detailIndex - 1 });
+    else if (d.returnToReview) setD((x) => ({ ...x, step: 'review', returnToReview: false }));
+    else if (idx > 0) go(order[idx - 1]);
+  };
+  useHardwareBack('assistente', canBack, back, `${d.step}:${d.detailIndex}:${d.returnToReview ? 1 : 0}`);
+
+  /** Desktop: Enter avança (campos de texto de uma linha vazios ou sem formulário próprio). */
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.nativeEvent.isComposing) return;
+    if (!window.matchMedia?.('(pointer: fine)').matches) return;
+    const t = e.target as HTMLElement;
+    if (t.closest('textarea,button,select,a,[role="radio"]')) return;
+    const input = t instanceof HTMLInputElement ? t : null;
+    // Campo com formulário próprio (nome, "adicionar item" com texto): o formulário decide.
+    if (input?.form && input.value.trim()) return;
+    if (input?.form && !input.form.hasAttribute('data-add')) return;
+    const primary = composerRef.current?.querySelector<HTMLButtonElement>('[data-primary]:not(:disabled)');
+    if (!primary) return;
+    e.preventDefault();
+    primary.click();
+  };
+
   const setStage = (key: string, patch: Partial<DraftStage>) => setD((x) => ({ ...x, stages: x.stages.map((s) => (s.key === key ? { ...s, ...patch } : s)) }));
   const setAct = (key: string, patch: Partial<DraftActivity>) => setD((x) => ({ ...x, stages: x.stages.map((s) => ({ ...s, activities: s.activities.map((a) => (a.key === key ? { ...a, ...patch } : a)) })) }));
 
@@ -104,12 +144,14 @@ export default function Assistant() {
 
   const finish = async () => {
     if (!process || issues.some((i) => i.severity === 'error')) return;
+    if (demoBlocked('salvar')) return;
     setBusy(true);
     try {
       const w = await createWorkspace(process, { kind: 'wizard' });
       await db.deleteDraft(DRAFT).catch(() => {});
-      toast('ok', 'Pronto! Seu processo está mapeado e salvo neste aparelho.');
-      nav(`/app/p/${w.id}/${issues.length ? 'validar' : 'mapa'}`);
+      localDraft.remove(DRAFT);
+      setDone(w);
+      window.scrollTo({ top: 0 });
     } catch {
       toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
     } finally {
@@ -119,6 +161,7 @@ export default function Assistant() {
   const discard = async () => {
     if (!(await confirm({ title: 'Começar do zero?', body: 'As respostas até aqui serão apagadas deste aparelho.', confirm: 'Apagar e recomeçar', danger: true }))) return;
     await db.deleteDraft(DRAFT).catch(() => {});
+    localDraft.remove(DRAFT);
     setD(emptyDraft());
     setRestored(false);
   };
@@ -126,6 +169,8 @@ export default function Assistant() {
   // Transcrição: perguntas já respondidas, com "Corrigir".
   const answered = order.slice(0, idx).map((step) => ({ step, ...summary(step, d) })).filter((x) => x.q);
   const section = sectionOf(d.step);
+
+  if (done) return <Success w={done} warnings={issues.length} onOpen={(path) => nav(`/app/p/${done.id}/${path}`, { replace: true })} />;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-6 pt-4 sm:pt-8">
@@ -166,7 +211,22 @@ export default function Assistant() {
         ))}
       </div>
 
-      <div ref={composerRef} className="mt-4 rounded-2xl border border-line/15 bg-surface p-4 shadow-card sm:p-5" data-testid="assistant-step">
+      <div
+        ref={composerRef}
+        key={`${d.step}:${d.step === 'details' ? d.detailIndex : ''}`}
+        onKeyDown={onKeyDown}
+        className="np-fade-in mt-4 rounded-2xl border border-line/15 bg-surface p-4 shadow-card sm:p-5"
+        data-testid="assistant-step"
+      >
+        <button
+          type="button"
+          data-back
+          className="-ml-2 -mt-1 mb-2 inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-ink2 hover:bg-surface2 hover:text-ink"
+          onClick={() => (canBack ? back() : nav('/app'))}
+          aria-label={canBack ? (d.returnToReview ? 'Voltar ao resumo' : 'Voltar à pergunta anterior') : 'Voltar para Meus projetos'}
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden /> Voltar
+        </button>
         {ack && (
           <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-ok" data-testid="assistant-ack">
             <Check className="h-4 w-4 shrink-0" aria-hidden /> {ack}
@@ -263,7 +323,7 @@ export default function Assistant() {
               <Button variant="secondary" onClick={() => next({ volume: undefined, volumeUnknown: true })}>
                 Não sei ainda
               </Button>
-              <Button onClick={() => next({ volumeUnknown: false })} disabled={d.volume === undefined}>
+              <Button data-primary onClick={() => next({ volumeUnknown: false })} disabled={d.volume === undefined}>
                 {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
               </Button>
             </Actions>
@@ -280,7 +340,7 @@ export default function Assistant() {
               <Button variant="secondary" onClick={() => next({ costPerHour: undefined, costUnknown: true })}>
                 Não sei / prefiro não informar
               </Button>
-              <Button onClick={() => next({ costUnknown: false })} disabled={d.costPerHour === undefined}>
+              <Button data-primary onClick={() => next({ costUnknown: false })} disabled={d.costPerHour === undefined}>
                 {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
               </Button>
             </Actions>
@@ -308,19 +368,14 @@ export default function Assistant() {
               ))
             )}
             <Actions>
-              <Button onClick={() => void finish()} loading={busy} disabled={issues.some((i) => i.severity === 'error') || !acts.length}>
-                <Check className="h-4 w-4" aria-hidden /> Criar projeto e ver o mapa
+              <Button data-primary onClick={() => void finish()} loading={busy} disabled={issues.some((i) => i.severity === 'error') || !acts.length}>
+                <Check className="h-4 w-4" aria-hidden /> Criar meu projeto
               </Button>
             </Actions>
           </div>
         )}
       </div>
       <div ref={endRef} />
-      {idx > 0 && (
-        <button type="button" className="mt-3 inline-flex min-h-[44px] items-center gap-1 self-start text-sm font-semibold text-ink2 hover:text-ink" onClick={() => go(order[idx - 1])}>
-          <ChevronLeft className="h-4 w-4" aria-hidden /> Voltar à pergunta anterior
-        </button>
-      )}
     </div>
   );
 }
@@ -457,6 +512,7 @@ function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, nextLab
       {mode === 'um' ? (
         <form
           className="flex gap-2"
+          data-add
           onSubmit={(e) => {
             e.preventDefault();
             add();
@@ -531,7 +587,7 @@ function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, nextLab
             {skipLabel ?? 'Pular por agora'}
           </Button>
         )}
-        <Button onClick={onNext} disabled={!items.length || items.some((x) => !x.label.trim())}>
+        <Button data-primary onClick={onNext} disabled={!items.length || items.some((x) => !x.label.trim())}>
           {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
         </Button>
       </Actions>
@@ -567,7 +623,7 @@ function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: Assista
       <div className="space-y-3">
         <Bubble>Ainda não há atividades para detalhar. Tudo bem, seguimos.</Bubble>
         <Actions>
-          <Button onClick={onNext}>{nextLabel}</Button>
+          <Button data-primary onClick={onNext}>{nextLabel}</Button>
         </Actions>
       </div>
     );
@@ -647,6 +703,7 @@ function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: Assista
         </Button>
         {i < acts.length - 1 ? (
           <Button
+            data-primary
             onClick={() => {
               setAct(a.key, { reviewed: true });
               set({ detailIndex: i + 1 });
@@ -656,6 +713,7 @@ function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: Assista
           </Button>
         ) : (
           <Button
+            data-primary
             onClick={() => {
               setAct(a.key, { reviewed: true });
               onNext();
@@ -716,10 +774,60 @@ function DecisionsStep({ d, set, nextLabel, onNext }: { d: AssistantDraft; set: 
         <Button variant="secondary" onClick={add} disabled={!acts.length}>
           <Plus className="h-4 w-4" aria-hidden /> {d.decisions.length ? 'Outra decisão' : 'Sim, adicionar decisão'}
         </Button>
-        <Button onClick={onNext} disabled={incomplete}>
+        <Button data-primary onClick={onNext} disabled={incomplete}>
           {d.decisions.length ? nextLabel : `Não há decisões — ${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}`} <ChevronRight className="h-4 w-4" aria-hidden />
         </Button>
       </Actions>
+    </div>
+  );
+}
+
+/** "Aha!": o que acabou de ser mapeado, com números reais do processo criado. */
+function Success({ w, warnings, onOpen }: { w: Workspace; warnings: number; onOpen: (path: string) => void }) {
+  const p = w.asIs;
+  const tasks = p.activities.filter((a) => a.type === 'task');
+  const owners = new Set(tasks.map((a) => a.owner?.trim()).filter(Boolean)).size;
+  const decisions = p.activities.filter((a) => a.type === 'decision').length;
+  const recs = useMemo(() => recommend(p, w.bottleneck.criterion, w.bottleneck.thresholdPct).length, [p, w.bottleneck]);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => headingRef.current?.focus(), []);
+  const facts = [
+    plural(tasks.length, 'atividade em ordem', 'atividades em ordem'),
+    owners ? plural(owners, 'responsável identificado', 'responsáveis identificados') : null,
+    decisions ? plural(decisions, 'ponto de decisão', 'pontos de decisão') : null,
+    recs ? plural(recs, 'oportunidade de melhoria para avaliar', 'oportunidades de melhoria para avaliar') : null,
+  ].filter(Boolean) as string[];
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 pb-10 pt-6 sm:pt-12" data-testid="assistant-success">
+      <div className="np-fade-in rounded-2xl border border-ok/30 bg-surface p-6 text-center shadow-card sm:p-8">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-ok/15 text-ok" aria-hidden>
+          <Sparkles className="h-7 w-7" />
+        </span>
+        <h1 ref={headingRef} tabIndex={-1} className="mt-4 text-2xl font-extrabold tracking-tight outline-none">
+          Excelente! Seu processo foi mapeado com {plural(p.stageOrder.length, 'etapa', 'etapas')}.
+        </h1>
+        <p className="mt-2 text-ink2">“{p.name}” já está salvo neste aparelho, com o mapa desenhado e o diagnóstico calculado a partir das suas respostas.</p>
+        <ul className="mx-auto mt-5 max-w-sm space-y-2 text-left text-sm">
+          {facts.map((f) => (
+            <li key={f} className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-ok" aria-hidden /> {f}
+            </li>
+          ))}
+          {warnings > 0 && (
+            <li className="flex items-start gap-2 text-ink2">
+              <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden /> {plural(warnings, 'ponto para completar quando puder', 'pontos para completar quando puder')}
+            </li>
+          )}
+        </ul>
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Button size="lg" onClick={() => onOpen('plano')}>
+            Ver meu Plano de Ação <ChevronRight className="h-4 w-4" aria-hidden />
+          </Button>
+          <Button size="lg" variant="secondary" onClick={() => onOpen(warnings ? 'validar' : 'mapa')}>
+            <MapIcon className="h-4 w-4" aria-hidden /> {warnings ? 'Revisar os dados' : 'Ver o mapa'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

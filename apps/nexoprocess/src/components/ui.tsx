@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { AlertTriangle, CheckCircle2, ChevronDown, HelpCircle, Info, Loader2, X } from 'lucide-react';
 import { GLOSSARY, type GlossaryKey } from '../config/glossary';
 import type { Basis } from '../domain/compare';
+import { useHardwareBack } from '../state/backNav';
 
 export function Card({ title, subtitle, action, children, className, id, tone = 'default' }: {
   title?: ReactNode;
@@ -360,6 +361,8 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
 export function Drawer({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode }) {
   const ref = useFocusTrap(open, onClose);
   const id = useId();
+  // "Voltar" do celular fecha o painel em vez de sair da tela.
+  useHardwareBack(`painel${id}`, open, onClose);
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-50 bg-black/45" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -457,6 +460,33 @@ export function Spinner({ label = 'Carregando…' }: { label?: string }) {
 
 export function Skeleton({ className }: { className?: string }) {
   return <div className={clsx('animate-pulse rounded-xl bg-surface2', className)} aria-hidden />;
+}
+
+/** Esqueleto de página enquanto o conteúdo carrega (no lugar de tela em branco). */
+export function PageSkeleton({ label = 'Carregando…', variant = 'page' }: { label?: string; variant?: 'page' | 'tab' }) {
+  return (
+    <div role="status" aria-live="polite" className={clsx('w-full', variant === 'page' ? 'safe-x mx-auto max-w-5xl space-y-4 py-6' : 'space-y-4')} data-testid="skeleton">
+      <span className="sr-only">{label}</span>
+      {variant === 'page' && (
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-8 w-2/3 max-w-md" />
+        </div>
+      )}
+      <div className="rounded-2xl border border-line/10 p-4">
+        <Skeleton className="h-5 w-40" />
+        <div className="mt-4 space-y-2.5">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-4 w-4/5" />
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+      </div>
+    </div>
+  );
 }
 
 /**

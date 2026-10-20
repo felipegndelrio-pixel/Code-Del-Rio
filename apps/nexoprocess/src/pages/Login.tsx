@@ -2,12 +2,14 @@
 // os dados dos processos continuam neste aparelho.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
+import { PlayCircle, ShieldCheck } from 'lucide-react';
 import { BRAND } from '../config/brand';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/AppShell';
 import { Button, Callout, Field, Input } from '../components/ui';
 import { activate, currentLicense, LICENSE } from '../license/config';
+import { endDemo, startDemo } from '../license/demo';
+import { openDemo } from '../state/actions';
 
 /** Só volta para rotas internas do app (evita redirecionamento aberto). */
 const safeReturn = (v: string | null) => (v && /^\/app(\/|$|\?)/.test(v) && !v.startsWith('//') ? v : '/app');
@@ -30,13 +32,26 @@ export default function Login() {
     if (error) errRef.current?.focus();
   }, [error]);
 
+  const tryDemo = async () => {
+    startDemo();
+    try {
+      const w = await openDemo();
+      nav(`/app/p/${w.id}/visao-geral`);
+    } catch {
+      nav('/app');
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setBusy(true);
     const r = await activate({ email });
     setBusy(false);
-    if (r.ok) nav(volta, { replace: true });
+    if (r.ok) {
+      endDemo();
+      nav(volta, { replace: true });
+    }
     else setError({ message: r.message, buy: r.reason === 'nao_encontrado' });
   };
 
@@ -97,6 +112,14 @@ export default function Login() {
             Entrar
           </Button>
         </form>
+
+        <div className="mt-4 rounded-2xl border border-dashed border-line/30 p-4">
+          <p className="text-sm font-semibold text-ink">Ainda está decidindo?</p>
+          <p className="mt-1 text-sm text-ink2">Navegue por um processo de exemplo completo — mapa, diagnóstico e plano de ação. Na demonstração nada é salvo nem exportado.</p>
+          <Button variant="secondary" className="mt-3 w-full" onClick={() => void tryDemo()}>
+            <PlayCircle className="h-4 w-4" aria-hidden /> Experimentar a versão Demo
+          </Button>
+        </div>
 
         <p className="mt-4 flex items-start gap-2 text-sm text-muted">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />

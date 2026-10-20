@@ -13,7 +13,7 @@ export const CSP = (() => {
   return m[1].trim();
 })();
 
-export async function prepare(page: Page, opts: { theme?: 'dark' | 'light' } = {}) {
+export async function prepare(page: Page, opts: { theme?: 'dark' | 'light'; tour?: boolean } = {}) {
   const errors: string[] = [];
   const external: string[] = [];
   page.on('console', (m) => {
@@ -30,6 +30,10 @@ export async function prepare(page: Page, opts: { theme?: 'dark' | 'light' } = {
     if ((headers['content-type'] ?? '').includes('text/html')) headers['content-security-policy'] = CSP;
     await route.fulfill({ response: resp, headers });
   });
+  // Sem animações (axe mede contraste no meio do fade) e sem o tour de boas-vindas,
+  // exceto nos testes que tratam dele.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  if (!opts.tour) await page.addInitScript(() => localStorage.setItem('nexo.tour.plano', '1'));
   if (opts.theme) await page.addInitScript((t) => localStorage.setItem('nexo.theme', t), opts.theme);
   return { errors, external };
 }
