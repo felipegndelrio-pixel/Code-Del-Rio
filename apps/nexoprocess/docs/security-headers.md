@@ -62,6 +62,8 @@ TEST_BASE_URL=https://<deploy>.pages.dev npm run nexo:test:csp:rotas
 
 **Limite dos E2E:** eles injetam a CSP por `page.route` sobre o `vite preview`, que não aplica `_headers`. Navegações servidas pelo service worker não passam por `page.route`, e por isso a varredura com cabeçalho real é o `nexo:test:csp:rotas`.
 
+**API:** as respostas de `/api/*` (Pages Functions ou Vercel) são JSON com `Cache-Control: no-store`. O `wrangler pages dev` dos testes roda em `apps/nexoprocess`, como o Pages com Root directory nessa pasta, e serve também as functions (`npm run nexo:test:api`).
+
 **Telemetria do wrangler:** desligada nos testes (`WRANGLER_SEND_METRICS=false`). O estado local fica em `.wrangler/` (ignorado pelo git).
 
 ## Arquivo único (`nexo:build:single`) — sem CSP

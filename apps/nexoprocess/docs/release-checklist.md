@@ -11,12 +11,13 @@ Itens verificados antes de cada versão. Detalhes por fase em [`plano-fases.md`]
 - [ ] Entrada maliciosa (`tests/e2e/security.spec.ts`): 6 arquivos maliciosos, `.xlsm` com macro, `<noscript>` e tema sem flash
 - [ ] Paridade `vercel.json` × `public/_headers` (`tests/api/vercel-headers.test.ts`)
 - [ ] Acesso pela compra: API e webhook (`tests/api/license.test.ts`) e E2E do modo de venda (`tests/e2e/license.spec.ts`, projeto `licenca`)
+- [ ] API no runtime do Cloudflare Pages (`nexo:test:api`: functions + workerd + Supabase falso, webhook → ativação → reembolso)
 
 ## Metas medidas manualmente
 
 - [ ] Lighthouse móvel no mapa (`/app/p/:id/mapa`, perfil com a demonstração): Desempenho ≥ 80, Acessibilidade ≥ 95
 - [ ] Diagrama inteiro na primeira dobra a 390×844 e 360×800 (`docs/evidencias/fase-1.5/`)
-- [ ] Com deploy no Cloudflare: `TEST_BASE_URL=https://<deploy>.pages.dev npm run nexo:test:csp` e `nexo:test:csp:rotas` contra o deploy de preview
+- [ ] Com deploy no Cloudflare: `TEST_BASE_URL=https://<deploy>.pages.dev npm run nexo:test:csp` e `nexo:test:csp:rotas`, `curl` em `/api/license` e "Enviar teste" do webhook da Hotmart com log `→ active` (`docs/DEPLOY_CLOUDFLARE.md`, passos 4 e 5)
 - [ ] Com deploy na Vercel: os mesmos dois testes com `TEST_BASE_URL=https://<app>.vercel.app`, `curl` em `/api/license` e "Enviar teste" do webhook da Hotmart com log `→ active` (`docs/DEPLOY_VERCEL.md`, passos 4 e 5)
 
 ## Dívidas conhecidas

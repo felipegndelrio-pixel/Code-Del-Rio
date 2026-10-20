@@ -21,7 +21,7 @@ O navegador baixa os arquivos estáticos do app da hospedagem (ex.: Cloudflare P
 ## Acesso pago (build de venda, `VITE_LICENSE_REQUIRED=true`)
 | Momento | O que sai do aparelho | Para onde |
 |---|---|---|
-| Ativação (tela "Entrar") | **Só o e-mail digitado** | `POST /api/license` (função da Vercel, mesma origem) |
+| Ativação (tela "Entrar") | **Só o e-mail digitado** | `POST /api/license` (função do servidor na mesma origem: Cloudflare Pages Functions ou Vercel) |
 | Renovação, no máximo a cada 7 dias e só com internet | O token salvo (contém o e-mail) | `POST /api/license` |
 | Compra, reembolso ou chargeback na Hotmart | Nada do aparelho: a **Hotmart** envia e-mail, produto, transação e evento | `POST /api/hotmart-webhook` |
 

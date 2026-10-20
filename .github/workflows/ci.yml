@@ -25,6 +25,8 @@ jobs:
       - run: npm run nexo:check-bundle
       # CSP e cabeçalhos reais do public/_headers, servidos pelo wrangler pages dev
       - run: npm run nexo:test:csp
+      # API de acesso (functions + workerd) com Supabase falso: webhook → ativação → reembolso
+      - run: npm run nexo:test:api
   nexoprocess-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 25

@@ -1,5 +1,7 @@
 # Deploy na Vercel — NexoProcess com acesso pela compra na Hotmart
 
+> **Alternativa paga.** Para vender sem mensalidade, use o [Cloudflare Pages](DEPLOY_CLOUDFLARE.md) (caminho recomendado). Os passos de Supabase, chaves, webhook e operação são os mesmos nos dois guias.
+
 Guia passo a passo do build de venda: PWA instalável, acesso liberado pelo e-mail da compra, revogado em reembolso ou chargeback.
 
 ## ⚠️ Antes de começar: custo
