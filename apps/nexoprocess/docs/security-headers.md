@@ -1,6 +1,6 @@
 # Cabeçalhos de segurança — NexoProcess
 
-Fonte única: [`public/_headers`](../public/_headers) (Cloudflare Pages). A política é verificada em CI contra o servidor real (`wrangler pages dev`). Diagnóstico e medições: [`fase-2-diagnostico.md`](fase-2-diagnostico.md).
+Fonte: [`public/_headers`](../public/_headers) (Cloudflare Pages), espelhado em [`vercel.json`](../vercel.json) para a Vercel, que não lê `_headers`. O teste `tests/api/vercel-headers.test.ts` falha se os dois divergirem. A política é verificada em CI contra o servidor real (`wrangler pages dev`). Diagnóstico e medições: [`fase-2-diagnostico.md`](fase-2-diagnostico.md).
 
 ```
 Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
@@ -19,7 +19,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 | `style-src` | `'self' 'unsafe-inline'` | **Único motivo medido:** o SVG do mapa no relatório é inserido como HTML (`ReportPage.tsx`, decisão B da Fase 2) e traz atributos `style=` (325 na demonstração). React e bpmn-js aplicam estilo via CSSOM, o que a CSP permite: sem `'unsafe-inline'`, mapa, gráficos, assistente e exportações não geram nenhuma violação. Não há nonce no fluxo atual (site estático). | Varredura com `style-src 'self'`: violações só no relatório (§3 do diagnóstico) |
 | `img-src` | `'self' data: blob:` | `data:`: CSS do bpmn-js (`content:url("data:image/svg+xml…")`). `blob:`: exportação PNG, em que o SVG vira `blob:`, depois `<img>` e por fim canvas (`bpmn/render.ts`). | Exportação PNG sem violação em `nexo:test:csp:rotas` |
 | `font-src` | `'self'` | Fontes IBM Plex servidas como `.woff2` do próprio bundle. Saiu `data:`: nenhuma fonte embutida. | CSS do build só referencia `/assets/*.woff2` |
-| `connect-src` | `'self'` | O app não chama nenhuma API. O service worker busca o precache na própria origem. | — |
+| `connect-src` | `'self'` | O app só chama a própria origem: o precache do service worker e, no build de venda, `/api/license` (mesma origem, sem domínio extra). | — |
 | `worker-src` | `'self'` | O único worker é o service worker (`/sw.js`). **Sem `blob:`:** jszip e exceljs **não** criam workers; as menções a `importScripts` nos chunks `zip-*` e `xlsx-*` são polyfills de `setImmediate` que só testam se estão num worker. | Nenhum `new Worker` no bundle; ZIP e XLSX exportados sem violação |
 | `manifest-src` | `'self'` | Manifesto do PWA (`/manifest.webmanifest`). | — |
 | `object-src` | `'none'` | Bloqueia `<object>`/`<embed>` (plugins, PDF/Flash/Java embutidos). | — |
