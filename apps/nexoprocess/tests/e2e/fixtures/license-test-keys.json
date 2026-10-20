@@ -1,0 +1,16 @@
+{
+  "aviso": "CHAVE SÓ DE TESTE (E2E do modo de venda). Nunca use em produção: gere a sua com scripts/license-keys.mjs.",
+  "privateJwk": {
+    "kty": "EC",
+    "x": "LGQgjfbQ9uI8WpXo-cj_V9811QuFQRSjJc1pQqbku54",
+    "y": "rYDpGKmsRuzWPQSEaPTsskdpibfxI4frCTTAkzaMdTs",
+    "crv": "P-256",
+    "d": "b03nufET0bJLx38ImT52MIWP3w4EnAqK8Acsl72jmWg"
+  },
+  "publicJwk": {
+    "kty": "EC",
+    "x": "LGQgjfbQ9uI8WpXo-cj_V9811QuFQRSjJc1pQqbku54",
+    "y": "rYDpGKmsRuzWPQSEaPTsskdpibfxI4frCTTAkzaMdTs",
+    "crv": "P-256"
+  }
+}

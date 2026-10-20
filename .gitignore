@@ -13,6 +13,7 @@ backups/
 dist-e2e
 dist-demo
 dist-single
+dist-licenca
 dist-pages
 
 # Relatórios locais de build do NexoProcess

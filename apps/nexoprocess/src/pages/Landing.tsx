@@ -5,6 +5,7 @@ import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/AppShell';
 import { Button, useToast } from '../components/ui';
 import { openDemo } from '../state/actions';
+import { LICENSE } from '../license/config';
 
 const FEATURE_ICONS = [GitBranch, BarChart3, Lightbulb, Scale, ScrollText, Lock];
 
@@ -47,16 +48,16 @@ export default function Landing() {
               <Button size="lg" onClick={() => nav('/app')}>
                 {COMMERCIAL.primaryCta} <ArrowRight className="h-5 w-5" aria-hidden />
               </Button>
-              <Button size="lg" variant="secondary" onClick={demo}>
-                Ver demonstração fictícia
-              </Button>
+              <SecondaryCta onDemo={demo} />
               {COMMERCIAL.secondaryCta.url && (
                 <a href={COMMERCIAL.secondaryCta.url} className="inline-flex min-h-[52px] items-center rounded-xl px-4 font-semibold text-brand underline-offset-4 hover:underline" rel="noopener">
                   {COMMERCIAL.secondaryCta.label}
                 </a>
               )}
             </div>
-            <p className="mt-3 text-sm text-muted">Sem cadastro. Suas planilhas são lidas no navegador e ficam salvas só neste aparelho.</p>
+            <p className="mt-3 text-sm text-muted">
+              {LICENSE.required ? 'Acesso com o e-mail usado na compra.' : 'Sem cadastro.'} Suas planilhas são lidas no navegador e ficam salvas só neste aparelho.
+            </p>
           </div>
           <HeroVisual />
         </section>
@@ -118,14 +119,12 @@ export default function Landing() {
 
         <section className="mt-6 rounded-2xl border border-brand/30 bg-surface p-6 text-center ">
           <h2 className="text-2xl font-bold">Seu processo. Seu mapa. Seus gargalos.</h2>
-          <p className="mx-auto mt-2 max-w-xl text-ink2">Explore a demonstração fictícia ou traga o seu processo agora.</p>
+          <p className="mx-auto mt-2 max-w-xl text-ink2">{LICENSE.required ? 'Entre com o e-mail da compra e traga o seu processo agora.' : 'Explore a demonstração fictícia ou traga o seu processo agora.'}</p>
           <div className="mt-4 flex flex-wrap justify-center gap-3">
             <Button size="lg" onClick={() => nav('/app')}>
               Começar agora
             </Button>
-            <Button size="lg" variant="secondary" onClick={demo}>
-              Ver demonstração fictícia
-            </Button>
+            <SecondaryCta onDemo={demo} />
           </div>
         </section>
       </main>
@@ -183,5 +182,21 @@ function HeroVisual() {
         </g>
       </svg>
     </figure>
+  );
+}
+
+/** No build de venda, o lugar da demonstração vira o link de compra (a demo exige acesso). */
+function SecondaryCta({ onDemo }: { onDemo: () => void }) {
+  if (!LICENSE.required)
+    return (
+      <Button size="lg" variant="secondary" onClick={onDemo}>
+        Ver demonstração fictícia
+      </Button>
+    );
+  if (!LICENSE.checkoutUrl) return null;
+  return (
+    <a href={LICENSE.checkoutUrl} rel="noopener noreferrer" target="_blank" className="inline-flex min-h-[52px] items-center rounded-xl border border-line/20 bg-surface px-5 font-semibold text-ink hover:border-line/40">
+      Comprar na Hotmart
+    </a>
   );
 }

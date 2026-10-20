@@ -250,7 +250,7 @@ test('noscript visivel e com tokens de tema quando o JavaScript esta desligado',
     await page.goto('/');
     const box = page.getByRole('alert');
     await expect(box.getByRole('heading', { name: 'NexoProcess precisa de JavaScript' })).toBeVisible();
-    await expect(box).toContainText('seus dados nunca são enviados a servidores');
+    await expect(box).toContainText('seus processos e planilhas nunca são enviados a servidores');
     expect(await box.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(bg);
     await shot(page, `8-noscript-${scheme}`);
     await ctx.close();

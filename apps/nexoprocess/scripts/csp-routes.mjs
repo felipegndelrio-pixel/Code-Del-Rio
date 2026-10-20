@@ -10,7 +10,7 @@ import { chromium } from '@playwright/test';
 import { startPagesServer } from './lib/pages-server.mjs';
 
 const PROJECT_TABS = ['visao-geral', 'dados', 'validar', 'mapa', 'diagnostico', 'recomendacoes', 'tobe', 'comparar', 'plano', 'resultados', 'riscos', 'responsabilidades', 'simulacao', 'automacao', 'exportar', 'relatorio'];
-const APP_ROUTES = ['/', '/app', '/app/novo', '/app/novo/formulario', '/app/importar', '/app/ajuda'];
+const APP_ROUTES = ['/', '/entrar', '/app', '/app/novo', '/app/novo/formulario', '/app/importar', '/app/ajuda'];
 const EXPORTS = ['Mapas em PNG (ZIP)', 'Mapas em SVG (ZIP)', 'Dados em XLSX', 'Dados em CSV', 'BPMN 2.0 XML'];
 
 const candidate = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
