@@ -21,9 +21,9 @@ export default function ExportTab() {
     setBusy(key);
     try {
       await fn();
-      toast('ok', 'Arquivo gerado.');
+      toast('ok', 'Pronto! Arquivo gerado.');
     } catch (e) {
-      toast('bad', `Não foi possível exportar: ${e instanceof Error ? e.message : String(e)}`);
+      toast('bad', `Não conseguimos exportar: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
     }

@@ -55,7 +55,7 @@ export default function RecsTab() {
       },
       { area: 'Plano de ação', message: `Ação criada a partir de “${r.title}”` },
     );
-    toast('ok', 'Ação adicionada ao plano (responsável e prazo ficam pendentes até você definir).');
+    toast('ok', 'Boa! Ação adicionada ao plano. Responsável e prazo ficam pendentes até você definir.');
   };
 
   const shown = recs.filter((r) => filter === 'todas' || status(r) === filter);

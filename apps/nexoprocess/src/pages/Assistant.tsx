@@ -20,6 +20,27 @@ const PERIOD_TXT: Record<Period, string> = { dia: 'dia', semana: 'semana', mes: 
 function stepOrder(d: AssistantDraft): string[] {
   return ['name', 'trigger', 'outcome', 'stages', ...d.stages.map((s) => `acts:${s.key}`), 'details', 'decisions', 'volume', 'cost', 'review'];
 }
+/** Para onde o botão leva, em linguagem natural ("Avançar para as etapas"). */
+function stepTarget(step: string, d: AssistantDraft): string {
+  if (step.startsWith('acts:')) {
+    const st = d.stages.find((x) => `acts:${x.key}` === step);
+    return st ? `as atividades de “${st.name}”` : 'as atividades';
+  }
+  const T: Record<string, string> = { name: 'o nome', trigger: 'o início do processo', outcome: 'o fim do processo', stages: 'as etapas', details: 'os detalhes', decisions: 'as decisões', volume: 'o volume', cost: 'o custo-hora', review: 'a revisão' };
+  return T[step] ?? 'a próxima pergunta';
+}
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+
+/** Confirmação curta ao chegar em marcos do roteiro (não aparece ao corrigir a partir da revisão). */
+function ackFor(step: string, d: AssistantDraft, order: string[]): string | null {
+  const acts = allActivities(d);
+  if (step === 'trigger') return `Ótimo, vamos mapear “${d.name}”.`;
+  if (step === order.find((x) => x.startsWith('acts:'))) return `Boa! ${plural(d.stages.length, 'etapa definida', 'etapas definidas')}. Agora, o que acontece em cada uma.`;
+  if (step === 'details' && acts.length) return `Boa, isso já ajuda a mapear o fluxo: ${plural(acts.length, 'atividade', 'atividades')} até aqui.`;
+  if (step === 'volume') return 'Fluxo desenhado. Faltam só dois números, e os dois são opcionais.';
+  return null;
+}
+
 function sectionOf(step: string): number {
   if (['name', 'trigger', 'outcome'].includes(step)) return 0;
   if (step === 'stages') return 1;
@@ -61,6 +82,8 @@ export default function Assistant() {
 
   const order = stepOrder(d);
   const idx = Math.max(0, order.indexOf(d.step));
+  const nextLabel = d.returnToReview ? 'Voltar à revisão' : `Avançar para ${stepTarget(order[Math.min(order.length - 1, idx + 1)], d)}`;
+  const ack = d.returnToReview ? null : ackFor(d.step, d, order);
   const set = (patch: Partial<AssistantDraft>) => setD((x) => ({ ...x, ...patch }));
   const go = (step: string) => setD((x) => ({ ...x, step, returnToReview: x.step === 'review' && SINGLE_ANSWER.has(step) }));
   const next = (patch: Partial<AssistantDraft> = {}) =>
@@ -85,16 +108,16 @@ export default function Assistant() {
     try {
       const w = await createWorkspace(process, { kind: 'wizard' });
       await db.deleteDraft(DRAFT).catch(() => {});
-      toast('ok', 'Projeto criado e salvo neste dispositivo.');
+      toast('ok', 'Pronto! Seu processo está mapeado e salvo neste aparelho.');
       nav(`/app/p/${w.id}/${issues.length ? 'validar' : 'mapa'}`);
     } catch {
-      toast('bad', 'Não foi possível salvar neste navegador. Verifique se o armazenamento do site não está bloqueado.');
+      toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
     } finally {
       setBusy(false);
     }
   };
   const discard = async () => {
-    if (!(await confirm({ title: 'Descartar rascunho?', body: 'As respostas dadas até agora serão apagadas deste aparelho.', confirm: 'Descartar', danger: true }))) return;
+    if (!(await confirm({ title: 'Começar do zero?', body: 'As respostas até aqui serão apagadas deste aparelho.', confirm: 'Apagar e recomeçar', danger: true }))) return;
     await db.deleteDraft(DRAFT).catch(() => {});
     setD(emptyDraft());
     setRestored(false);
@@ -108,12 +131,12 @@ export default function Assistant() {
     <div className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-6 pt-4 sm:pt-8">
       <div className="mb-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-xl font-semibold">Novo projeto</h1>
+          <h1 className="text-xl font-semibold">Vamos mapear seu processo</h1>
           <Link to="/app/novo/formulario" className="text-xs font-semibold text-accent hover:underline">
-            Prefere um formulário único?
+            Prefere preencher tudo de uma vez?
           </Link>
         </div>
-        <ol className="mt-3 flex gap-1" aria-label={`Seção ${section + 1} de ${SECTIONS.length}: ${SECTIONS[section]}`}>
+        <ol className="mt-3 flex gap-1" aria-label={`Etapa ${section + 1} de ${SECTIONS.length}: ${SECTIONS[section]}`}>
           {SECTIONS.map((s, i) => (
             <li key={s} className="flex-1" title={s}>
               <span className={clsx('block h-1.5 rounded-full', i < section ? 'bg-brand' : i === section ? 'bg-accentStrong' : 'bg-surface2')} />
@@ -121,10 +144,10 @@ export default function Assistant() {
           ))}
         </ol>
         <p className="mt-1 flex justify-between text-xs text-muted">
-          <span>
-            {SECTIONS[section]} · {section + 1} de {SECTIONS.length}
+          <span className="font-medium text-ink2">
+            Etapa {section + 1} de {SECTIONS.length}: {SECTIONS[section]}
           </span>
-          <span>Rascunho salvo neste dispositivo</span>
+          <span>Rascunho salvo neste aparelho</span>
         </p>
       </div>
 
@@ -144,10 +167,17 @@ export default function Assistant() {
       </div>
 
       <div ref={composerRef} className="mt-4 rounded-2xl border border-line/15 bg-surface p-4 shadow-card sm:p-5" data-testid="assistant-step">
+        {ack && (
+          <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-ok" data-testid="assistant-ack">
+            <Check className="h-4 w-4 shrink-0" aria-hidden /> {ack}
+          </p>
+        )}
         {d.step === 'name' && (
           <TextStep
-            q="Qual processo você deseja analisar?"
-            help="Use o nome que a equipe usa no dia a dia."
+            q="Vamos começar. Como você chama esse processo?"
+            help="Use o nome que a equipe usa no dia a dia. Dá para mudar depois."
+            placeholder="Ex.: Análise de crédito"
+            nextLabel={nextLabel}
             value={d.name}
             onChange={(v) => set({ name: v })}
             examples={['Aprovação de compras', 'Atendimento de solicitações internas', 'Processamento de pedidos']}
@@ -156,15 +186,15 @@ export default function Assistant() {
           />
         )}
         {d.step === 'trigger' && (
-          <TextStep q="O que inicia esse processo?" help="O evento que dispara o trabalho. Ex.: “Uma área solicita a compra de um material ou serviço”." value={d.trigger ?? ''} onChange={(v) => set({ trigger: v })} onNext={() => next()} onSkip={() => next({ trigger: undefined })} />
+          <TextStep q="O que faz esse processo começar?" help="Pense no evento que dispara o trabalho." placeholder="Ex.: uma área pede a compra de um material" nextLabel={nextLabel} value={d.trigger ?? ''} onChange={(v) => set({ trigger: v })} onNext={() => next()} onSkip={() => next({ trigger: undefined })} />
         )}
         {d.step === 'outcome' && (
-          <TextStep q="Como o processo termina?" help="O resultado entregue. Ex.: “Pedido de compra emitido ao fornecedor”." value={d.outcome ?? ''} onChange={(v) => set({ outcome: v })} onNext={() => next()} onSkip={() => next({ outcome: undefined })} />
+          <TextStep q="E como ele termina? O que é entregue no fim?" help="O resultado que fecha o ciclo." placeholder="Ex.: pedido de compra enviado ao fornecedor" nextLabel={nextLabel} value={d.outcome ?? ''} onChange={(v) => set({ outcome: v })} onNext={() => next()} onSkip={() => next({ outcome: undefined })} />
         )}
         {d.step === 'stages' && (
           <ListStep
-            q="Quais são as principais etapas?"
-            help="Pense em 2 a 7 blocos, na ordem em que acontecem. Ex.: Solicitação → Aprovação → Cotação → Compra."
+            q="Quais são as grandes etapas, na ordem em que acontecem?"
+            help="De 2 a 7 blocos costuma bastar. Ex.: Solicitação → Aprovação → Cotação → Compra."
             items={d.stages.map((s) => ({ key: s.key, label: s.name }))}
             onChange={(items) =>
               set({
@@ -173,6 +203,7 @@ export default function Assistant() {
             }
             addLabel="Adicionar etapa"
             textPlaceholder={'Solicitação\nAprovação\nCotação\nCompra'}
+            nextLabel={nextLabel}
             onNext={() => next()}
           />
         )}
@@ -184,7 +215,7 @@ export default function Assistant() {
               <ListStep
                 key={st.key}
                 q={`O que acontece na etapa “${st.name}”?`}
-                help="Liste as atividades em ordem, com verbo. Se souber, inclua quem faz e o tempo: “Aprovar compra por Gestor (15 min)” — assim não perguntamos de novo."
+                help="Liste as atividades em ordem, começando por um verbo. Se já souber quem faz e quanto tempo leva, escreva junto — “Aprovar compra por Gestor (15 min)” — e não perguntamos de novo."
                 items={st.activities.map((a) => ({ key: a.key, label: a.name, meta: [a.owner, a.duration !== undefined ? `${fmtNum(a.duration)} ${UNIT_TXT[a.unit]}` : ''].filter(Boolean).join(' · ') }))}
                 parse={(line) => {
                   const a = draftActivityFrom(line);
@@ -203,21 +234,22 @@ export default function Assistant() {
                 }
                 addLabel="Adicionar atividade"
                 textPlaceholder={'Registrar solicitação por Solicitante (10 min)\nAnalisar orçamento por Gestor\nAprovar ou recusar'}
+                nextLabel={nextLabel}
                 onNext={() => next()}
                 onSkip={() => {
                   setStage(st.key, { skipped: true });
                   next();
                 }}
-                skipLabel="Ainda não sei — pular etapa"
+                skipLabel="Ainda não sei — completo depois"
               />
             );
           })()}
-        {d.step === 'details' && <DetailsStep d={d} owners={owners} setAct={setAct} set={set} onNext={() => next()} />}
-        {d.step === 'decisions' && <DecisionsStep d={d} set={set} onNext={() => next({ decisionsAnswered: true })} />}
+        {d.step === 'details' && <DetailsStep d={d} owners={owners} setAct={setAct} set={set} nextLabel={nextLabel} onNext={() => next()} />}
+        {d.step === 'decisions' && <DecisionsStep d={d} set={set} nextLabel={nextLabel} onNext={() => next({ decisionsAnswered: true })} />}
         {d.step === 'volume' && (
           <div className="space-y-4">
             <Bubble>Quantas vezes esse processo acontece?</Bubble>
-            <p className="text-sm text-ink2">Com o volume, calculamos esforço por mês e capacidade. Sem ele, ainda mostramos tempos por execução.</p>
+            <p className="text-sm text-ink2">Com esse número, calculamos o esforço por mês e a capacidade da equipe. Sem ele, ainda mostramos o tempo de cada execução.</p>
             <div className="flex flex-wrap items-end gap-3">
               <Field label="Execuções" className="w-40">
                 {(f) => <NumberInput {...f} value={d.volume} onChange={(v) => set({ volume: v, volumeUnknown: false })} placeholder="Ex.: 300" />}
@@ -232,15 +264,15 @@ export default function Assistant() {
                 Não sei ainda
               </Button>
               <Button onClick={() => next({ volumeUnknown: false })} disabled={d.volume === undefined}>
-                Continuar <ChevronRight className="h-4 w-4" aria-hidden />
+                {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
               </Button>
             </Actions>
           </div>
         )}
         {d.step === 'cost' && (
           <div className="space-y-4">
-            <Bubble>Qual o custo-hora médio de quem executa?</Bubble>
-            <p className="text-sm text-ink2">Custo carregado: salário + encargos + benefícios ÷ horas trabalhadas. É opcional; sem ele não mostramos valores em R$ (nunca estimamos por você).</p>
+            <Bubble>Quanto custa, em média, uma hora de quem executa?</Bubble>
+            <p className="text-sm text-ink2">Some salário, encargos e benefícios e divida pelas horas trabalhadas. É opcional: sem esse dado, não mostramos valores em R$ — nunca estimamos por você.</p>
             <Field label="Custo-hora (R$)" className="w-48">
               {(f) => <NumberInput {...f} value={d.costPerHour} onChange={(v) => set({ costPerHour: v, costUnknown: false })} placeholder="Ex.: 55" />}
             </Field>
@@ -249,14 +281,14 @@ export default function Assistant() {
                 Não sei / prefiro não informar
               </Button>
               <Button onClick={() => next({ costUnknown: false })} disabled={d.costPerHour === undefined}>
-                Continuar <ChevronRight className="h-4 w-4" aria-hidden />
+                {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
               </Button>
             </Actions>
           </div>
         )}
         {d.step === 'review' && process && (
           <div className="space-y-4">
-            <Bubble>Pronto. Confira o resumo antes de criar o projeto.</Bubble>
+            <Bubble>Tudo pronto! Confira o resumo antes de criarmos o projeto.</Bubble>
             <dl className="divide-y divide-line/10 rounded-lg border border-line/15 text-sm">
               <ReviewRow label="Processo" value={d.name} onEdit={() => go('name')} />
               <ReviewRow label="Início · fim" value={`${d.trigger || 'Início'} → ${d.outcome || 'Fim'}`} onEdit={() => go('trigger')} />
@@ -267,7 +299,7 @@ export default function Assistant() {
               <ReviewRow label="Custo-hora" value={d.costUnknown || d.costPerHour === undefined ? 'Não informado' : `R$ ${fmtNum(d.costPerHour)}`} onEdit={() => go('cost')} />
             </dl>
             {issues.length === 0 ? (
-              <Callout tone="ok">Tudo certo para criar o projeto. Você poderá completar ou corrigir qualquer dado depois.</Callout>
+              <Callout tone="ok">Tudo certo por aqui. Você pode completar ou ajustar qualquer dado depois.</Callout>
             ) : (
               issues.slice(0, 6).map((i) => (
                 <Callout key={i.id} tone={i.severity === 'error' ? 'bad' : 'warn'} title={i.message}>
@@ -277,7 +309,7 @@ export default function Assistant() {
             )}
             <Actions>
               <Button onClick={() => void finish()} loading={busy} disabled={issues.some((i) => i.severity === 'error') || !acts.length}>
-                <Check className="h-4 w-4" aria-hidden /> Criar projeto
+                <Check className="h-4 w-4" aria-hidden /> Criar projeto e ver o mapa
               </Button>
             </Actions>
           </div>
@@ -294,14 +326,14 @@ export default function Assistant() {
 }
 
 function summary(step: string, d: AssistantDraft): { q: string; a: string } {
-  if (step === 'name') return { q: 'Qual processo você deseja analisar?', a: d.name };
-  if (step === 'trigger') return { q: 'O que inicia esse processo?', a: d.trigger || 'Pulado' };
-  if (step === 'outcome') return { q: 'Como o processo termina?', a: d.outcome || 'Pulado' };
-  if (step === 'stages') return { q: 'Quais são as principais etapas?', a: d.stages.map((s) => s.name).join(' → ') };
+  if (step === 'name') return { q: 'Como você chama esse processo?', a: d.name };
+  if (step === 'trigger') return { q: 'O que faz esse processo começar?', a: d.trigger || 'Pulado — dá para completar depois' };
+  if (step === 'outcome') return { q: 'Como ele termina?', a: d.outcome || 'Pulado — dá para completar depois' };
+  if (step === 'stages') return { q: 'Quais são as grandes etapas?', a: d.stages.map((s) => s.name).join(' → ') };
   if (step.startsWith('acts:')) {
     const s = d.stages.find((x) => `acts:${x.key}` === step);
     if (!s) return { q: '', a: '' };
-    return { q: `O que acontece em “${s.name}”?`, a: s.skipped ? 'Pulado — completar depois' : s.activities.map((a) => a.name).join('; ') };
+    return { q: `O que acontece em “${s.name}”?`, a: s.skipped ? 'Pulado — dá para completar depois' : s.activities.map((a) => a.name).join('; ') };
   }
   if (step === 'details') {
     const acts = allActivities(d);
@@ -351,7 +383,7 @@ function ReviewRow({ label, value, onEdit }: { label: string; value: string; onE
   );
 }
 
-function TextStep({ q, help, value, onChange, examples, onNext, onSkip, required }: { q: string; help: string; value: string; onChange: (v: string) => void; examples?: string[]; onNext: () => void; onSkip?: () => void; required?: boolean }) {
+function TextStep({ q, help, placeholder, nextLabel, value, onChange, examples, onNext, onSkip, required }: { q: string; help: string; placeholder: string; nextLabel: string; value: string; onChange: (v: string) => void; examples?: string[]; onNext: () => void; onSkip?: () => void; required?: boolean }) {
   return (
     <form
       className="space-y-3"
@@ -362,9 +394,9 @@ function TextStep({ q, help, value, onChange, examples, onNext, onSkip, required
     >
       <Bubble>{q}</Bubble>
       <p className="text-sm text-ink2">{help}</p>
-      <Input aria-label={q} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Digite sua resposta" enterKeyHint="next" />
+      <Input aria-label={q} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} enterKeyHint="next" />
       {examples && (
-        <div className="flex flex-wrap gap-2" aria-label="Sugestões">
+        <div className="flex flex-wrap gap-2" aria-label="Sugestões de nome">
           {examples.map((x) => (
             <button key={x} type="button" onClick={() => onChange(x)} className="min-h-[36px] rounded-full border border-line/20 px-3 text-sm text-ink2 hover:border-accent hover:text-ink">
               {x}
@@ -375,11 +407,11 @@ function TextStep({ q, help, value, onChange, examples, onNext, onSkip, required
       <Actions>
         {onSkip && (
           <Button variant="ghost" onClick={onSkip}>
-            Pular
+            Pular por agora
           </Button>
         )}
         <Button type="submit" disabled={required && !value.trim()}>
-          Continuar <ChevronRight className="h-4 w-4" aria-hidden />
+          {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
         </Button>
       </Actions>
     </form>
@@ -387,7 +419,7 @@ function TextStep({ q, help, value, onChange, examples, onNext, onSkip, required
 }
 
 type Item = { key: string; label: string; meta?: string; raw?: string };
-function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, onNext, onSkip, skipLabel, parse }: { q: string; help: string; items: Item[]; onChange: (items: Item[]) => void; addLabel: string; textPlaceholder: string; onNext: () => void; onSkip?: () => void; skipLabel?: string; parse?: (line: string) => Item }) {
+function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, nextLabel, onNext, onSkip, skipLabel, parse }: { q: string; help: string; items: Item[]; onChange: (items: Item[]) => void; addLabel: string; textPlaceholder: string; nextLabel: string; onNext: () => void; onSkip?: () => void; skipLabel?: string; parse?: (line: string) => Item }) {
   const [mode, setMode] = useState<'um' | 'texto'>('um');
   const [one, setOne] = useState('');
   const [text, setText] = useState('');
@@ -496,11 +528,11 @@ function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, onNext,
       <Actions>
         {onSkip && (
           <Button variant="ghost" onClick={onSkip}>
-            {skipLabel ?? 'Pular'}
+            {skipLabel ?? 'Pular por agora'}
           </Button>
         )}
         <Button onClick={onNext} disabled={!items.length || items.some((x) => !x.label.trim())}>
-          Continuar <ChevronRight className="h-4 w-4" aria-hidden />
+          {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
         </Button>
       </Actions>
     </div>
@@ -526,16 +558,16 @@ function Chips<T extends string>({ label, value, options, onChange }: { label: s
   );
 }
 
-function DetailsStep({ d, owners, setAct, set, onNext }: { d: AssistantDraft; owners: string[]; setAct: (k: string, p: Partial<DraftActivity>) => void; set: (p: Partial<AssistantDraft>) => void; onNext: () => void }) {
+function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: AssistantDraft; owners: string[]; setAct: (k: string, p: Partial<DraftActivity>) => void; set: (p: Partial<AssistantDraft>) => void; nextLabel: string; onNext: () => void }) {
   const acts = allActivities(d);
   const i = Math.min(d.detailIndex, Math.max(0, acts.length - 1));
   const a = acts[i];
   if (!a)
     return (
       <div className="space-y-3">
-        <Bubble>Não há atividades para detalhar.</Bubble>
+        <Bubble>Ainda não há atividades para detalhar. Tudo bem, seguimos.</Bubble>
         <Actions>
-          <Button onClick={onNext}>Continuar</Button>
+          <Button onClick={onNext}>{nextLabel}</Button>
         </Actions>
       </div>
     );
@@ -543,10 +575,10 @@ function DetailsStep({ d, owners, setAct, set, onNext }: { d: AssistantDraft; ow
   return (
     <div className="space-y-4">
       <Bubble>
-        Detalhes de “{a.name}” <span className="font-normal text-muted">({a.stage})</span>
+        Vamos detalhar “{a.name}” <span className="font-normal text-muted">({a.stage})</span>
       </Bubble>
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
-        Atividade {i + 1} de {acts.length} · tudo é opcional — “Não sei” é uma resposta válida.
+        Atividade {i + 1} de {acts.length} · tudo é opcional — “Não sei” também é resposta.
         {known && <Badge tone="ok">Tempo e responsável já informados no texto</Badge>}
       </p>
       <fieldset className="space-y-2">
@@ -560,7 +592,7 @@ function DetailsStep({ d, owners, setAct, set, onNext }: { d: AssistantDraft; ow
         </div>
       </fieldset>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Quem faz? (função ou área)</legend>
+        <legend className="text-sm font-medium">Quem faz isso na prática? Pode ser uma função ou uma área.</legend>
         {owners.length > 0 && <Chips label="Responsáveis já citados" value={a.owner} options={owners.map((o) => ({ value: o, label: o }))} onChange={(v) => setAct(a.key, { owner: v })} />}
         <Input aria-label="Quem faz" value={a.owner ?? ''} onChange={(e) => setAct(a.key, { owner: e.target.value || undefined })} placeholder="Ex.: Comprador" />
       </fieldset>
@@ -629,7 +661,7 @@ function DetailsStep({ d, owners, setAct, set, onNext }: { d: AssistantDraft; ow
               onNext();
             }}
           >
-            Continuar <ChevronRight className="h-4 w-4" aria-hidden />
+            {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
           </Button>
         )}
       </Actions>
@@ -637,14 +669,14 @@ function DetailsStep({ d, owners, setAct, set, onNext }: { d: AssistantDraft; ow
   );
 }
 
-function DecisionsStep({ d, set, onNext }: { d: AssistantDraft; set: (p: Partial<AssistantDraft>) => void; onNext: () => void }) {
+function DecisionsStep({ d, set, nextLabel, onNext }: { d: AssistantDraft; set: (p: Partial<AssistantDraft>) => void; nextLabel: string; onNext: () => void }) {
   const acts = allActivities(d);
   const setDec = (key: string, patch: Partial<AssistantDraft['decisions'][number]>) => set({ decisions: d.decisions.map((x) => (x.key === key ? { ...x, ...patch } : x)) });
   const add = () => set({ decisions: [...d.decisions, { key: uid('dc'), question: '', afterKey: acts[0]?.key ?? '', noTarget: '__end' }] });
   const incomplete = d.decisions.some((x) => !x.question.trim() || !x.afterKey);
   return (
     <div className="space-y-4">
-      <Bubble>Existe algum ponto de decisão no caminho — uma pergunta com resposta sim ou não?</Bubble>
+      <Bubble>Em algum momento o caminho depende de uma resposta sim ou não?</Bubble>
       <p className="text-sm text-ink2">Ex.: “Orçamento aprovado?”. Com “sim”, o fluxo segue; com “não”, volta para uma atividade (retrabalho) ou encerra.</p>
       {d.decisions.map((x, n) => (
         <div key={x.key} className="space-y-3 rounded-lg border border-violet/30 bg-violet/5 p-3">
@@ -685,7 +717,7 @@ function DecisionsStep({ d, set, onNext }: { d: AssistantDraft; set: (p: Partial
           <Plus className="h-4 w-4" aria-hidden /> {d.decisions.length ? 'Outra decisão' : 'Sim, adicionar decisão'}
         </Button>
         <Button onClick={onNext} disabled={incomplete}>
-          {d.decisions.length ? 'Continuar' : 'Não há decisões'} <ChevronRight className="h-4 w-4" aria-hidden />
+          {d.decisions.length ? nextLabel : `Não há decisões — ${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}`} <ChevronRight className="h-4 w-4" aria-hidden />
         </Button>
       </Actions>
     </div>

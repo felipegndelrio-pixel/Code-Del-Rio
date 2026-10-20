@@ -89,9 +89,9 @@ export default function ImportPage() {
         const w = await createWorkspace(result.process, source);
         nav(`/app/p/${w.id}/validar`);
       }
-      toast('ok', 'Processo importado. Confira a validação e o mapa.');
+      toast('ok', 'Ótimo! Planilha importada. Vamos conferir a validação e o mapa.');
     } catch {
-      toast('bad', 'Não foi possível salvar neste navegador.');
+      toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
     }
   };
 

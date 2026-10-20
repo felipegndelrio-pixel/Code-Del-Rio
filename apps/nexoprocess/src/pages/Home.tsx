@@ -54,7 +54,7 @@ export default function Home() {
   const wipe = async () => {
     if (!(await confirm({ title: 'Apagar todos os dados locais?', body: <>Todos os projetos, rascunhos e preferências deste navegador serão apagados. Faça um backup antes se quiser guardar algo.</>, confirm: 'Apagar tudo', danger: true }))) return;
     await db.clearAll();
-    toast('ok', 'Dados locais apagados.');
+    toast('ok', 'Pronto, os dados deste aparelho foram apagados.');
     void load();
   };
 
@@ -138,10 +138,10 @@ export default function Home() {
           <section className="max-w-3xl">
             <p className="eyebrow">Análise e melhoria de processos</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Entenda seu processo, encontre os gargalos e saia com um plano de melhoria.</h1>
-            <p className="mt-3 text-base text-ink2">Descreva como o trabalho acontece hoje. O NexoProcess desenha o mapa, calcula tempo, esforço e desperdício com as fórmulas à vista e ajuda a montar e comparar o cenário futuro.</p>
+            <p className="mt-3 text-base text-ink2">Ainda não temos nada por aqui. Que tal mapear seu primeiro processo? Você conta como o trabalho acontece hoje; nós desenhamos o mapa, calculamos tempo, esforço e desperdício com as fórmulas à vista e ajudamos a montar o cenário futuro. Leva poucos minutos.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button size="lg" onClick={() => nav('/app/novo')}>
-                <Plus className="h-5 w-5" aria-hidden /> Criar projeto
+                <Plus className="h-5 w-5" aria-hidden /> Mapear meu primeiro processo
               </Button>
               <Button size="lg" variant="secondary" onClick={() => nav('/app/importar')}>
                 <FileSpreadsheet className="h-5 w-5" aria-hidden /> Importar planilha
@@ -191,7 +191,7 @@ export default function Home() {
                 <Upload className="h-4 w-4" aria-hidden /> Importar projeto
               </Button>
               <Button onClick={() => nav('/app/novo')}>
-                <Plus className="h-4 w-4" aria-hidden /> Novo projeto
+                <Plus className="h-4 w-4" aria-hidden /> Mapear novo processo
               </Button>
             </div>
           </div>
@@ -250,11 +250,11 @@ export default function Home() {
                 </li>
               );
             })}
-            {!rows.length && <li className="p-6 text-center text-sm text-muted">Nenhum projeto encontrado com esse filtro.</li>}
+            {!rows.length && <li className="p-6 text-center text-sm text-muted">Nada encontrado com esse filtro. Que tal tentar outro termo?</li>}
           </ul>
           {!real.length && (
-            <Callout tone="info" title="Você só tem a demonstração">
-              Quando quiser, crie seu primeiro projeto — por perguntas guiadas ou importando uma planilha.
+            <Callout tone="info" title="Por enquanto, só a demonstração por aqui">
+              Quando quiser, vamos mapear seu primeiro processo — respondendo perguntas ou a partir de uma planilha. Leva poucos minutos.
             </Callout>
           )}
 

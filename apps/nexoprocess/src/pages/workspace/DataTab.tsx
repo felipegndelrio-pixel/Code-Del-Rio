@@ -33,7 +33,7 @@ export default function DataTab() {
   const saveActivity = () => {
     if (!editing) return;
     if (!editing.name.trim()) {
-      toast('bad', 'Dê um nome à atividade.');
+      toast('bad', 'Faltou só uma coisinha: o nome da atividade.');
       return;
     }
     update(
@@ -48,7 +48,7 @@ export default function DataTab() {
       { area: 'AS-IS', message: `${isNew ? 'Adicionada' : 'Editada'} atividade “${editing.name}”` },
     );
     setEditing(null);
-    toast('ok', 'Atividade salva.');
+    toast('ok', 'Atividade salva. Isso já atualiza o mapa e os números.');
   };
 
   const remove = async (a: Activity) => {

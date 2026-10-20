@@ -39,7 +39,11 @@ interface WState {
   costPerHour?: number;
 }
 
-const STEPS = ['Processo', 'Etapas', 'Atividades', 'Volume e custos', 'Revisar'];
+const STEPS = ['Processo', 'Etapas', 'Atividades', 'Volume e custos', 'Revisão'];
+/** Título de cada passo, em tom de conversa; STEPS fica para o progresso ("Etapa 2 de 5: Etapas"). */
+const TITLES = ['Vamos começar pelo processo', 'Quais são as grandes etapas?', 'O que acontece em cada etapa?', 'Volume e custos (opcional)', 'Revisão final'];
+/** Destino do botão de avançar: "Avançar para as etapas". */
+const TARGET = ['o processo', 'as etapas', 'as atividades', 'volume e custos', 'a revisão'];
 const DRAFT = 'wizard';
 const blankItem = (): WItem => ({ key: uid('i'), name: '', unit: 'min' });
 const initial = (): WState => ({
@@ -142,17 +146,17 @@ export default function Wizard() {
 
   const check = (step: number): boolean => {
     const e: Record<string, string> = {};
-    if (step === 0 && !s.name.trim()) e.name = 'Dê um nome ao processo (ex.: Atendimento de pedidos).';
+    if (step === 0 && !s.name.trim()) e.name = 'Faltou só o nome. Como a equipe chama esse processo? (ex.: Análise de crédito)';
     if (step === 1) {
       const named = s.stages.filter((st) => st.name.trim());
-      if (!named.length) e.stages = 'Informe pelo menos uma etapa.';
+      if (!named.length) e.stages = 'Faltou pelo menos uma etapa. Pode ser só uma, para começar.';
       const names = named.map((st) => st.name.trim().toLowerCase());
-      if (new Set(names).size !== names.length) e.stages = 'Há etapas com o mesmo nome. Use nomes diferentes.';
+      if (new Set(names).size !== names.length) e.stages = 'Duas etapas estão com o mesmo nome. Que tal diferenciar?';
     }
     if (step === 2) {
       const any = s.stages.some((st) => st.name.trim() && st.items.some((i) => i.name.trim()));
-      if (!any) e.items = 'Descreva pelo menos uma atividade.';
-      for (const st of s.stages) for (const i of st.items) if (i.isDecision && i.name.trim() && !i.noTarget) e[`no_${i.key}`] = 'Escolha para onde segue quando a resposta é “não”.';
+      if (!any) e.items = 'Faltou só uma coisinha: descreva pelo menos uma atividade.';
+      for (const st of s.stages) for (const i of st.items) if (i.isDecision && i.name.trim() && !i.noTarget) e[`no_${i.key}`] = 'Para onde o fluxo vai quando a resposta é “não”?';
     }
     setErrors(e);
     return !Object.keys(e).length;
@@ -166,24 +170,24 @@ export default function Wizard() {
   const finish = async () => {
     if (!check(0) || !check(1) || !check(2)) return;
     if (issues.some((i) => i.severity === 'error')) {
-      toast('bad', 'Há erros a corrigir antes de criar o processo.');
+      toast('bad', 'Quase lá: falta ajustar os pontos destacados antes de criar o processo.');
       return;
     }
     setBusy(true);
     try {
       const w = await createWorkspace(process, { kind: 'wizard' });
       await db.deleteDraft(DRAFT);
-      toast('ok', 'Processo criado. Veja o mapa gerado.');
+      toast('ok', 'Pronto! Seu processo foi criado. Vamos conferir os dados?');
       nav(`/app/p/${w.id}/validar`);
     } catch {
-      toast('bad', 'Não foi possível salvar neste navegador.');
+      toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
     } finally {
       setBusy(false);
     }
   };
 
   const discard = async () => {
-    if (!(await confirm({ title: 'Descartar rascunho?', body: 'As respostas preenchidas até agora serão apagadas.', confirm: 'Descartar', danger: true }))) return;
+    if (!(await confirm({ title: 'Começar do zero?', body: 'As respostas até aqui serão apagadas deste aparelho.', confirm: 'Apagar e recomeçar', danger: true }))) return;
     await db.deleteDraft(DRAFT);
     setS(initial());
     setRestored(false);
@@ -195,16 +199,16 @@ export default function Wizard() {
   return (
     <div className="safe-x mx-auto max-w-3xl space-y-5 py-6">
       <div>
-        <p className="text-sm font-semibold text-brand">Assistente guiado</p>
+        <p className="text-sm font-semibold text-brand">Formulário completo</p>
         <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold outline-none">
-          {STEPS[s.step]}
+          {TITLES[s.step]}
         </h1>
-        <div className="mt-3" aria-label={`Passo ${s.step + 1} de ${STEPS.length}`}>
+        <div className="mt-3" aria-label={`Etapa ${s.step + 1} de ${STEPS.length}: ${STEPS[s.step]}`}>
           <div className="flex justify-between text-xs text-muted">
-            <span>
-              Passo {s.step + 1} de {STEPS.length}
+            <span className="font-medium text-ink2">
+              Etapa {s.step + 1} de {STEPS.length}: {STEPS[s.step]}
             </span>
-            <span>Salvo neste dispositivo</span>
+            <span>Salvo neste aparelho</span>
           </div>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label="Progresso do assistente" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${pct}%` }} />
@@ -213,16 +217,16 @@ export default function Wizard() {
       </div>
 
       {restored && (
-        <Callout tone="info" title="Rascunho recuperado" action={<Button size="sm" variant="ghost" onClick={() => void discard()}>Descartar rascunho</Button>}>
-          Continuamos de onde você parou.
+        <Callout tone="info" title="Continuamos de onde você parou." action={<Button size="sm" variant="ghost" onClick={() => void discard()}>Começar do zero</Button>}>
+          Suas respostas ficaram salvas neste aparelho.
         </Callout>
       )}
 
       {s.step === 0 && (
         <Card>
           <div className="space-y-4">
-            <Field label="Qual é o nome do processo?" required help="Use o nome que a equipe usa no dia a dia." error={errors.name}>
-              {(p) => <Input {...p} value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ex.: Atendimento de pedidos" autoFocus />}
+            <Field label="Como você chama esse processo?" required help="Use o nome que a equipe usa no dia a dia. Dá para mudar depois." error={errors.name}>
+              {(p) => <Input {...p} value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ex.: Análise de crédito" autoFocus />}
             </Field>
             <Field label="Em uma frase, para que ele serve?" help="Opcional. Ex.: do pedido do cliente até a entrega.">
               {(p) => <Textarea {...p} value={s.description} onChange={(e) => set({ description: e.target.value })} />}
@@ -235,7 +239,7 @@ export default function Wizard() {
       )}
 
       {s.step === 1 && (
-        <Card title="Quais são as grandes etapas?" subtitle="Visão macro">
+        <Card title="Na ordem em que acontecem" subtitle="Visão macro">
           <p className="mb-3 text-sm text-ink2">Pense em 3 a 7 blocos, na ordem em que acontecem. Ex.: Recebimento → Análise → Execução → Entrega.</p>
           {errors.stages && <p className="mb-2 text-sm font-medium text-bad" role="alert">{errors.stages}</p>}
           <ol className="space-y-2">
@@ -264,7 +268,7 @@ export default function Wizard() {
       {s.step === 2 && (
         <div className="space-y-4">
           <Callout tone="info">
-            Para cada etapa, liste o que acontece, na ordem. Só o nome é obrigatório; tempo e pessoas desbloqueiam mais análises. Use “É uma pergunta/decisão?” quando o caminho muda conforme a resposta (ex.: “Documentos completos?”).
+            Para cada etapa, liste o que acontece, na ordem. Só o nome é obrigatório; tempo e pessoas liberam mais análises. Quando o caminho muda conforme uma resposta (ex.: “Documentos completos?”), marque “É uma pergunta/decisão?”.
           </Callout>
           {errors.items && <p className="text-sm font-medium text-bad" role="alert">{errors.items}</p>}
           {s.stages
@@ -371,7 +375,7 @@ export default function Wizard() {
 
       {s.step === 3 && (
         <Card title="Volume e custos" subtitle="Opcional">
-          <p className="mb-4 text-sm text-ink2">Sem estes dados você ainda vê o mapa, tempos e desperdícios. Com eles, calculamos esforço por mês e custo estimado. Não sabe agora? Pule — dá para preencher depois.</p>
+          <p className="mb-4 text-sm text-ink2">Sem estes números você já vê o mapa, os tempos e os desperdícios. Com eles, calculamos o esforço por mês e o custo estimado. Não sabe agora? Pode pular e preencher depois.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Quantas vezes o processo acontece?" help="Ex.: 1.200 pedidos.">
               {(p) => <NumberInput {...p} value={s.volume} onChange={(v) => set({ volume: v })} placeholder="Ex.: 1200" />}
@@ -394,7 +398,7 @@ export default function Wizard() {
       )}
 
       {s.step === 4 && (
-        <Card title="Revise antes de criar" subtitle={s.name}>
+        <Card title="Confira antes de criarmos" subtitle={s.name}>
           <ol className="space-y-3 text-sm">
             {s.stages
               .filter((st) => st.name.trim())
@@ -418,7 +422,7 @@ export default function Wizard() {
           </ol>
           <div className="mt-4 space-y-2">
             {issues.filter((i) => i.severity !== 'info').length === 0 ? (
-              <Callout tone="ok">Tudo certo para criar o processo.</Callout>
+              <Callout tone="ok">Tudo certo por aqui. Vamos criar o processo?</Callout>
             ) : (
               issues
                 .filter((i) => i.severity !== 'info')
@@ -433,23 +437,32 @@ export default function Wizard() {
         </Card>
       )}
 
-      <div className="safe-bottom sticky bottom-0 -mx-4 flex items-center justify-between gap-2 border-t border-line/15 bg-bg/90 px-4 py-3 backdrop-blur">
+      {/* No celular: "Voltar" curto na 1ª linha e o avanço (com o destino por extenso) ocupando a 2ª. */}
+      <div className="safe-bottom sticky bottom-0 -mx-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/15 bg-bg/90 px-4 py-3 backdrop-blur">
         <Button variant="ghost" onClick={() => (s.step === 0 ? nav('/app') : go(-1))}>
-          <ArrowLeft className="h-4 w-4" /> {s.step === 0 ? 'Sair' : 'Voltar'}
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          {s.step === 0 ? (
+            'Sair'
+          ) : (
+            <>
+              <span className="sm:hidden">Voltar</span>
+              <span className="hidden sm:inline">Voltar para {TARGET[s.step - 1]}</span>
+            </>
+          )}
         </Button>
         {s.step < STEPS.length - 1 ? (
-          <div className="flex gap-2">
+          <div className="flex w-full gap-2 sm:w-auto">
             {s.step === 3 && (
-              <Button variant="secondary" onClick={() => go(1)}>
-                Pular
+              <Button variant="secondary" className="flex-1 sm:flex-none" onClick={() => go(1)}>
+                Pular por agora
               </Button>
             )}
-            <Button onClick={() => go(1)}>
-              Continuar <ArrowRight className="h-4 w-4" />
+            <Button className="flex-1 sm:flex-none" onClick={() => go(1)}>
+              Avançar para {TARGET[s.step + 1]} <ArrowRight className="h-4 w-4" aria-hidden />
             </Button>
           </div>
         ) : (
-          <Button onClick={() => void finish()} loading={busy}>
+          <Button className="w-full sm:w-auto" onClick={() => void finish()} loading={busy}>
             Criar processo e ver o mapa
           </Button>
         )}

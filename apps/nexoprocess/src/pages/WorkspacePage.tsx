@@ -43,7 +43,7 @@ export default function WorkspacePage() {
   if (w === null)
     return (
       <div className="safe-x mx-auto max-w-xl py-10">
-        <Empty title="Projeto não encontrado neste aparelho" action={<Link to="/app" className="font-semibold text-accent underline">Ver meus projetos</Link>}>
+        <Empty title="Não encontramos esse projeto neste aparelho" action={<Link to="/app" className="font-semibold text-accent underline">Ver meus projetos</Link>}>
           Os projetos ficam salvos no navegador onde foram criados. Se você limpou os dados do navegador ou trocou de aparelho, importe o arquivo do projeto ou restaure um backup.
         </Empty>
       </div>

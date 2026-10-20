@@ -53,7 +53,7 @@ export default function RisksTab() {
           </p>
         )}
         {!w.risks.length ? (
-          <Empty title="Nenhum risco registrado">Registre o que pode dar errado, a probabilidade, o impacto e o controle. Nenhuma pontuação é inventada: sem notas, não há prioridade calculada.</Empty>
+          <Empty title="Nenhum risco registrado ainda">Vamos pensar no que pode dar errado? Registre a probabilidade, o impacto e o controle de cada risco. Nenhuma pontuação é inventada: sem notas, não calculamos prioridade.</Empty>
         ) : (
           <Table caption="Riscos">
             <thead>

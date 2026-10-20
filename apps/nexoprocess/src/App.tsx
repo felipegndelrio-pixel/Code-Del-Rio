@@ -33,8 +33,8 @@ export default function App() {
             path="*"
             element={
               <div className="mx-auto max-w-xl p-6">
-                <Empty title="Página não encontrada" action={<Link className="font-semibold text-brand underline" to="/app">Voltar ao início</Link>}>
-                  O endereço não existe ou foi digitado errado.
+                <Empty title="Essa página não existe" action={<Link className="font-semibold text-brand underline" to="/app">Voltar ao início</Link>}>
+                  Talvez o endereço tenha sido digitado errado. Vamos voltar ao início?
                 </Empty>
               </div>
             }

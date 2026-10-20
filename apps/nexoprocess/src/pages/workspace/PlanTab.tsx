@@ -23,7 +23,7 @@ export default function PlanTab() {
 
   const save = () => {
     if (!edit?.description.trim()) {
-      toast('bad', 'Descreva a ação.');
+      toast('bad', 'Faltou só uma coisinha: o que vai ser feito nessa ação.');
       return;
     }
     const issue = completionIssue(edit);
@@ -47,7 +47,7 @@ export default function PlanTab() {
     if (status === 'concluida' && !a.observedResult?.trim()) {
       // Conclusão exige registro: abre o formulário em vez de marcar direto.
       setEdit({ ...structuredClone(a), status, completedAt: a.completedAt ?? today });
-      toast('info', 'Para concluir, registre o resultado observado.');
+      toast('info', 'Quase lá: para concluir, conte qual resultado foi observado.');
       return;
     }
     update(
@@ -66,7 +66,7 @@ export default function PlanTab() {
     if (!sc) return;
     const fresh = sc.changes.filter((c) => !w.actions.some((a) => a.origin?.ref === c.id) && c.kind !== 'restore');
     if (!fresh.length) {
-      toast('info', 'Todas as mudanças do TO-BE já têm ação no plano.');
+      toast('info', 'Tudo em dia: cada mudança do TO-BE já tem uma ação no plano.');
       return;
     }
     update(
@@ -84,7 +84,7 @@ export default function PlanTab() {
       },
       { area: 'Plano de ação', message: `${fresh.length} ação(ões) criadas a partir do TO-BE “${sc.name}”` },
     );
-    toast('ok', `${fresh.length} ação(ões) criadas. Defina responsáveis e prazos.`);
+    toast('ok', `Pronto! Seu plano de ação está montado (${fresh.length} ${fresh.length === 1 ? 'ação' : 'ações'}). Agora é só definir responsáveis e prazos; dá para ajustar a qualquer momento.`);
   };
 
   const list = w.actions.filter((a) => (filter === 'todas' ? true : filter === 'concluida' ? a.status === 'concluida' : a.status !== 'concluida' && a.status !== 'cancelada'));
@@ -113,7 +113,7 @@ export default function PlanTab() {
           <span className="text-xs text-muted">Responsável e prazo nunca são preenchidos automaticamente — ficam “pendente” até você definir.</span>
         </div>
         {!w.actions.length ? (
-          <Empty title="Nenhuma ação ainda">Gere ações a partir das mudanças do TO-BE, crie a partir de recomendações aceitas, ou adicione manualmente.</Empty>
+          <Empty title="Ainda não temos ações por aqui">Vamos montar o plano? Gere as ações a partir das mudanças do TO-BE, aproveite as recomendações aceitas ou crie uma do zero.</Empty>
         ) : (
           <>
             {/* Tabela só a partir de 1280 px; abaixo disso, cartões (sem colunas espremidas). */}

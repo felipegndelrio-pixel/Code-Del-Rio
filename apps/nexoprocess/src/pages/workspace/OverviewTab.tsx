@@ -37,7 +37,7 @@ export default function OverviewTab() {
       const how = await shareProject(w);
       toast('ok', how === 'shared' ? 'Arquivo do projeto enviado.' : 'Arquivo do projeto baixado. Abra-o no outro aparelho em Meus projetos → Importar projeto.');
     } catch (e) {
-      if ((e as Error)?.name !== 'AbortError') toast('bad', 'Não foi possível gerar o arquivo do projeto.');
+      if ((e as Error)?.name !== 'AbortError') toast('bad', 'Não conseguimos gerar o arquivo do projeto. Tente de novo em instantes.');
     }
   };
 

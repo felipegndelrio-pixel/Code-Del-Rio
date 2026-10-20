@@ -58,7 +58,7 @@ export default function ToBeTab() {
     if (!sc) return;
     const next = fn(structuredClone(sc));
     if (!next) {
-      toast('info', 'Nada mudou.');
+      toast('info', 'Nada mudou por aqui.');
       return;
     }
     update(
@@ -131,7 +131,7 @@ export default function ToBeTab() {
   const confirmPending = () => {
     if (!pending) return;
     if (!meta.justification?.trim()) {
-      toast('bad', 'Registre a justificativa da mudança.');
+      toast('bad', 'Faltou só uma coisinha: o motivo da mudança.');
       return;
     }
     try {

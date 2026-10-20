@@ -31,7 +31,7 @@ export default function ValidateTab() {
       },
       { area: 'Validação', message: `Correção aplicada: ${i.autofix.label}` },
     );
-    toast('ok', 'Correção aplicada.');
+    toast('ok', 'Pronto, correção aplicada.');
   };
 
   const accept = () => {

@@ -124,7 +124,7 @@ export default function ResultsTab() {
 
       <Card title="Realizado × linha de base × previsão" subtitle="Último valor registrado por indicador">
         {!summary.length ? (
-          <Empty title="Nenhum resultado medido ainda">Depois de implantar as mudanças, registre os valores reais por período. Um zero só deve ser registrado se for zero de fato.</Empty>
+          <Empty title="Nenhum resultado medido ainda">Depois de implantar as mudanças, registre aqui os valores reais de cada período. Use zero só quando o valor for zero de fato.</Empty>
         ) : (
           <Table caption="Comparação de resultados">
             <thead>

@@ -29,7 +29,7 @@ export default function CompareTab() {
 
   if (!sc || !cmp)
     return (
-      <Empty title="Crie um cenário TO-BE para comparar" action={<Link to={`/app/p/${w.id}/tobe`} className="font-semibold text-brand underline">Ir para TO-BE</Link>}>
+      <Empty title="Para comparar, vamos criar o cenário futuro (TO-BE) primeiro" action={<Link to={`/app/p/${w.id}/tobe`} className="font-semibold text-brand underline">Ir para TO-BE</Link>}>
         A comparação mostra o que muda em tempo, esforço, custo e capacidade entre o processo atual e o futuro.
       </Empty>
     );

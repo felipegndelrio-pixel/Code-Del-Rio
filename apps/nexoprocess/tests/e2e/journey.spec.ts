@@ -30,11 +30,12 @@ test('2–13. jornada completa: AS-IS → validação → mapa → diagnóstico 
 
   // ---------- 2. Criar AS-IS pelo formulário único (sem custo-hora)
   await page.goto('/app/novo/formulario');
-  await page.getByLabel('Qual é o nome do processo?').fill('Atendimento de solicitações');
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.getByText('Etapa 1 de 5: Processo')).toBeVisible();
+  await page.getByLabel('Como você chama esse processo?').fill('Atendimento de solicitações');
+  await page.getByRole('button', { name: 'Avançar para as etapas' }).click();
   await page.getByLabel('Nome da etapa 1').fill('Entrada');
   await page.getByLabel('Nome da etapa 2').fill('Análise');
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: 'Avançar para as atividades' }).click();
 
   const what = page.getByLabel('O que acontece?');
   const time = page.getByLabel('Tempo de trabalho');
@@ -60,10 +61,11 @@ test('2–13. jornada completa: AS-IS → validação → mapa → diagnóstico 
   await page.getByLabel('É uma pergunta/decisão?').nth(3).check();
   await page.getByLabel('Pergunta da decisão').fill('Aprovado?');
   await page.getByLabel('Se a resposta for NÃO, vai para…').selectOption('__end');
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: 'Avançar para volume e custos' }).click();
   await page.getByLabel('Quantas vezes o processo acontece?').fill('1000');
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByText('Tudo certo para criar o processo.')).toBeVisible();
+  await page.getByRole('button', { name: 'Avançar para a revisão' }).click();
+  await expect(page.getByText('Etapa 5 de 5: Revisão')).toBeVisible();
+  await expect(page.getByText('Tudo certo por aqui. Vamos criar o processo?')).toBeVisible();
   await page.getByRole('button', { name: 'Criar processo e ver o mapa' }).click();
 
   // ---------- 3. Validação
