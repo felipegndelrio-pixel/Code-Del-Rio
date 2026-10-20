@@ -53,7 +53,7 @@ export default function AppShell() {
       </a>
       <header className="no-print safe-top sticky top-0 z-40 bg-nav text-navInk">
         <div className="safe-x mx-auto flex h-14 max-w-[1440px] items-center gap-2">
-          <Link to="/app" className="mr-auto flex items-center gap-2.5 font-semibold tracking-tight" aria-label={`${BRAND.name} — Meus projetos`}>
+          <Link to="/app" className="mr-auto flex min-h-[44px] min-w-[44px] items-center gap-2.5 font-semibold tracking-tight" aria-label={`${BRAND.name} — Meus projetos`}>
             <Logo className="h-7 w-7" />
             <span className="hidden sm:inline">{BRAND.name}</span>
           </Link>

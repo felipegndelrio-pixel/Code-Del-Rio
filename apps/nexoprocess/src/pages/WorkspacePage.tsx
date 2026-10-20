@@ -156,7 +156,7 @@ function StepHeader({ item, step, base }: { item: NavItem; step?: JourneyStep; b
       <p className="mt-1 max-w-3xl text-sm text-ink2">{objective}</p>
       {reqs.length > 0 && (
         <div className="mt-2">
-          <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-accent hover:underline">
+          <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex min-h-[40px] items-center gap-1 text-xs font-semibold text-accent hover:underline">
             <ChevronRight className={clsx('h-3.5 w-3.5 transition-transform', open && 'rotate-90')} aria-hidden />
             {missingRequired.length ? `Falta ${missingRequired.length} item obrigatório` : 'O que esta etapa usa'} · {reqs.filter((r) => r.ok).length}/{reqs.length} disponíveis
           </button>
@@ -176,7 +176,7 @@ function StepHeader({ item, step, base }: { item: NavItem; step?: JourneyStep; b
               ))}
               {reqs.some((r) => !r.ok && r.kind !== 'opcional') && (
                 <li className="sm:col-span-2">
-                  <Link to={`${base}/dados`} className="text-xs font-semibold text-accent hover:underline">
+                  <Link to={`${base}/dados`} className="inline-flex min-h-[32px] items-center text-xs font-semibold text-accent hover:underline">
                     Completar dados do processo
                   </Link>
                 </li>
@@ -231,11 +231,11 @@ function Shell() {
       <div className="safe-x min-w-0 pb-28 pt-4 lg:px-8 lg:pb-12">
         {/* Breadcrumbs + projeto */}
         <nav aria-label="Você está em" className="no-print mb-2 flex min-w-0 items-center gap-1 text-xs text-muted">
-          <Link to="/app" className="shrink-0 hover:text-ink">
+          <Link to="/app" className="inline-flex min-h-[28px] shrink-0 items-center hover:text-ink">
             Meus projetos
           </Link>
           <ChevronRight className="h-3 w-3 shrink-0" aria-hidden />
-          <Link to={`${base}/visao-geral`} className="min-w-0 truncate hover:text-ink">
+          <Link to={`${base}/visao-geral`} className="min-w-0 truncate py-1.5 hover:text-ink">
             {w.asIs.name}
           </Link>
           {item && item.path !== 'visao-geral' && (
@@ -279,7 +279,7 @@ function Shell() {
               Próxima etapa recomendada: <strong className="text-ink">{j.next.label}</strong>
             </span>
             <span className="sm:hidden">Próxima etapa:</span>
-            <Link to={`${base}/${STEP_PATH[j.next.key]}`} className="inline-flex items-center gap-1 font-semibold text-accent hover:underline">
+            <Link to={`${base}/${STEP_PATH[j.next.key]}`} className="inline-flex min-h-[32px] items-center gap-1 font-semibold text-accent hover:underline">
               Ir para {j.next.short} <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </div>

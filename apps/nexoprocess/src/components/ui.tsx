@@ -139,7 +139,7 @@ export function Term({ k, children, iconOnly }: { k: GlossaryKey; children?: Rea
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((o) => !o)}
-        className={clsx('inline-flex items-center gap-0.5 align-baseline', iconOnly ? 'ml-1 text-muted hover:text-brand' : 'border-b border-dotted border-brand/70 text-inherit hover:text-brand')}
+        className={clsx('inline-flex items-center gap-0.5 align-baseline', iconOnly ? 'relative ml-1 text-muted before:absolute before:-inset-[6px] before:content-[""] hover:text-brand' : 'border-b border-dotted border-brand/70 text-inherit hover:text-brand')}
         aria-label={iconOnly ? `O que é ${g.term}?` : undefined}
       >
         {!iconOnly && (children ?? g.term)}
@@ -429,7 +429,7 @@ export function Providers({ children }: { children: ReactNode }) {
         >
           <div className="space-y-2 text-sm text-ink2">{confirm?.body}</div>
         </Modal>
-        <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4 safe-bottom">
+        <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-4">
           {toasts.map((t) => (
             <div
               key={t.id}

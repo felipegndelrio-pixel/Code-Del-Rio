@@ -132,7 +132,7 @@ export default function Assistant() {
       <div className="mb-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-xl font-semibold">Vamos mapear seu processo</h1>
-          <Link to="/app/novo/formulario" className="text-xs font-semibold text-accent hover:underline">
+          <Link to="/app/novo/formulario" className="inline-flex min-h-[32px] items-center text-xs font-semibold text-accent hover:underline">
             Prefere preencher tudo de uma vez?
           </Link>
         </div>

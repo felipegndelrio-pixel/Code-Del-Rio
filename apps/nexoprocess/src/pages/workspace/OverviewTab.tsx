@@ -122,7 +122,7 @@ export default function OverviewTab() {
                 <span className="font-semibold tabular">{cmp.business.paybackMonths === null ? '—' : cmp.business.paybackMonths === 0 ? 'imediato' : `${fmtNum(cmp.business.paybackMonths, 1)} meses`}</span>
               </div>
               <p className="text-xs text-muted">Estimativas condicionadas às premissas do cenário — não são economia realizada.</p>
-              <Link to={`${base}/comparar`} className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline">
+              <Link to={`${base}/comparar`} className="inline-flex min-h-[32px] items-center gap-1 text-sm font-semibold text-accent hover:underline">
                 Ver comparação completa <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
             </div>
@@ -152,7 +152,7 @@ export default function OverviewTab() {
               <span className="text-ink2">Resultados medidos</span>
               <span className="font-semibold tabular">{w.results.filter((r) => !r.noData).length}</span>
             </div>
-            <Link to={`${base}/plano`} className="inline-flex items-center gap-1 font-semibold text-accent hover:underline">
+            <Link to={`${base}/plano`} className="inline-flex min-h-[32px] items-center gap-1 font-semibold text-accent hover:underline">
               Abrir plano de ação <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </div>

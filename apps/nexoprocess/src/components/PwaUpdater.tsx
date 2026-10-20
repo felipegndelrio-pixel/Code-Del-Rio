@@ -10,7 +10,7 @@ export default function PwaUpdater() {
   } = useRegisterSW();
   if (!needRefresh) return null;
   return (
-    <div role="status" className="no-print fixed inset-x-0 bottom-4 z-[55] mx-auto flex w-[calc(100%-2rem)] max-w-md items-center gap-3 rounded-2xl border border-brand/40 bg-surface p-3 text-sm shadow-card">
+    <div role="status" className="no-print fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[55] lg:bottom-4 mx-auto flex w-[calc(100%-2rem)] max-w-md items-center gap-3 rounded-2xl border border-brand/40 bg-surface p-3 text-sm shadow-card">
       <RefreshCw className="h-5 w-5 shrink-0 text-brand" aria-hidden />
       <span className="flex-1 text-ink2">Nova versão disponível. Seus dados continuam salvos neste aparelho.</span>
       <Button size="sm" variant="ghost" onClick={() => setNeedRefresh(false)}>

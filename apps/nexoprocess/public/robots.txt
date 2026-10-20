@@ -1,0 +1,6 @@
+# NexoProcess: a página inicial pode ser indexada; o app e a API não.
+User-agent: *
+Allow: /$
+Disallow: /app
+Disallow: /api/
+Disallow: /entrar

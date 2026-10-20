@@ -181,12 +181,14 @@ export default function Home() {
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          {/* No celular os botões ficam sempre em linha própria: a troca da fonte reserva pela
+              IBM Plex não pode mudar a quebra de linha (era a causa do CLS 0,146 em /app). */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <div>
               <p className="eyebrow">Seu trabalho</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Meus projetos</h1>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <Button variant="secondary" onClick={() => projectRef.current?.click()}>
                 <Upload className="h-4 w-4" aria-hidden /> Importar projeto
               </Button>

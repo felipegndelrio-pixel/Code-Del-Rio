@@ -184,7 +184,7 @@ export default function DiagnosisTab() {
               </li>
             ))}
           </ul>
-          <Link to={`/app/p/${w.id}/dados`} className="mt-2 inline-block text-sm font-semibold text-brand hover:underline">
+          <Link to={`/app/p/${w.id}/dados`} className="mt-1 inline-flex min-h-[32px] items-center text-sm font-semibold text-brand hover:underline">
             Completar dados
           </Link>
         </Card>
@@ -228,9 +228,9 @@ function LeanReview() {
           .filter((g) => g.items.length)
           .map((g) => (
             <section key={g.key} aria-label={g.title} className="rounded-lg border border-line/15 p-3">
-              <h4 className="text-sm font-semibold text-ink">
+              <h3 className="text-sm font-semibold text-ink">
                 {g.title} <span className="font-normal text-muted">({g.items.length})</span>
-              </h4>
+              </h3>
               <p className="mb-2 text-xs text-muted">{g.hint}</p>
               <ul className="divide-y divide-line/10">
                 {g.items.map((a) => (
