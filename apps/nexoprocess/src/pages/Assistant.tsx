@@ -293,7 +293,7 @@ export default function Assistant() {
                   })
                 }
                 addLabel="Adicionar atividade"
-                textPlaceholder={'Registrar solicitação por Solicitante (10 min)\nAnalisar orçamento por Gestor\nAprovar ou recusar'}
+                textPlaceholder={'Aprovar por Gestor (15 min)\nAnalisar orçamento por Comprador\nRegistrar pedido'}
                 nextLabel={nextLabel}
                 onNext={() => next()}
                 onSkip={() => {

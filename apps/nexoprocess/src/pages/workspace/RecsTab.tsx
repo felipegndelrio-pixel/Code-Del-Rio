@@ -5,8 +5,9 @@ import { Check, ClipboardPlus, Pencil, Search, X } from 'lucide-react';
 import { Badge, BasisTag, Button, Callout, Card, Field, Modal, Segmented, Textarea, useToast } from '../../components/ui';
 import { GROUP_LABEL, type Recommendation, type RecGroup } from '../../domain/recommendations';
 import type { RecStatus } from '../../domain/types';
-import { nowIso, uid } from '../../domain/units';
+import { nowIso } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
+import { actionFromRecommendation } from '../../domain/plan';
 
 const STATUS_LABEL: Record<RecStatus, string> = { pending: 'Pendente', accepted: 'Aceita', rejected: 'Rejeitada', investigating: 'Investigando' };
 const GROUPS: RecGroup[] = ['resolver', 'investigar', 'automatizar', 'monitorar'];
@@ -39,19 +40,7 @@ export default function RecsTab() {
     }
     update(
       (d) => {
-        d.actions.push({
-          id: uid('act_'),
-          description: w.recDecisions[r.id]?.editedAction ?? r.action,
-          owner: r.owner,
-          priority: r.priority,
-          status: 'a_fazer',
-          successIndicator: r.successIndicator,
-          dependencies: r.dependencies.join(' ') || undefined,
-          relatedProblem: `${r.title} — ${r.problem}`,
-          expectedValue: r.ceiling,
-          origin: { kind: 'recommendation', ref: r.id },
-          createdAt: nowIso(),
-        });
+        d.actions.push(actionFromRecommendation(r, w.recDecisions[r.id]?.editedAction));
       },
       { area: 'Plano de ação', message: `Ação criada a partir de “${r.title}”` },
     );

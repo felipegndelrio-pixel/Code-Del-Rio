@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
-import { FileDown, FileSpreadsheet, FileUp, ListPlus, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Badge, Button, Callout, Card, Drawer, Empty, Field, Input, Modal, Segmented, Select, Table, td, Textarea, th, useConfirm, useToast } from '../../components/ui';
+import { CalendarDays, FileDown, FileSpreadsheet, FileUp, ListPlus, Pencil, Plus, Sparkles, Trash2, UserRound } from 'lucide-react';
+import { Badge, Button, Callout, Card, Drawer, Field, Input, Modal, Segmented, Select, Table, td, Textarea, th, useConfirm, useToast } from '../../components/ui';
 import { Tour, type TourStep } from '../../components/Tour';
 import type { ActionItem, ActionStatus, Priority } from '../../domain/types';
-import { completionIssue, relatedProblemOf } from '../../domain/plan';
+import { actionFromRecommendation, completionIssue, planCandidates, relatedProblemOf, STARTER_PLAN_SIZE } from '../../domain/plan';
+import type { Recommendation } from '../../domain/recommendations';
 import { fmtDate, nowIso, uid } from '../../domain/units';
 import { actionsToCsv, readPlanFile, type PlanImport } from '../../io/planCsv';
 import { ImportError } from '../../io/parse';
@@ -18,16 +19,16 @@ export const ACTION_STATUS: Record<ActionStatus, string> = { a_fazer: 'A fazer',
 const PRIO: Record<Priority, string> = { alta: 'Alta', media: 'Média', baixa: 'Baixa' };
 
 const TOUR: TourStep[] = [
-  { target: '[data-tour="nova"]', title: 'Crie as ações do plano', body: 'Cada ação diz o que será feito. Responsável e prazo você define quando souber — nunca preenchemos por você.' },
-  { target: '[data-tour="gerar"]', title: 'Ou gere a partir do TO-BE', body: 'Cada mudança do processo futuro vira uma ação, sem digitar de novo.' },
-  { target: '[data-tour="importar"]', title: 'Já tem o plano numa planilha?', body: 'Importe um CSV com as colunas Ação, Responsável e Prazo.' },
+  { target: '[data-tour="acao"]', title: 'Defina quem faz e até quando', body: 'Toque numa ação para escolher o responsável e o prazo. Isso nunca é preenchido por você: a decisão é da equipe.' },
   { target: '[data-tour="exportar"]', title: 'Compartilhe com a equipe', body: 'Exporte em PDF para apresentar ou em planilha (CSV) para acompanhar no Excel.' },
+  { target: '[data-tour="importar"]', title: 'Já tem ações numa planilha?', body: 'Importe um CSV com as colunas Ação, Responsável e Prazo; elas entram no fim do plano.' },
 ];
 
 const blank = (): ActionItem => ({ id: uid('act_'), description: '', priority: 'media', status: 'a_fazer', origin: { kind: 'manual' }, createdAt: nowIso() });
 
 export default function PlanTab() {
-  const { w, update } = useWorkspace();
+  const { w, update, recs } = useWorkspace();
+  const candidates = planCandidates(recs, w);
   const toast = useToast();
   const confirm = useConfirm();
   // Ação em edição sobrevive a um recarregamento (rascunho local por projeto).
@@ -149,6 +150,24 @@ export default function PlanTab() {
     toast('ok', `${n} ${n === 1 ? 'ação adicionada' : 'ações adicionadas'} ao plano.`);
   };
 
+  // Plano vazio: as oportunidades de maior pontuação viram ações num clique (decisão da pessoa).
+  const [justBuilt, setJustBuilt] = useState(false);
+  const buildFromRecs = () => {
+    const pick = candidates.slice(0, STARTER_PLAN_SIZE);
+    if (!pick.length) return;
+    setJustBuilt(true);
+    update(
+      (d) => {
+        for (const r of pick) {
+          d.actions.push(actionFromRecommendation(r, d.recDecisions[r.id]?.editedAction));
+          if (!d.recDecisions[r.id]) d.recDecisions[r.id] = { status: 'accepted', decidedAt: nowIso() };
+        }
+      },
+      { area: 'Plano de ação', message: `Plano montado com ${pick.length} oportunidade(s) de melhoria` },
+    );
+    toast('ok', `Plano montado com ${pick.length} ${pick.length === 1 ? 'ação' : 'ações'}. Agora defina quem faz e até quando — toque numa ação para editar.`);
+  };
+
   const list = w.actions.filter((a) => (filter === 'todas' ? true : filter === 'concluida' ? a.status === 'concluida' : a.status !== 'concluida' && a.status !== 'cancelada'));
   const changeCount = (w.scenarios.find((s) => s.id === w.activeScenarioId) ?? w.scenarios[0])?.changes.length ?? 0;
 
@@ -171,6 +190,8 @@ export default function PlanTab() {
           </div>
         }
       >
+        <input ref={fileRef} type="file" accept=".csv,text/csv" className="sr-only" tabIndex={-1} aria-hidden data-testid="plan-import-input" onChange={(e) => void pickFile(e.target.files?.[0])} />
+        {w.actions.length > 0 && (
         <div className="no-print mb-3 flex flex-wrap items-center gap-2 border-b border-line/10 pb-3">
           <span className="flex flex-wrap gap-2" data-tour="exportar">
             <Button size="sm" variant="secondary" onClick={exportPdf} disabled={!w.actions.length}>
@@ -183,24 +204,22 @@ export default function PlanTab() {
           <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()} data-tour="importar">
             <FileUp className="h-4 w-4" aria-hidden /> Importar planilha (CSV)
           </Button>
-          <input ref={fileRef} type="file" accept=".csv,text/csv" className="sr-only" tabIndex={-1} aria-hidden data-testid="plan-import-input" onChange={(e) => void pickFile(e.target.files?.[0])} />
         </div>
+        )}
         <div className="print:hidden">
+        {w.actions.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <Segmented label="Filtro" value={filter} onChange={setFilter} options={[{ value: 'todas', label: `Todas (${w.actions.length})` }, { value: 'abertas', label: 'Abertas' }, { value: 'concluida', label: 'Concluídas' }]} />
           <span className="text-xs text-muted">Responsável e prazo nunca são preenchidos automaticamente — ficam “pendente” até você definir.</span>
         </div>
+        )}
         {!w.actions.length ? (
-          <Empty
-            title="Ainda não temos ações por aqui"
-            action={
-              <Link to="../recomendacoes" relative="path" className="inline-flex min-h-[36px] items-center font-semibold text-accent hover:underline">
-                Ver as oportunidades de melhoria
-              </Link>
-            }
-          >
-            Vamos montar o plano? Gere as ações a partir das mudanças do TO-BE, aproveite as recomendações aceitas, importe uma planilha ou crie uma do zero.
-          </Empty>
+          <StarterPlan
+            candidates={candidates}
+            onBuild={buildFromRecs}
+            onNew={() => setEdit(blank())}
+            onImport={() => fileRef.current?.click()}
+          />
         ) : (
           <>
             {/* Tabela só a partir de 1280 px; abaixo disso, cartões (sem colunas espremidas). */}
@@ -224,8 +243,8 @@ export default function PlanTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((a) => (
-                    <tr key={a.id} className={clsx(overdue(a) && 'bg-bad/5')}>
+                  {list.map((a, i) => (
+                    <tr key={a.id} className={clsx(overdue(a) && 'bg-bad/5')} data-tour={i === 0 ? 'acao' : undefined}>
                       <td className={clsx(td, 'text-ink')}>
                         {a.description}
                         {relatedProblemOf(a, w) && <span className="block text-xs text-ink2">Problema: {relatedProblemOf(a, w)}</span>}
@@ -272,16 +291,25 @@ export default function PlanTab() {
               </Table>
             </div>
             <ul className="space-y-2 xl:hidden">
-              {list.map((a) => (
+              {list.map((a, i) => (
                 <li key={a.id}>
-                  <button type="button" onClick={() => setEdit(structuredClone(a))} className={clsx('w-full rounded-xl border p-3 text-left', overdue(a) ? 'border-bad/40' : 'border-line/15')}>
+                  <button type="button" onClick={() => setEdit(structuredClone(a))} data-tour={i === 0 ? 'acao' : undefined} className={clsx('w-full rounded-xl border p-3 text-left', overdue(a) ? 'border-bad/40' : 'border-line/15')}>
                     <p className="font-semibold text-ink">{a.description}</p>
                     {relatedProblemOf(a, w) && <p className="mt-0.5 text-xs text-ink2">Problema: {relatedProblemOf(a, w)}</p>}
-                    <div className="mt-1 flex flex-wrap gap-1 text-xs">
+                    <div className="mt-2 flex flex-wrap gap-1 text-xs">
                       <Badge tone="accent">{ACTION_STATUS[a.status]}</Badge>
                       <Badge tone={a.priority === 'alta' ? 'bad' : 'muted'}>{PRIO[a.priority]}</Badge>
-                      <span className="text-ink2">{a.owner ?? 'responsável pendente'}</span>
-                      <span className={clsx('text-ink2', overdue(a) && 'text-bad')}>· {a.due ? fmtDate(a.due) : 'prazo pendente'}</span>
+                    </div>
+                    {/* Quem e quando: o que falta definir aparece como selo, para chamar a ação. */}
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                      <span className="inline-flex items-center gap-1 text-ink2">
+                        <UserRound className="h-3.5 w-3.5" aria-hidden />
+                        {a.owner ? a.owner : <Badge tone="amber">Responsável pendente</Badge>}
+                      </span>
+                      <span className={clsx('inline-flex items-center gap-1 text-ink2', overdue(a) && 'font-semibold text-bad')}>
+                        <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+                        {a.due ? `${fmtDate(a.due)}${overdue(a) ? ' · atrasada' : ''}` : <Badge tone="amber">Prazo pendente</Badge>}
+                      </span>
                     </div>
                     {a.successIndicator && <p className="mt-1 text-xs text-ink2">Indicador: {a.successIndicator}</p>}
                   </button>
@@ -346,7 +374,9 @@ export default function PlanTab() {
           </div>
         )}
       </Modal>
-      <Tour storageKey="nexo.tour.plano" steps={TOUR} />
+      {/* O tour aponta os botões do plano: só faz sentido quando já há ações. */}
+      {/* Logo depois de montar o plano, a confirmação já orienta; o tour fica para a próxima visita. */}
+      {w.actions.length > 0 && !justBuilt && <Tour storageKey="nexo.tour.plano" steps={TOUR} />}
 
       <Drawer
         open={!!edit}
@@ -458,6 +488,58 @@ function PrintPlan() {
         </tbody>
       </table>
       <p className="mt-4 text-[10px] text-muted">“Pendente” = responsável ou prazo ainda não definidos pela equipe. Gerado pelo NexoProcess; os dados ficam no aparelho de quem gerou.</p>
+    </div>
+  );
+}
+
+/** Plano vazio: ponto de partida com um clique, a partir das oportunidades encontradas. */
+function StarterPlan({ candidates, onBuild, onNew, onImport }: { candidates: Recommendation[]; onBuild: () => void; onNew: () => void; onImport: () => void }) {
+  const n = Math.min(STARTER_PLAN_SIZE, candidates.length);
+  return (
+    <div className="rounded-2xl border border-dashed border-line/25 p-5 text-center sm:p-8" data-testid="plan-starter">
+      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand/10 text-brand" aria-hidden>
+        <Sparkles className="h-6 w-6" />
+      </span>
+      <h3 className="mt-3 text-lg font-semibold text-ink">Seu plano começa aqui</h3>
+      {n > 0 ? (
+        <>
+          <p className="mx-auto mt-1 max-w-lg text-sm text-ink2">
+            Encontramos {candidates.length === 1 ? '1 oportunidade de melhoria' : `${candidates.length} oportunidades de melhoria`} no seu processo. Transforme {n === 1 ? 'a principal' : `as ${n} principais`} em ações agora; depois é só
+            definir quem faz e até quando.
+          </p>
+          <ul className="mx-auto mt-4 max-w-lg space-y-1.5 text-left text-sm">
+            {candidates.slice(0, n).map((r) => (
+              <li key={r.id} className="flex items-start gap-2 rounded-lg bg-surface2/60 px-3 py-2">
+                <Badge tone={r.priority === 'alta' ? 'bad' : r.priority === 'media' ? 'amber' : 'muted'} className="mt-0.5 shrink-0">
+                  {PRIO[r.priority]}
+                </Badge>
+                <span className="text-ink">{r.title}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-5 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+            <Button size="lg" onClick={onBuild} className="w-full sm:w-auto">
+              <ListPlus className="h-5 w-5" aria-hidden /> Montar meu plano
+              <span className="hidden sm:inline">
+                {' '}com {n} {n === 1 ? 'ação' : 'ações'}
+              </span>
+            </Button>
+            <Link to="../recomendacoes" relative="path" className="inline-flex min-h-[44px] items-center px-3 text-sm font-semibold text-accent hover:underline">
+              Prefiro escolher uma a uma
+            </Link>
+          </div>
+        </>
+      ) : (
+        <p className="mx-auto mt-1 max-w-lg text-sm text-ink2">Crie a primeira ação ou importe o plano que você já tem numa planilha.</p>
+      )}
+      <div className="mt-4 flex flex-wrap justify-center gap-2 border-t border-line/10 pt-4">
+        <Button size="sm" variant={n > 0 ? 'ghost' : 'primary'} onClick={onNew}>
+          <Plus className="h-4 w-4" aria-hidden /> Criar ação do zero
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onImport}>
+          <FileUp className="h-4 w-4" aria-hidden /> Importar planilha (CSV)
+        </Button>
+      </div>
     </div>
   );
 }

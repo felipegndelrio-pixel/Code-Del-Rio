@@ -142,7 +142,7 @@ export default function Home() {
           <section className="max-w-3xl">
             <p className="eyebrow">Análise e melhoria de processos</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Entenda seu processo, encontre os gargalos e saia com um plano de melhoria.</h1>
-            <p className="mt-3 text-base text-ink2">Ainda não temos nada por aqui. Que tal mapear seu primeiro processo? Você conta como o trabalho acontece hoje; nós desenhamos o mapa, calculamos tempo, esforço e desperdício com as fórmulas à vista e ajudamos a montar o cenário futuro. Leva poucos minutos.</p>
+            <p className="mt-3 text-base text-ink2">Você conta como o trabalho acontece hoje; nós desenhamos o mapa, mostramos onde estão o tempo e o desperdício e ajudamos a montar o plano de melhoria. Leva poucos minutos.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button size="lg" onClick={() => nav('/app/novo')}>
                 <Plus className="h-5 w-5" aria-hidden /> Mapear meu primeiro processo
@@ -151,7 +151,7 @@ export default function Home() {
                 <FileSpreadsheet className="h-5 w-5" aria-hidden /> Importar planilha
               </Button>
               <Button size="lg" variant="ghost" onClick={() => void demo()}>
-                Ver demonstração fictícia <ArrowRight className="h-4 w-4" aria-hidden />
+                Abrir demonstração <ArrowRight className="h-4 w-4" aria-hidden />
               </Button>
             </div>
           </section>
@@ -170,18 +170,30 @@ export default function Home() {
               </li>
             ))}
           </ol>
-          <section aria-labelledby="ways">
-            <h2 id="ways" className="mb-3 text-lg font-semibold">
-              Escolha como começar
-            </h2>
-            {ways}
-            <p className="mt-3 text-sm text-ink2">
-              Já tem um arquivo de projeto de outro aparelho?{' '}
-              <button type="button" className="font-semibold text-accent hover:underline" onClick={() => projectRef.current?.click()}>
-                Importar projeto
+          {/* As três formas de começar já estão no topo; aqui só os atalhos de quem chega com arquivo. */}
+          <div className="grid gap-3 text-sm text-ink2 sm:grid-cols-2">
+            <p>
+              <span className="font-semibold text-ink">Já tem uma planilha?</span> Comece pelo modelo:{' '}
+              <button type="button" className="font-semibold text-accent hover:underline" onClick={() => void downloadTemplateXlsx()}>
+                Baixar modelo XLSX
+              </button>{' '}
+              ·{' '}
+              <button type="button" className="font-semibold text-accent hover:underline" onClick={() => void downloadTemplateCsv()}>
+                Baixar exemplo CSV
               </button>
             </p>
-          </section>
+            <p>
+              <span className="font-semibold text-ink">Trocou de aparelho?</span>{' '}
+              <button type="button" className="font-semibold text-accent hover:underline" onClick={() => projectRef.current?.click()}>
+                Importar projeto
+              </button>{' '}
+              ou{' '}
+              <button type="button" className="font-semibold text-accent hover:underline" onClick={() => backupRef.current?.click()}>
+                Restaurar backup
+              </button>
+              .
+            </p>
+          </div>
         </>
       ) : (
         <>
@@ -273,8 +285,21 @@ export default function Home() {
         </>
       )}
 
+      {/* Primeira visita: só a promessa de privacidade. Backup e limpeza aparecem quando há o que guardar. */}
+      {list !== null && !hasProjects && (
+        <p className="flex items-start gap-2 text-sm text-ink2">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-ok" aria-hidden />
+          <span>
+            Seus processos ficam salvos só neste aparelho; o conteúdo não é enviado a servidores.{' '}
+            <Link to="/app/ajuda#privacidade" className="font-semibold text-accent hover:underline">
+              Detalhes
+            </Link>
+          </span>
+        </p>
+      )}
+
       {/* Só depois de carregar a lista: evita deslocar o layout (CLS). */}
-      {list !== null && (
+      {list !== null && hasProjects && (
         <Card title="Seus dados, seu controle" subtitle="Privacidade e continuidade">
           <div className="grid gap-4 md:grid-cols-[1fr_auto]">
             <div className="flex gap-3 text-sm text-ink2">

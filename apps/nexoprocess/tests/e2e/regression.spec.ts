@@ -32,7 +32,7 @@ test('backup sem processo AS-IS e recusado com explicacao e sem alterar dados', 
   writeFileSync(file, JSON.stringify({ format: 'nexoprocess-backup', version: 1, workspaces: [{ id: 'w_ruim' }] }));
   await page.goto('/app');
   // Espera o app criar o banco antes de ler: o helper não pode abrir o IndexedDB primeiro.
-  await expect(page.getByRole('heading', { name: /Escolha como começar|Meus projetos/ })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /Entenda seu processo|Meus projetos/ })).toBeVisible();
   const before = (await readWorkspaces(page)).length;
   await page.getByLabel('Arquivo de backup').setInputFiles(file);
   await expect(page.getByRole('alert')).toContainText('Nenhum dado foi alterado');

@@ -12,6 +12,7 @@ Itens verificados antes de cada versão. Detalhes por fase em [`plano-fases.md`]
 - [ ] Paridade `vercel.json` × `public/_headers` (`tests/api/vercel-headers.test.ts`)
 - [ ] Acesso pela compra: API e webhook (`tests/api/license.test.ts`) e E2E do modo de venda (`tests/e2e/license.spec.ts`, projeto `licenca`)
 - [ ] Compatibilidade (`compat.spec.ts`, `mobile-compat.spec.ts`): aviso em navegador antigo, campos com 16px no toque (sem zoom no iPhone), painéis dentro da tela, convite de instalação no iPhone. Validação em aparelhos reais: `docs/COMPATIBILIDADE.md`
+- [ ] Primeira experiência: Home vazia sem opções repetidas; cabeçalho do projeto em uma linha no celular (conteúdo da etapa na primeira tela); plano vazio com "Montar meu plano" (ações sem responsável nem prazo, axe sem violações) — `retention.spec.ts`
 - [ ] Retenção e conversão (`tests/e2e/retention.spec.ts`, `mobile-back.spec.ts`): "Voltar" da tela e do sistema, auto-save ao recarregar, Enter no desktop, plano em CSV (exportar/importar) e PDF, tour só na 1ª visita; modo demo bloqueando salvar/exportar (`license.spec.ts`)
 - [ ] API no runtime do Cloudflare Pages (`nexo:test:api`: functions + workerd + Supabase falso, webhook → ativação → reembolso)
 

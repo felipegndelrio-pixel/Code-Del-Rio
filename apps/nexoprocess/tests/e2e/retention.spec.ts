@@ -1,6 +1,7 @@
 // Última rodada antes do lançamento: navegação (Voltar da tela e do sistema),
 // auto-save, tela de sucesso, plano de ação (PDF, CSV, importação), tour e Enter.
 import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'node:fs';
 import { openDemo, prepare, readWorkspaces } from './helpers';
 
@@ -112,7 +113,7 @@ test('plano: tour de boas-vindas aparece só na primeira visita', async ({ page 
   const base = await openDemo(page);
   await page.goto(`${base}/plano`);
   const tour = page.getByTestId('tour');
-  await expect(tour).toContainText('Crie as ações do plano');
+  await expect(tour).toContainText('Defina quem faz e até quando');
   await expect(tour).toContainText(/Dica 1 de \d/);
   for (let i = 0; i < 6 && (await tour.getByRole('button', { name: 'Próxima' }).isVisible()); i++) await tour.getByRole('button', { name: 'Próxima' }).click();
   await tour.getByRole('button', { name: 'Entendi' }).click();
@@ -128,4 +129,53 @@ test('build aberto: /entrar não oferece demo e leva direto ao app', async ({ pa
   await page.goto('/entrar');
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('button', { name: 'Experimentar a versão Demo' })).toHaveCount(0);
+});
+
+test('plano vazio: “Montar meu plano” cria as ações das principais oportunidades, sem responsável nem prazo', async ({ page }) => {
+  const { errors } = await prepare(page, { tour: true });
+  await startAssistant(page);
+  const st = step(page);
+  await st.getByRole('button', { name: 'Pular por agora' }).click();
+  for (const e of ['Pedido', 'Compra']) {
+    await st.getByRole('textbox', { name: 'Adicionar etapa' }).fill(e);
+    await st.getByRole('button', { name: 'Adicionar etapa' }).click();
+  }
+  await st.getByRole('button', { name: /Avançar/ }).click();
+  for (const a of ['Registrar pedido por Solicitante (10 min)', 'Aprovar por Gestor (3 h)']) {
+    await st.getByRole('textbox', { name: 'Adicionar atividade' }).fill(a);
+    await st.getByRole('button', { name: 'Adicionar atividade' }).click();
+  }
+  await st.getByRole('button', { name: /Avançar/ }).click();
+  await st.getByRole('textbox', { name: 'Adicionar atividade' }).fill('Emitir pedido por Comprador (15 min)');
+  await st.getByRole('button', { name: 'Adicionar atividade' }).click();
+  await st.getByRole('button', { name: /Avançar/ }).click();
+  await st.getByRole('button', { name: 'Pular detalhes restantes' }).click();
+  await st.getByRole('button', { name: /Não há decisões/ }).click();
+  await st.getByRole('button', { name: 'Não sei ainda' }).click();
+  await st.getByRole('button', { name: /Não sei \/ prefiro/ }).click();
+  await st.getByRole('button', { name: 'Criar meu projeto' }).click();
+  await page.getByRole('button', { name: 'Ver meu Plano de Ação' }).click();
+
+  const starter = page.getByTestId('plan-starter');
+  await expect(starter).toContainText('Seu plano começa aqui');
+  await expect(page.getByRole('button', { name: 'Exportar PDF' })).toHaveCount(0); // nada a exportar ainda
+  await expect(page.getByTestId('tour')).toHaveCount(0); // sem ações, sem tour
+  const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+  await starter.getByRole('button', { name: /Montar meu plano/ }).click();
+  await expect(starter).toHaveCount(0);
+  const [w] = await readWorkspaces(page);
+  expect(w.actions.length).toBeGreaterThan(0);
+  expect(w.actions.length).toBeLessThanOrEqual(5);
+  for (const a of w.actions) {
+    expect(a.owner).toBeUndefined(); // responsável nunca preenchido automaticamente
+    expect(a.due).toBeUndefined();
+    expect(a.origin.kind).toBe('recommendation');
+    expect(w.recDecisions[a.origin.ref].status).toBe('accepted');
+  }
+  await page.waitForTimeout(900);
+  await expect(page.getByTestId('tour')).toHaveCount(0); // a confirmação já orienta; o tour fica para depois
+  await page.reload();
+  await expect(page.getByTestId('tour')).toContainText('Defina quem faz e até quando');
+  expect(errors).toEqual([]);
 });

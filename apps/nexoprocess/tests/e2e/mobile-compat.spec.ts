@@ -34,6 +34,9 @@ test('iPhone: convite para adicionar à Tela de Início, dispensável', async ({
   await page.goto('/app');
   const ios = await page.evaluate(() => /iPhone|iPad/.test(navigator.userAgent));
   test.skip(!ios, 'só no perfil de iPhone');
+  await expect(page.getByTestId('install-hint')).toHaveCount(0); // primeira visita: nada a proteger ainda
+  await openDemo(page); // com um projeto salvo, o convite aparece
+  await page.goto('/app');
   const hint = page.getByTestId('install-hint');
   await expect(hint).toContainText('Adicionar à Tela de Início');
   await hint.getByRole('button', { name: 'Dispensar dica de instalação' }).click();

@@ -72,7 +72,11 @@ function SaveIndicator() {
     <span className="inline-flex items-center gap-1.5 text-xs text-muted" role="status" aria-live="polite" data-testid="save-state">
       {save === 'demo' ? (
         <span className="inline-flex items-center gap-1 text-ink2">
-          <CloudOff className="h-3.5 w-3.5 text-amber" aria-hidden /> Demonstração · não salvo
+          <CloudOff className="h-3.5 w-3.5 text-amber" aria-hidden />
+          <span className="hidden sm:inline">Demonstração · não salvo</span>
+          <span className="sm:hidden">
+            Não salvo<span className="sr-only"> (demonstração)</span>
+          </span>
         </span>
       ) : save === 'salvando' ? (
         <>
@@ -149,7 +153,7 @@ function StepHeader({ item, step, base }: { item: NavItem; step?: JourneyStep; b
   const missingRequired = reqs.filter((r) => r.kind === 'obrigatório' && !r.ok);
   const objective = step ? STEP_OBJECTIVE[step.key] : item.objective;
   return (
-    <header className="no-print mb-4 sm:mb-5">
+    <header className="no-print mb-3 sm:mb-5">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-xl font-semibold text-ink sm:text-2xl">{item.label}</h2>
         {step && (
@@ -205,6 +209,7 @@ function Shell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const item = NAV_ITEMS.find((i) => i.path === active);
   const step = item?.step ? j.steps.find((s) => s.key === item.step) : undefined;
+  const showNext = !!(j.next && step && step.key !== j.next.key && step.state !== 'atual');
 
   const doUndo = () => {
     const label = undo();
@@ -234,9 +239,10 @@ function Shell() {
       </aside>
 
       <div className="safe-x min-w-0 pb-28 pt-4 lg:px-8 lg:pb-12">
-        {/* Breadcrumbs + projeto */}
-        <BackButton className="mb-1" />
-        <nav aria-label="Você está em" className="no-print mb-2 flex min-w-0 items-center gap-1 text-xs text-muted">
+        {/* Cabeçalho do projeto. Celular: uma linha (voltar · nome · salvo · desfazer), para o
+            conteúdo da etapa aparecer na primeira tela. Desktop: voltar + trilha, depois o nome. */}
+        <nav aria-label="Você está em" className="no-print mb-2 hidden min-w-0 items-center gap-1 text-xs text-muted sm:flex">
+          <BackButton className="mr-2" />
           <Link to="/app" className="inline-flex min-h-[28px] shrink-0 items-center hover:text-ink">
             Meus projetos
           </Link>
@@ -251,16 +257,20 @@ function Shell() {
             </>
           )}
         </nav>
-        <div className="no-print mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line/10 pb-3 sm:mb-4 sm:pb-4">
-          <h1 className="w-full min-w-0 break-words text-base font-semibold leading-snug sm:w-auto sm:flex-1 sm:line-clamp-2 sm:text-xl" title={w.asIs.name}>
+        <div className="no-print mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line/10 pb-2 sm:mb-4 sm:gap-x-3 sm:gap-y-2 sm:pb-4">
+          <BackButton compact className="sm:hidden" />
+          <h1 className="line-clamp-2 min-w-0 flex-1 break-words text-base font-semibold leading-snug sm:text-xl" title={w.asIs.name}>
             {w.asIs.name}
           </h1>
           {w.isDemo && (
-            <Badge tone="amber" className="text-xs">
-              Exemplo fictício<span className="sr-only sm:not-sr-only"> — dados ilustrativos</span>
-            </Badge>
+            // No celular o selo vai para a linha de baixo: o nome do projeto não quebra no meio da palavra.
+            <div className="order-last w-full sm:order-none sm:w-auto">
+              <Badge tone="amber" className="text-xs">
+                Exemplo fictício<span className="sr-only sm:not-sr-only"> — dados ilustrativos</span>
+              </Badge>
+            </div>
           )}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 sm:w-auto sm:flex-none">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <SaveIndicator />
             <Button size="sm" variant="ghost" onClick={doUndo} disabled={!undoLabel} title={undoLabel ? `Desfazer: ${undoLabel} (Ctrl+Z)` : 'Nada para desfazer'} aria-label={undoLabel ? `Desfazer: ${undoLabel}` : 'Nada para desfazer'}>
               <Undo2 className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Desfazer</span>
@@ -279,14 +289,13 @@ function Shell() {
         )}
 
         {item && <StepHeader item={item} step={step} base={base} />}
-        {j.next && step && step.key !== j.next.key && step.state !== 'atual' && (
-          <div className="no-print -mt-2 mb-4 flex flex-wrap items-center gap-2 text-sm text-ink2">
-            <span className="hidden sm:inline">
-              Próxima etapa recomendada: <strong className="text-ink">{j.next.label}</strong>
+        {showNext && (
+          <div className="no-print -mt-2 mb-4 hidden flex-wrap items-center gap-2 text-sm text-ink2 lg:flex">
+            <span>
+              Próxima etapa recomendada: <strong className="text-ink">{j.next!.label}</strong>
             </span>
-            <span className="sm:hidden">Próxima etapa:</span>
-            <Link to={`${base}/${STEP_PATH[j.next.key]}`} className="inline-flex min-h-[32px] items-center gap-1 font-semibold text-accent hover:underline">
-              Ir para {j.next.short} <ArrowRight className="h-4 w-4" aria-hidden />
+            <Link to={`${base}/${STEP_PATH[j.next!.key]}`} className="inline-flex min-h-[32px] items-center gap-1 font-semibold text-accent hover:underline">
+              Ir para {j.next!.short} <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </div>
         )}
@@ -312,6 +321,20 @@ function Shell() {
             <Route path="*" element={<Navigate to="visao-geral" replace />} />
           </Routes>
         </Suspense>
+        {/* Celular/tablet: o próximo passo vem depois do conteúdo, como um botão de continuar. */}
+        {showNext && (
+          <Link
+            to={`${base}/${STEP_PATH[j.next!.key]}`}
+            className="no-print mt-6 flex min-h-[56px] items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-brand/5 px-4 py-3 lg:hidden"
+            data-testid="next-step"
+          >
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-accent">Próxima etapa</span>
+              <span className="block font-semibold text-ink">{j.next!.label}</span>
+            </span>
+            <ArrowRight className="h-5 w-5 shrink-0 text-brand" aria-hidden />
+          </Link>
+        )}
       </div>
 
       {/* Barra inferior (celular/tablet) */}

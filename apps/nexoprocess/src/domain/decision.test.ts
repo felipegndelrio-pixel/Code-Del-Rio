@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { businessCases, compareScenarios, DEFAULT_SENSITIVITY, responsibilityChanges, roleLoads } from './compare';
 import { demoProcess, demoWorkspace } from './demo';
-import { completionIssue, relatedProblemOf } from './plan';
+import { actionFromRecommendation, completionIssue, planCandidates, relatedProblemOf } from './plan';
 import { recommend } from './recommendations';
 import type { ActionItem } from './types';
 
@@ -115,5 +115,28 @@ describe('demonstração coerente', () => {
       expect(a.status).not.toBe('concluida');
     }
     expect(w.results).toEqual([]);
+  });
+});
+
+describe('plano a partir das oportunidades', () => {
+  it('a ação nasce sem responsável e sem prazo, ligada à oportunidade', () => {
+    const [r] = recommend(demoProcess());
+    expect(r.owner).toBeTruthy(); // a oportunidade conhece o dono da atividade…
+    const a = actionFromRecommendation(r);
+    expect(a.owner).toBeUndefined(); // …mas o responsável da ação é decisão da equipe
+    expect(a.due).toBeUndefined();
+    expect(a).toMatchObject({ status: 'a_fazer', origin: { kind: 'recommendation', ref: r.id } });
+    expect(actionFromRecommendation(r, '  Ação editada ').description).toBe('Ação editada');
+  });
+
+  it('candidatas: sem as rejeitadas e sem as que já viraram ação', () => {
+    const w = demoWorkspace();
+    const recs = recommend(w.asIs);
+    w.actions = [actionFromRecommendation(recs[0])];
+    w.recDecisions = { [recs[1].id]: { status: 'rejected', decidedAt: '2026-01-01T00:00:00Z' } };
+    const ids = planCandidates(recs, w).map((r) => r.id);
+    expect(ids).not.toContain(recs[0].id);
+    expect(ids).not.toContain(recs[1].id);
+    expect(ids).toHaveLength(recs.length - 2);
   });
 });

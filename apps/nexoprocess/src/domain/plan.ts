@@ -1,5 +1,7 @@
 // Regras do plano de ação: uma ação só é "concluída" com registro do resultado observado.
+import type { Recommendation } from './recommendations';
 import type { ActionItem, Workspace } from './types';
+import { nowIso, uid } from './units';
 
 export function completionIssue(a: ActionItem): string | null {
   if (a.status !== 'concluida') return null;
@@ -18,4 +20,31 @@ export function relatedProblemOf(a: ActionItem, w: Workspace): string | undefine
     }
   }
   return undefined;
+}
+
+/**
+ * Ação a partir de uma oportunidade de melhoria. Responsável e prazo ficam vazios:
+ * nunca são preenchidos automaticamente (a equipe define).
+ */
+export function actionFromRecommendation(r: Recommendation, editedAction?: string): ActionItem {
+  return {
+    id: uid('act_'),
+    description: editedAction?.trim() || r.action,
+    priority: r.priority,
+    status: 'a_fazer',
+    successIndicator: r.successIndicator,
+    dependencies: r.dependencies.join(' ') || undefined,
+    relatedProblem: `${r.title} — ${r.problem}`,
+    expectedValue: r.ceiling,
+    origin: { kind: 'recommendation', ref: r.id },
+    createdAt: nowIso(),
+  };
+}
+
+/** Quantas oportunidades o "Montar meu plano" transforma em ação de uma vez (as de maior pontuação). */
+export const STARTER_PLAN_SIZE = 5;
+
+/** Oportunidades ainda sem ação e não rejeitadas, na ordem de pontuação. */
+export function planCandidates(recs: Recommendation[], w: Workspace): Recommendation[] {
+  return recs.filter((r) => w.recDecisions[r.id]?.status !== 'rejected' && !w.actions.some((a) => a.origin?.ref === r.id));
 }

@@ -82,8 +82,9 @@ export default function MapTab() {
           value={mode}
           onChange={setMode}
           options={[
-            { value: 'gargalos', label: 'Gargalos e retrabalho' },
-            { value: 'lean', label: 'Classificação Lean' },
+            // Rótulos curtos no celular: as três opções cabem numa linha só.
+            { value: 'gargalos', label: <>Gargalos<span className="hidden sm:inline"> e retrabalho</span></> },
+            { value: 'lean', label: <><span className="hidden sm:inline">Classificação </span>Lean</> },
             { value: 'nenhum', label: 'Sem destaque' },
           ]}
         />

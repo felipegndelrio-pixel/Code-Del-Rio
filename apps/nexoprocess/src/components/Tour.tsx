@@ -4,6 +4,9 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { Lightbulb, X } from 'lucide-react';
 import { Button } from './ui';
 
+/** Primeiro elemento visível do seletor (o plano tem tabela no desktop e cartões no celular). */
+const visible = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].find((el) => el.getClientRects().length > 0) ?? null;
+
 export interface TourStep {
   target: string;
   title: string;
@@ -37,7 +40,7 @@ export function Tour({ storageKey, steps }: { storageKey: string; steps: TourSte
   useEffect(() => {
     if (seen(storageKey)) return;
     const t = setTimeout(() => {
-      const list = steps.filter((s) => document.querySelector(s.target));
+      const list = steps.filter((s) => visible(s.target));
       if (!list.length) return;
       setAvail(list);
       setI(0);
@@ -48,9 +51,9 @@ export function Tour({ storageKey, steps }: { storageKey: string; steps: TourSte
   const step = i !== null ? avail[i] : undefined;
   useLayoutEffect(() => {
     if (!step) return;
-    const el = document.querySelector(step.target);
+    const el = visible(step.target);
     if (!el) return;
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.scrollIntoView({ block: 'center' }); // instantâneo: o destaque é desenhado já na posição final
     const update = () => setRect(el.getBoundingClientRect());
     update();
     window.addEventListener('resize', update);
