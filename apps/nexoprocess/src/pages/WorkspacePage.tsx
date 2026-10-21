@@ -239,7 +239,7 @@ function Shell() {
         </div>
       </aside>
 
-      <div className="safe-x min-w-0 pb-28 pt-4 lg:px-8 lg:pb-12">
+      <div className="safe-x min-w-0 pb-28 pt-4 lg:px-8 lg:pb-12 print:p-0">
         {/* Cabeçalho do projeto. Celular: uma linha (voltar · nome · salvo · desfazer), para o
             conteúdo da etapa aparecer na primeira tela. Desktop: voltar + trilha, depois o nome. */}
         <nav aria-label="Você está em" className="no-print mb-2 hidden min-w-0 items-center gap-1 text-xs text-muted sm:flex">

@@ -432,7 +432,7 @@ export function Providers({ children }: { children: ReactNode }) {
         >
           <div className="space-y-2 text-sm text-ink2">{confirm?.body}</div>
         </Modal>
-        <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-4">
+        <div aria-live="polite" className="no-print pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-4">
           {toasts.map((t) => (
             <div
               key={t.id}

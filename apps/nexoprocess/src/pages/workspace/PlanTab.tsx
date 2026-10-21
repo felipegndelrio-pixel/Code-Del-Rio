@@ -447,6 +447,16 @@ export default function PlanTab() {
 
 
 /** Versão para impressão/PDF: todas as ações, sem controles, com resumo no topo. */
+const PRINT_COLS = [
+  { h: '#', w: '4%' },
+  { h: 'Ação', w: '34%' },
+  { h: 'Responsável', w: '14%' },
+  { h: 'Prazo', w: '11%' },
+  { h: 'Prioridade', w: '9%' },
+  { h: 'Situação', w: '11%' },
+  { h: 'Indicador de sucesso', w: '17%' },
+];
+
 function PrintPlan() {
   const { w } = useWorkspace();
   const today = new Date().toISOString().slice(0, 10);
@@ -459,12 +469,18 @@ function PrintPlan() {
         Gerado em {fmtDate(today)} · {w.actions.length} ações · {open.length} abertas · {w.actions.filter((a) => a.status === 'concluida').length} concluídas
         {late.length > 0 && ` · ${late.length} com prazo vencido`}
       </p>
-      <table className="mt-4 w-full border-collapse text-[11px] leading-snug">
+      <table className="np-print-table mt-4 w-full text-[10.5px] leading-snug">
+        {/* Larguras fixas (soma 100%): a ação leva o maior espaço; prazo cabe "00/00/0000". */}
+        <colgroup>
+          {PRINT_COLS.map((c) => (
+            <col key={c.h} style={{ width: c.w }} />
+          ))}
+        </colgroup>
         <thead>
-          <tr className="border-b-2 border-line/60 text-left">
-            {['#', 'Ação', 'Responsável', 'Prazo', 'Prioridade', 'Situação', 'Indicador de sucesso'].map((h) => (
-              <th key={h} className="px-1.5 py-1 font-semibold text-ink">
-                {h}
+          <tr className="border-b-2 border-line/60 bg-surface2 text-left">
+            {PRINT_COLS.map((c) => (
+              <th key={c.h} className="px-1.5 py-1.5 font-semibold text-ink">
+                {c.h}
               </th>
             ))}
           </tr>

@@ -310,7 +310,13 @@ input[type='date']::-webkit-calendar-picker-indicator {
 
 /* ---------- Impressão / PDF ---------- */
 @media print {
-  :root {
+  /* Papel é sempre claro, em qualquer tema. Os seletores repetem os do tema escuro
+     (mesma especificidade, declarados depois) — só `:root` perdia para
+     `:root[data-theme='dark']` e o texto saía cinza-claro no PDF. */
+  :root,
+  :root[data-theme='dark'],
+  :root:not([data-theme='light']) {
+    color-scheme: light;
     --bg: 255 255 255;
     --surface: 255 255 255;
     --surface-2: 243 245 248;
@@ -319,7 +325,32 @@ input[type='date']::-webkit-calendar-picker-indicator {
     --ink-2: 55 68 92;
     --muted: 90 104 128;
     --brand: 14 116 144;
-    color-scheme: light;
+    --brand-ink: 255 255 255;
+    --accent: 0 100 116;
+    --accent-strong: 0 168 188;
+    --violet: 91 33 182;
+    --amber: 146 64 14;
+    --ok: 17 96 56;
+    --warn: 133 77 14;
+    --bad: 176 26 26;
+    --on-bad: 255 255 255;
+    --on-amber: 255 255 255;
+    --nav: 13 28 56;
+    --nav-ink: 236 241 248;
+    --shadow-card: none;
+    --shadow-pop: none;
+    --bpmn-fill: #ffffff;
+    --bpmn-stroke: #334155;
+    --bpmn-label: #0e1626;
+    --date-filter: none;
+  }
+  /* Alturas de tela (100vh, espaço da barra inferior) empurravam um pedaço vazio
+     para uma página extra no fim do PDF. */
+  html,
+  body,
+  #root,
+  .min-h-screen {
+    min-height: 0 !important;
   }
   body {
     background: #fff !important;
@@ -339,6 +370,25 @@ input[type='date']::-webkit-calendar-picker-indicator {
   }
   thead {
     display: table-header-group;
+  }
+  /* Tabela do relatório (Plano de ação): largura da folha, colunas fixas e texto que
+     quebra dentro da célula em vez de empurrar as vizinhas. */
+  .np-print-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .np-print-table th,
+  .np-print-table td {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    vertical-align: top;
+  }
+  .np-print-table tr {
+    page-break-inside: avoid;
   }
   /* Gráficos (Recharts): na impressão o gráfico ocupa a largura da página. A altura
      fica a da tela (sem altura o Recharts não desenha); o SVG se ajusta pelo viewBox
