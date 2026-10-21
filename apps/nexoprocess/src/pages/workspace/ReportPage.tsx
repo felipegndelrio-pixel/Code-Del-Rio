@@ -137,9 +137,9 @@ export default function ReportPage() {
         <p className="w-full text-xs text-muted">Dica: no diálogo de impressão escolha “Salvar como PDF”, papel A4, e ative “Gráficos de plano de fundo”.</p>
       </div>
 
-      <header className="avoid-break border-b-2 border-brand pb-3">
+      <header className="avoid-break border-b-2 border-brand pb-3 print:pb-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-brand">Relatório executivo de processo · {BRAND.name}</p>
-        <h1 className="mt-1 text-2xl font-extrabold">{w.asIs.name}</h1>
+        <h1 className="mt-1 text-2xl font-extrabold print:text-xl">{w.asIs.name}</h1>
         <p className="mt-1 text-sm text-ink2">
           Gerado em {fmtDateTime(nowIso())} · AS-IS de {fmtDateTime(w.updatedAt)}
           {sc && ` · TO-BE “${sc.name}” (versão de ${fmtDateTime(sc.updatedAt)})`} · {BRAND.name} v{BRAND.version}
@@ -163,21 +163,35 @@ export default function ReportPage() {
           <Kpi label={`ROI em ${biz?.horizonMonths ?? 12} meses`} value={biz?.roiPct != null ? fmtPct(biz.roiPct) : 'não calculado'} b="estimado" />
         </div>
         {messages.length > 0 && (
-          <div className="avoid-break mt-3">
+          <div className="avoid-break mt-3 print:mt-2">
             <h3 className="text-[13px] font-semibold">Mensagens-chave</h3>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12px]">
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12px] print:space-y-0 print:text-[11px]">
               {messages.map((t) => (
                 <li key={t}>{t}</li>
               ))}
             </ul>
           </div>
         )}
-        {/* Gargalos já estão nas mensagens-chave e no Pareto (em vermelho); aqui, só as próximas ações. */}
-        <div className="mt-3">
-          <div className="avoid-break">
+        {/* Gargalos e próximos passos lado a lado, num bloco só: cabem inteiros na 1ª página. */}
+        <div className="avoid-break mt-3 grid gap-3 sm:grid-cols-2 print:mt-2 print:grid-cols-2">
+          <div>
+            <h3 className="text-[13px] font-semibold">Principais gargalos</h3>
+            {bn.flagged.length ? (
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[12px] print:space-y-0 print:text-[11px]">
+                {bn.flagged.slice(0, 3).map((b) => (
+                  <li key={b.id}>
+                    {name(b.id)} — {fmtPct(b.share, 1)} <span className="text-ink2">({m.graph.byId.get(b.id)?.stage})</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-1 text-[12px] text-ink2 print:text-[11px]">{bn.reason ?? 'Nenhuma atividade acima do limiar.'}</p>
+            )}
+          </div>
+          <div>
             <h3 className="text-[13px] font-semibold">Próximos passos</h3>
             {nextSteps.length ? (
-              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[12px]">
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[12px] print:space-y-0 print:text-[11px]">
                 {nextSteps.map((a) => (
                   <li key={a.id}>
                     {a.description} <span className="text-ink2">— {a.owner ?? 'responsável pendente'} · {a.due ? fmtDate(a.due) : 'prazo pendente'}</span>
@@ -185,7 +199,7 @@ export default function ReportPage() {
                 ))}
               </ol>
             ) : (
-              <p className="mt-1 text-[12px] text-ink2">Nenhuma ação em aberto no plano.</p>
+              <p className="mt-1 text-[12px] text-ink2 print:text-[11px]">Nenhuma ação em aberto no plano.</p>
             )}
           </div>
         </div>
@@ -576,7 +590,7 @@ export default function ReportPage() {
 
 function Section({ n, title, children, breakBefore }: { n: number; title: string; children: React.ReactNode; breakBefore?: boolean }) {
   return (
-    <section className={`mt-6 ${breakBefore ? 'print-break' : ''}`}>
+    <section className={`mt-6 print:mt-4 ${breakBefore ? 'print-break' : ''}`}>
       <h2 className="mb-2 text-lg font-bold">
         {n}. {title}
       </h2>
