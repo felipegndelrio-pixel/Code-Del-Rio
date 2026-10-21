@@ -1,6 +1,6 @@
 // API de licença e webhook da Hotmart — handlers puros, com chaves geradas no teste.
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { handleLicense, handleWebhook, maskEmail, safeEqual } from '../../api/_lib/handlers';
+import { handleLicense, handleWebhook, licenseDepsFromEnv, maskEmail, safeEqual, webhookDepsFromEnv } from '../../api/_lib/handlers';
 import { classify } from '../../api/_lib/hotmart';
 import { allowlistStore, memoryStore, storeFromEnv, supabaseStore } from '../../api/_lib/store';
 import { normalizeEmail, readToken, verifyToken } from '../../src/license/token';
@@ -153,5 +153,37 @@ describe('armazenamento', () => {
     expect(safeEqual('abc', 'abd')).toBe(false);
     expect(safeEqual('abc', 'abcd')).toBe(false);
     expect(maskEmail('ana@ex.com')).toBe('a***@ex.com');
+  });
+});
+
+describe('configuração pelo painel (diagnóstico do 503)', () => {
+  const body = async (r: Response) => (await r.json()) as { error: string; faltando?: string[] };
+
+  it('503 lista os nomes das variáveis que faltam, sem expor valores', async () => {
+    const r = await handleLicense(post('/api/license', { email: 'a@b.co' }), licenseDepsFromEnv({}));
+    expect(r.status).toBe(503);
+    expect((await body(r)).faltando).toEqual(['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'LICENSE_PRIVATE_JWK']);
+    const r2 = await handleLicense(post('/api/license', { email: 'a@b.co' }), licenseDepsFromEnv({ SUPABASE_URL: 'https://x.supabase.co', LICENSE_PRIVATE_JWK: '{quebrada' }));
+    const b2 = await body(r2);
+    expect(b2.faltando).toEqual(['SUPABASE_SERVICE_ROLE_KEY', 'LICENSE_PRIVATE_JWK (inválida: cole a linha inteira, de { até })']);
+    expect(JSON.stringify(b2)).not.toContain('x.supabase.co');
+    const w = await handleWebhook(post('/api/hotmart-webhook', {}), webhookDepsFromEnv({ SUPABASE_URL: 'u', SUPABASE_SERVICE_ROLE_KEY: 'k' }));
+    expect((await body(w)).faltando).toEqual(['HOTMART_HOTTOK']);
+  });
+
+  it('aceita SUPABASE_KEY como nome alternativo e URL com /rest/v1 ou barra final', () => {
+    const d = licenseDepsFromEnv({ SUPABASE_URL: ' https://abc.supabase.co/rest/v1/ ', SUPABASE_KEY: 'srv', LICENSE_PRIVATE_JWK: JSON.stringify(priv) });
+    expect(d.store?.kind).toBe('supabase');
+    expect(d.missing).toEqual([]);
+  });
+
+  it('chave privada colada do celular com aspas curvas (“ ”) ainda funciona', async () => {
+    let n = 0;
+    const curly = JSON.stringify(priv).replace(/"/g, () => (n++ % 2 ? '\u201D' : '\u201C'));
+    const d = licenseDepsFromEnv({ LICENSE_ALLOWLIST: 'a@b.co', LICENSE_PRIVATE_JWK: curly });
+    expect(d.privateJwk?.d).toBe(priv.d);
+    const r = await handleLicense(post('/api/license', { email: 'a@b.co' }), d);
+    expect(r.status).toBe(200);
+    expect(await verifyToken(((await r.json()) as { token: string }).token, pub)).not.toBeNull();
   });
 });

@@ -73,8 +73,13 @@ export function memoryStore(initial: Record<string, LicenseStatus> = {}): Licens
   };
 }
 
+/** Chave de serviço do Supabase. Aceita SUPABASE_KEY como nome alternativo (erro comum ao cadastrar). */
+export const supabaseServiceKey = (env: Env) => (env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_KEY || '').trim();
+/** URL do projeto, sem barra final e sem /rest/v1 colado por engano. */
+export const supabaseUrl = (env: Env) => (env.SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
+
 export function storeFromEnv(env: Env): LicenseStore | null {
-  if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) return supabaseStore(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+  if (supabaseUrl(env) && supabaseServiceKey(env)) return supabaseStore(supabaseUrl(env), supabaseServiceKey(env));
   if (env.LICENSE_ALLOWLIST) return allowlistStore(env.LICENSE_ALLOWLIST);
   return null;
 }

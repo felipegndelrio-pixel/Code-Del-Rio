@@ -1,7 +1,7 @@
 // Lógica das rotas, sem dependência da Vercel: Request → Response (testável).
 import { normalizeEmail, signToken, verifyToken } from '../../src/license/token.js';
 import { parseHotmart } from './hotmart.js';
-import { storeFromEnv, type Env, type LicenseStore } from './store.js';
+import { storeFromEnv, supabaseServiceKey, supabaseUrl, type Env, type LicenseStore } from './store.js';
 
 export interface LicenseDeps {
   store: LicenseStore | null;
@@ -9,6 +9,8 @@ export interface LicenseDeps {
   /** Validade do token em dias (padrão 30): uso offline sem revalidar. */
   ttlDays?: number;
   now?: () => number;
+  /** Nomes das variáveis que faltam (para o 503 dizer o que configurar). Nunca valores. */
+  missing?: string[];
 }
 
 export interface WebhookDeps {
@@ -16,6 +18,7 @@ export interface WebhookDeps {
   hottok: string | null;
   /** Se definido, só eventos deste produto contam. */
   productId?: string | null;
+  missing?: string[];
 }
 
 const json = (status: number, body: unknown) =>
@@ -34,24 +37,39 @@ export const maskEmail = (e: string) => e.replace(/^(.).*(@.*)$/, '$1***$2');
 function parseJwk(raw: string | undefined): JsonWebKey | null {
   if (!raw) return null;
   try {
-    const k = JSON.parse(raw) as JsonWebKey;
+    // Colado do celular, o JSON pode vir com aspas "inteligentes" (“ ”): normaliza antes.
+    const k = JSON.parse(raw.trim().replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')) as JsonWebKey;
     return k.kty === 'EC' && k.d ? k : null;
   } catch {
     return null;
   }
 }
 
-export const licenseDepsFromEnv = (env: Env): LicenseDeps => ({
-  store: storeFromEnv(env),
-  privateJwk: parseJwk(env.LICENSE_PRIVATE_JWK),
-  ttlDays: Number(env.LICENSE_TTL_DAYS) || 30,
-});
+/** Variáveis de armazenamento que faltam (vazio se o Supabase ou a lista fixa estiverem completos). */
+function missingStore(env: Env): string[] {
+  if (env.LICENSE_ALLOWLIST || (supabaseUrl(env) && supabaseServiceKey(env))) return [];
+  return [...(supabaseUrl(env) ? [] : ['SUPABASE_URL']), ...(supabaseServiceKey(env) ? [] : ['SUPABASE_SERVICE_ROLE_KEY'])];
+}
+
+export const licenseDepsFromEnv = (env: Env): LicenseDeps => {
+  const privateJwk = parseJwk(env.LICENSE_PRIVATE_JWK);
+  const missing = [...missingStore(env), ...(env.LICENSE_PRIVATE_JWK ? (privateJwk ? [] : ['LICENSE_PRIVATE_JWK (inválida: cole a linha inteira, de { até })']) : ['LICENSE_PRIVATE_JWK'])];
+  return { store: storeFromEnv(env), privateJwk, ttlDays: Number(env.LICENSE_TTL_DAYS) || 30, missing };
+};
 
 export const webhookDepsFromEnv = (env: Env): WebhookDeps => ({
   store: storeFromEnv(env),
-  hottok: env.HOTMART_HOTTOK || null,
-  productId: env.HOTMART_PRODUCT_ID || null,
+  hottok: env.HOTMART_HOTTOK?.trim() || null,
+  productId: env.HOTMART_PRODUCT_ID?.trim() || null,
+  missing: [...missingStore(env), ...(env.HOTMART_HOTTOK?.trim() ? [] : ['HOTMART_HOTTOK'])],
 });
+
+/** 503 que diz o que configurar (nomes, nunca valores) e registra no log da função. */
+function notConfigured(route: string, missing: string[] | undefined, message?: string) {
+  const faltando = missing?.length ? missing : undefined;
+  console.error(`${route}: não configurado${faltando ? ` — faltando: ${faltando.join(', ')}` : ''}`);
+  return json(503, { error: 'nao_configurado', ...(message ? { message } : {}), ...(faltando ? { faltando } : {}) });
+}
 
 const NOT_FOUND = { error: 'sem_licenca', message: 'Não encontramos uma compra ativa para este e-mail.' };
 
@@ -62,7 +80,7 @@ const NOT_FOUND = { error: 'sem_licenca', message: 'Não encontramos uma compra 
  */
 export async function handleLicense(req: Request, deps: LicenseDeps): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'metodo' });
-  if (!deps.store || !deps.privateJwk) return json(503, { error: 'nao_configurado', message: 'A ativação ainda não está configurada.' });
+  if (!deps.store || !deps.privateJwk) return notConfigured('/api/license', deps.missing, 'A ativação ainda não está configurada.');
   const text = await req.text();
   if (text.length > 4096) return json(413, { error: 'grande_demais' });
   let body: { email?: unknown; token?: unknown };
@@ -97,7 +115,7 @@ export async function handleLicense(req: Request, deps: LicenseDeps): Promise<Re
 /** POST /api/hotmart-webhook — grava ou revoga a licença do comprador. */
 export async function handleWebhook(req: Request, deps: WebhookDeps): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'metodo' });
-  if (!deps.hottok) return json(503, { error: 'nao_configurado' });
+  if (!deps.hottok) return notConfigured('/api/hotmart-webhook', deps.missing);
   const ev = await parseHotmart(req);
   if (!ev.hottok || !safeEqual(ev.hottok, deps.hottok)) return json(401, { error: 'hottok_invalido' });
   const log = (result: string) => console.log(`hotmart ${ev.event || '(sem evento)'} → ${result}${ev.email ? ` (${maskEmail(ev.email)})` : ''}`);
@@ -114,7 +132,7 @@ export async function handleWebhook(req: Request, deps: WebhookDeps): Promise<Re
     log('ignorado: sem e-mail');
     return json(200, { ignored: 'sem_email' }); // 200: evita reenvio infinito de um payload que nunca vai servir
   }
-  if (!deps.store) return json(503, { error: 'nao_configurado' }); // Hotmart reenvia depois
+  if (!deps.store) return notConfigured('/api/hotmart-webhook', deps.missing); // Hotmart reenvia depois
   const status = ev.action === 'grant' ? 'active' : 'revoked';
   try {
     await deps.store.upsert({ email, status, product_id: ev.productId, transaction: ev.transaction, event: ev.event });
