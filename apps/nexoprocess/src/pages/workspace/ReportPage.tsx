@@ -252,12 +252,13 @@ export default function ReportPage() {
             {pairs.length ? <PairBars label="AS-IS × TO-BE" rows={pairs} /> : <p className="text-[12px] text-ink2">Sem indicadores comparáveis (faltam dados nos dois cenários).</p>}
           </ReportFigure>
           {cases.some((x) => x.netBenefitMonth !== null) && (
-            <ReportFigure title="Cenários do business case — benefício líquido por mês" note="Conservador, base e otimista variam a realização do benefício e o investimento. Estimativas, não economia realizada.">
+            <ReportFigure title="Cenários do business case — benefício líquido por mês" note="Ao lado do nome, o investimento de cada cenário (o payback usa esse valor). Conservador, base e otimista variam a realização do benefício e o investimento. Estimativas, não economia realizada.">
               <HBars
                 label="Cenários"
                 valueW={250}
                 rows={cases.map((x) => ({
-                  label: CASE_LABEL[x.key],
+                  // Investimento do cenário no rótulo: o payback de cada caso usa o próprio investimento.
+                  label: x.investment === null ? CASE_LABEL[x.key] : `${CASE_LABEL[x.key]} — ${fmtBRL(x.investment)}`,
                   value: Math.max(0, x.netBenefitMonth ?? 0),
                   display: x.netBenefitMonth === null ? '—' : `${fmtBRL(x.netBenefitMonth)}/mês`,
                   sub: x.paybackMonths === null ? '· sem payback' : `· payback ${x.paybackMonths === 0 ? 'imediato' : `${fmtNum(x.paybackMonths, 1)} meses`}`,
