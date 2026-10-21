@@ -102,7 +102,8 @@ function ExportBtn({ icon, title, text, onClick, busy }: { icon: React.ReactNode
       <div className="text-brand [&>svg]:h-6 [&>svg]:w-6">{icon}</div>
       <p className="mt-2 font-semibold text-ink">{title}</p>
       <p className="flex-1 text-xs text-ink2">{text}</p>
-      <Button className="mt-3" size="sm" variant="secondary" onClick={onClick} loading={busy}>
+      {/* Nome acessível completo: com só "Baixar", o leitor de tela não diz o que cada botão baixa. */}
+      <Button className="mt-3" size="sm" variant="secondary" onClick={onClick} loading={busy} aria-label={`Baixar ${title}`}>
         Baixar
       </Button>
     </div>
