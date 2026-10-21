@@ -82,6 +82,19 @@ Trocar o par depois desconecta todos os compradores (cada um entra de novo com o
 
 **Subcaminho:** para servir em `/algo/`, defina `VITE_BASE=/algo/`.
 
+### Alternativa: publicar pela linha de comando (wrangler)
+
+As variáveis do painel **não** valem para `wrangler pages deploy`: o build é feito no seu computador. Use o build de venda, que se recusa a rodar sem as chaves (sem elas o app sairia aberto, sem `/entrar` nem modo demo):
+
+```bash
+export VITE_LICENSE_PUBLIC_JWK='<linha pública do passo 2>'
+export VITE_HOTMART_CHECKOUT_URL='https://pay.hotmart.com/SEU-PRODUTO'
+npm ci && npm run nexo:build:venda
+cd apps/nexoprocess && npx wrangler pages deploy dist --project-name SEU-PROJETO --branch main
+```
+
+As variáveis do servidor (`LICENSE_PRIVATE_JWK`, `SUPABASE_*`, `HOTMART_*`) continuam no painel: as functions as leem a cada requisição.
+
 ## Passo 4 — Conferir o deploy
 
 Troque `https://SEU-PROJETO.pages.dev` pelo endereço do deploy.

@@ -1,7 +1,7 @@
 // Entrada com o e-mail usado na compra (Hotmart). Só o e-mail vai ao servidor;
 // os dados dos processos continuam neste aparelho.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { PlayCircle, ShieldCheck } from 'lucide-react';
 import { BRAND } from '../config/brand';
 import { Logo } from '../components/Logo';
@@ -54,6 +54,9 @@ export default function Login() {
     }
     else setError({ message: r.message, buy: r.reason === 'nao_encontrado' });
   };
+
+  // Build aberto (sem cobrança): não há o que ativar nem demonstração; o app inteiro está liberado.
+  if (!LICENSE.required) return <Navigate to={volta} replace />;
 
   return (
     <div className="min-h-screen">

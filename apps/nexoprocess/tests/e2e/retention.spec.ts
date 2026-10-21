@@ -122,3 +122,10 @@ test('plano: tour de boas-vindas aparece só na primeira visita', async ({ page 
   await page.waitForTimeout(900);
   await expect(tour).toHaveCount(0);
 });
+
+test('build aberto: /entrar não oferece demo e leva direto ao app', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/entrar');
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole('button', { name: 'Experimentar a versão Demo' })).toHaveCount(0);
+});
