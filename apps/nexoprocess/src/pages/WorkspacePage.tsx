@@ -230,7 +230,8 @@ function Shell() {
   }, [undo, toast]);
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
+    // print:block: na impressão o menu lateral some; sem isso o conteúdo cairia na coluna de 264 px.
+    <div className="mx-auto w-full max-w-[1440px] lg:grid lg:grid-cols-[264px_minmax(0,1fr)] print:block">
       {/* Barra lateral (desktop) */}
       <aside className="no-print hidden border-r border-line/10 lg:block">
         <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto px-3 py-5">

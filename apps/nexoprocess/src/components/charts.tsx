@@ -64,7 +64,7 @@ export function ParetoChart({ data, unitLabel }: { data: { name: string; share: 
         </Table>
       }
     >
-      <div style={{ height: 300 }}>
+      <div className="np-chart-box" style={{ height: 300 }}>
         <ResponsiveContainer>
           <ComposedChart data={rows} margin={{ top: 16, right: 8, bottom: 8, left: 0 }}>
             <CartesianGrid vertical={false} stroke={c.grid} />
@@ -170,7 +170,7 @@ export function StackedLoad({ title, data, unit, note }: { title: string; data: 
         </Table>
       }
     >
-      <div style={{ height: Math.max(220, data.length * 46 + 70) }}>
+      <div className="np-chart-box" style={{ height: Math.max(220, data.length * 46 + 70) }}>
         <ResponsiveContainer>
           <BarChart data={data} layout="vertical" margin={{ top: 8, right: 24, bottom: 8, left: 8 }}>
             <CartesianGrid horizontal={false} stroke={c.grid} />
@@ -215,7 +215,7 @@ export function SimpleBars({ title, data, unit, note, color }: { title: string; 
         </Table>
       }
     >
-      <div style={{ height: Math.max(180, data.length * 40 + 40) }}>
+      <div className="np-chart-box" style={{ height: Math.max(180, data.length * 40 + 40) }}>
         <ResponsiveContainer>
           <BarChart data={data} layout="vertical" margin={{ top: 4, right: 56, bottom: 4, left: 8 }}>
             <CartesianGrid horizontal={false} stroke={c.grid} />
@@ -261,7 +261,7 @@ export function CompareBars({ title, data, unit }: { title: string; data: { key:
         </Table>
       }
     >
-      <div style={{ height: 220 }}>
+      <div className="np-chart-box" style={{ height: 220 }}>
         <ResponsiveContainer>
           <BarChart data={rows} margin={{ top: 20, right: 8, bottom: 4, left: 0 }}>
             <CartesianGrid vertical={false} stroke={c.grid} />
@@ -310,7 +310,7 @@ export function Histogram({ bins, markers }: { bins: { from: number; to: number;
         </Table>
       }
     >
-      <div style={{ height: 240 }}>
+      <div className="np-chart-box" style={{ height: 240 }}>
         <ResponsiveContainer>
           <BarChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
             <CartesianGrid vertical={false} stroke={c.grid} />

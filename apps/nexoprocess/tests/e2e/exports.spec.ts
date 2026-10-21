@@ -54,3 +54,29 @@ test('exportações geram arquivos utilizáveis (BPMN XML, SVG/PNG, XLSX, CSV, m
   expect(await tz.file('xl/workbook.xml')!.async('string')).toContain('workbookProtection');
   expect(errors).toEqual([]);
 });
+
+// Regressão: na impressão o menu lateral some; o conteúdo não pode cair na coluna de 264 px
+// e os gráficos (Recharts) precisam ocupar a largura do bloco, não um quadradinho no canto.
+test('impressão/PDF: gráficos do diagnóstico e da comparação ocupam a largura da página', async ({ page }) => {
+  await prepare(page);
+  const base = await openDemo(page);
+  for (const t of ['diagnostico', 'comparar']) {
+    await page.goto(`${base}/${t}`);
+    await expect(page.locator('.recharts-wrapper > svg.recharts-surface').first()).toBeVisible();
+    await page.emulateMedia({ media: 'print' });
+    const r = await page.evaluate(() => ({
+      content: Math.round(document.querySelector('main [class*="safe-x"]')!.getBoundingClientRect().width),
+      charts: [...document.querySelectorAll('.recharts-wrapper > svg.recharts-surface')].map((s) => {
+        const box = (s.closest('figure') ?? s.closest('section'))!.getBoundingClientRect().width;
+        return { w: Math.round(s.getBoundingClientRect().width), share: s.getBoundingClientRect().width / box };
+      }),
+    }));
+    expect(r.content, `${t}: conteúdo na impressão`).toBeGreaterThan(600);
+    expect(r.charts.length, `${t}: gráficos`).toBeGreaterThan(0);
+    for (const c of r.charts) {
+      expect(c.share, `${t}: gráfico com ${c.w}px`).toBeGreaterThan(0.95);
+      expect(c.w).toBeGreaterThan(400);
+    }
+    await page.emulateMedia({ media: null });
+  }
+});

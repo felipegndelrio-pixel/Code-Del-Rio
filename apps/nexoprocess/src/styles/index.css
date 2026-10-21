@@ -330,11 +330,36 @@ input[type='date']::-webkit-calendar-picker-indicator {
   .print-break {
     break-before: page;
   }
+  /* Tabelas quebram entre linhas (nunca no meio de uma) e repetem o cabeçalho;
+     se a tabela inteira fosse indivisível, uma tabela longa deixaria uma página em branco. */
   .avoid-break,
-  table,
   figure,
   tr {
     break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+  /* Gráficos (Recharts): na impressão o gráfico ocupa a largura da página. A altura
+     fica a da tela (sem altura o Recharts não desenha); o SVG se ajusta pelo viewBox
+     mesmo que tenha sido medido com outra largura. */
+  .np-chart-box,
+  .recharts-responsive-container,
+  .recharts-responsive-container > div,
+  .recharts-wrapper {
+    width: 100% !important;
+  }
+  .recharts-responsive-container > div,
+  .recharts-wrapper {
+    height: 100% !important;
+  }
+  .recharts-wrapper > svg.recharts-surface {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .recharts-tooltip-wrapper {
+    display: none !important;
   }
   @page {
     size: A4;
