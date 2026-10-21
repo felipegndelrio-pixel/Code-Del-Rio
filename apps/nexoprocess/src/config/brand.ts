@@ -20,10 +20,12 @@ export const COMMERCIAL = {
   contactEmail: (import.meta.env?.VITE_SUPPORT_EMAIL ?? '').trim(),
 } as const;
 
-// Identificação do controlador na Política de Privacidade (nome/razão social e CPF/CNPJ).
-// Vem do build (VITE_LEGAL_NAME); vazio = texto genérico "o produtor que vende na Hotmart".
+// Identificação do controlador na Política de Privacidade. Vem do build:
+// VITE_LEGAL_NAME (nome/razão social) e VITE_LEGAL_ID (CPF/CNPJ). Sem o CPF/CNPJ, o texto
+// omite o número em vez de publicar um marcador. Vazio = texto genérico "o produtor".
 export const LEGAL = {
   controller: (import.meta.env?.VITE_LEGAL_NAME ?? '').trim(),
+  id: (import.meta.env?.VITE_LEGAL_ID ?? '').trim(),
 } as const;
 
 export const LANDING = {

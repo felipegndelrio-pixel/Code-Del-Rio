@@ -314,6 +314,16 @@ export default function Home() {
                     Detalhes
                   </Link>
                 </p>
+                <p>
+                  Documentos:{' '}
+                  <Link to="/privacidade" className="font-semibold text-accent hover:underline">
+                    Política de Privacidade
+                  </Link>{' '}
+                  ·{' '}
+                  <Link to="/termos" className="font-semibold text-accent hover:underline">
+                    Termos de Uso
+                  </Link>
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap items-start gap-2">

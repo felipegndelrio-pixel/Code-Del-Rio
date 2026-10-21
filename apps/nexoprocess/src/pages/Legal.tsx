@@ -30,14 +30,23 @@ function Page({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function Controller() {
+  const email = COMMERCIAL.contactEmail && (
+    <a href={`mailto:${COMMERCIAL.contactEmail}`} className="font-semibold text-accent underline">
+      {COMMERCIAL.contactEmail}
+    </a>
+  );
+  if (!LEGAL.controller)
+    return (
+      <>
+        o produtor que vende o {BRAND.name} na Hotmart
+        {email && <>, contato: {email}</>}
+      </>
+    );
   return (
     <>
-      {LEGAL.controller ? <strong>{LEGAL.controller}</strong> : <>o produtor que vende o {BRAND.name} na Hotmart</>}
-      {COMMERCIAL.contactEmail && (
-        <>
-          , contato: <a href={`mailto:${COMMERCIAL.contactEmail}`} className="font-semibold text-accent underline">{COMMERCIAL.contactEmail}</a>
-        </>
-      )}
+      <strong>{LEGAL.controller}</strong>
+      {LEGAL.id && <>, inscrito no CPF/CNPJ sob o nº {LEGAL.id}</>}
+      {email && <>, com contato pelo e-mail {email}</>}
     </>
   );
 }

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { handleLicense } from '../../api/_lib/handlers';
 import { memoryStore, type LicenseStatus } from '../../api/_lib/store';
 import { signToken } from '../../src/license/token';
-import { prepare } from './helpers';
+import { openDemo, prepare } from './helpers';
 
 // Modo de venda (projeto "licenca", build com VITE_LICENSE_REQUIRED=true na porta 4181).
 // /api/license é atendido pelo handler REAL da API (memória + chave SÓ DE TESTE), então
@@ -226,3 +226,17 @@ for (const theme of ['dark', 'light'] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+// Meus projetos: links diretos para Privacidade e Termos (o cartão aparece quando há projetos).
+test('meus projetos: links diretos para Privacidade e Termos', async ({ page }) => {
+  await prepare(page);
+  await api(page, { [BUYER]: 'active' });
+  await page.goto('/entrar');
+  await login(page, BUYER);
+  await expect(page).toHaveURL(/\/app$/);
+  await openDemo(page);
+  await page.goto('/app');
+  await expect(page.getByRole('heading', { name: 'Seus dados, seu controle' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Política de Privacidade' }).first()).toHaveAttribute('href', '/privacidade');
+  await expect(page.getByRole('link', { name: 'Termos de Uso' }).first()).toHaveAttribute('href', '/termos');
+});
