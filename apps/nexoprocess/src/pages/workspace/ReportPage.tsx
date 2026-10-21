@@ -7,7 +7,7 @@ import { buildBpmn } from '../../bpmn/model';
 import { Badge, BasisTag, Button, Field, Select } from '../../components/ui';
 import { businessCases, CASE_LABEL, compareScenarios, responsibilityChanges } from '../../domain/compare';
 import { relatedProblemOf } from '../../domain/plan';
-import { bottlenecks, CRITERION_LABEL, dataGaps } from '../../domain/metrics';
+import { bottlenecks, CRITERION_LABEL, dataGaps, pareto } from '../../domain/metrics';
 import { GROUP_LABEL } from '../../domain/recommendations';
 import { CHANGE_LABEL } from '../../domain/tobe';
 import { LEAN_LABEL, PERIOD_LABEL } from '../../domain/types';
@@ -15,6 +15,18 @@ import { fmtBRL, fmtDate, fmtDateTime, fmtHours, fmtNum, fmtPct, nowIso } from '
 import { useWorkspace } from '../../state/workspace';
 import { ACTION_STATUS } from './PlanTab';
 import { demoBlocked } from '../../license/demo';
+import { HBars, PairBars, RC, ReportFigure, ShareBar, StackedHBars } from '../../components/reportCharts';
+
+// Rótulos curtos para o gráfico AS-IS × TO-BE (a tabela completa segue no detalhamento).
+const PAIR_LABEL: Record<string, string> = {
+  active: 'Trabalho ativo / execução',
+  wait: 'Espera / execução',
+  elapsed: 'Tempo decorrido',
+  effortExec: 'Esforço / execução',
+  effortMonth: 'Esforço / mês',
+  costMonth: 'Custo / mês',
+  reworkMonth: 'Retrabalho / mês',
+};
 
 const tbl = 'w-full border-collapse text-[12px]';
 const c = 'border border-line/25 px-2 py-1 text-left align-top';
@@ -52,6 +64,36 @@ export default function ReportPage() {
   const decided = recs.filter((r) => ['accepted', 'investigating'].includes(w.recDecisions[r.id]?.status ?? ''));
   const rejected = recs.filter((r) => w.recDecisions[r.id]?.status === 'rejected').length;
   const errors = issues.filter((i) => i.severity === 'error').length;
+
+  // Dados dos gráficos: as mesmas funções das abas Diagnóstico e Comparação.
+  const name = (id: string) => m.graph.byId.get(id)?.name ?? id;
+  const pr = pareto(w.asIs, m, w.bottleneck.criterion);
+  const flaggedIds = new Set(bn.flagged.map((b) => b.id));
+  const ownerEffort = m.byOwner.filter((g) => g.effortExecH > 0);
+  const biz = cmp?.business ?? null;
+  const cases = biz && sc ? businessCases(biz, sc.sensitivity) : [];
+  const pairs = (cmp?.rows ?? [])
+    .filter((r) => ['active', 'wait', 'elapsed', 'effortExec', 'effortMonth', 'costMonth', 'reworkMonth'].includes(r.key) && r.asIs !== null && r.toBe !== null && (r.asIs > 0 || r.toBe > 0))
+    .map((r) => ({
+      label: PAIR_LABEL[r.key] ?? r.label,
+      asIs: r.asIs!,
+      toBe: r.toBe!,
+      fmt: (v: number) => (r.unit === 'R$/mês' ? fmtBRL(v) : r.unit === 'horas' ? fmtHours(v) : `${fmtNum(v)} ${r.unit.replace('pessoa-hora', 'pessoa-h')}`),
+      change: r.reductionPct === null ? '—' : r.reductionPct > 0 ? `−${fmtPct(r.reductionPct, 1)}` : r.reductionPct < 0 ? `+${fmtPct(-r.reductionPct, 1)}` : '0%',
+    }));
+  const openActions = w.actions.filter((a) => a.status !== 'concluida' && a.status !== 'cancelada');
+  const PRIO_ORDER = { alta: 0, media: 1, baixa: 2 } as const;
+  const nextSteps = [...openActions].sort((a, b) => PRIO_ORDER[a.priority] - PRIO_ORDER[b.priority] || (a.due ?? '9999').localeCompare(b.due ?? '9999')).slice(0, 3);
+  const pendingOwners = openActions.filter((a) => !a.owner || !a.due).length;
+  // Mensagens-chave montadas só com valores calculados; o que falta não vira frase.
+  const messages: string[] = [];
+  if (m.effortPeriodH.value !== null) messages.push(`O processo consome ${fmtNum(m.effortPeriodH.value)} pessoa-h por ${per}${m.totalCostPeriod.value !== null ? `, com custo estimado de ${fmtBRL(m.totalCostPeriod.value)}` : ''}.`);
+  if (m.lean.classifiedHours > 0 && m.lean.pct.W !== null) messages.push(`${fmtPct(m.lean.pct.W)} do tempo classificado é desperdício e ${fmtPct(m.lean.pct.NNVA)} é necessário sem agregar valor.`);
+  if (bn.flagged.length) messages.push(`${bn.flagged.length === 1 ? 'Um gargalo concentra' : `${bn.flagged.length} gargalos concentram`} ${fmtPct(bn.flagged.reduce((t, b) => t + b.share, 0))} de “${CRITERION_LABEL[w.bottleneck.criterion].toLowerCase()}”; o principal é “${name(bn.flagged[0].id)}”.`);
+  if (sc && biz?.netBenefitMonth != null) messages.push(`O cenário “${sc.name}” estima benefício líquido de ${fmtBRL(biz.netBenefitMonth)}/mês${biz.paybackMonths !== null ? `, payback de ${biz.paybackMonths === 0 ? 'imediato' : `${fmtNum(biz.paybackMonths, 1)} meses`}` : ''}${biz.roiPct !== null ? ` e ROI de ${fmtPct(biz.roiPct)} em ${biz.horizonMonths} meses` : ''} — estimativa a validar.`);
+  if (openActions.length) messages.push(`${openActions.length} ação(ões) em aberto no plano${pendingOwners ? `; ${pendingOwners} ainda sem responsável ou prazo definidos pela equipe` : ''}.`);
+  let sn = 0;
+  const next = () => ++sn;
 
   return (
     <div className="mx-auto max-w-[900px] bg-surface px-4 py-6 text-ink print:max-w-none print:p-0" data-testid="report">
@@ -92,7 +134,124 @@ export default function ReportPage() {
         {errors > 0 && <p className="mt-2 text-sm font-semibold text-bad">Atenção: {errors} erro(s) de dados não corrigidos — indicadores podem estar incompletos.</p>}
       </header>
 
-      <Section n={1} title="Processo e escopo">
+      <Section n={next()} title="Resumo executivo">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 print:grid-cols-4">
+          <Kpi label="Tempo decorrido" value={m.elapsed.status === 'ok' ? fmtHours(m.elapsed.hours) : 'não calculado'} sub="por execução" b="estimado" />
+          <Kpi label={`Esforço por ${per}`} value={m.effortPeriodH.value === null ? 'não calculado' : `${fmtNum(m.effortPeriodH.value)} pessoa-h`} b="estimado" />
+          <Kpi label={`Custo por ${per}`} value={m.totalCostPeriod.value === null ? 'não calculado' : fmtBRL(m.totalCostPeriod.value)} b="estimado" />
+          <Kpi label="Desperdício (Lean)" value={m.lean.classifiedHours > 0 ? fmtPct(m.lean.pct.W) : 'sem classificação'} sub="do tempo classificado" b="calculado" />
+          <Kpi label="Gargalos identificados" value={String(bn.flagged.length)} sub={`regra: ≥ ${w.bottleneck.thresholdPct}%`} b="calculado" />
+          <Kpi label="Economia estimada" value={biz?.netBenefitMonth != null ? `${fmtBRL(biz.netBenefitMonth)}/mês` : 'não calculada'} sub={sc ? `cenário “${sc.name}”` : 'sem cenário TO-BE'} b="estimado" />
+          <Kpi label="Payback" value={biz?.paybackMonths != null ? (biz.paybackMonths === 0 ? 'imediato' : `${fmtNum(biz.paybackMonths, 1)} meses`) : 'não calculado'} b="estimado" />
+          <Kpi label={`ROI em ${biz?.horizonMonths ?? 12} meses`} value={biz?.roiPct != null ? fmtPct(biz.roiPct) : 'não calculado'} b="estimado" />
+        </div>
+        {messages.length > 0 && (
+          <div className="avoid-break mt-3">
+            <h3 className="text-[13px] font-semibold">Mensagens-chave</h3>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12px]">
+              {messages.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 print:grid-cols-2">
+          <div className="avoid-break">
+            <h3 className="text-[13px] font-semibold">Principais gargalos</h3>
+            {bn.flagged.length ? (
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[12px]">
+                {bn.flagged.slice(0, 3).map((b) => (
+                  <li key={b.id}>
+                    {name(b.id)} — {fmtPct(b.share, 1)} <span className="text-ink2">({m.graph.byId.get(b.id)?.stage})</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-1 text-[12px] text-ink2">{bn.reason ?? 'Nenhuma atividade acima do limiar.'}</p>
+            )}
+          </div>
+          <div className="avoid-break">
+            <h3 className="text-[13px] font-semibold">Próximos passos</h3>
+            {nextSteps.length ? (
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[12px]">
+                {nextSteps.map((a) => (
+                  <li key={a.id}>
+                    {a.description} <span className="text-ink2">— {a.owner ?? 'responsável pendente'} · {a.due ? fmtDate(a.due) : 'prazo pendente'}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-1 text-[12px] text-ink2">Nenhuma ação em aberto no plano.</p>
+            )}
+          </div>
+        </div>
+      </Section>
+
+      <Section n={next()} title="Diagnóstico em gráficos" breakBefore>
+        <ReportFigure title={`Pareto — participação por atividade (${CRITERION_LABEL[w.bottleneck.criterion].toLowerCase()})`} note={`Em vermelho, gargalos pela regra (≥ ${w.bottleneck.thresholdPct}%, máx. 5). “acum.” = participação acumulada. Mostra concentração; não prova causa-raiz.`}>
+          {pr.items.length ? (
+            <HBars
+              label="Pareto"
+              rows={pr.items.slice(0, 8).map((x) => ({ label: name(x.id), value: x.share, display: fmtPct(x.share, 1), sub: `acum. ${fmtPct(x.cumulative)}`, color: flaggedIds.has(x.id) ? RC.lean.W : RC.bar }))}
+            />
+          ) : (
+            <p className="text-[12px] text-ink2">{pr.reason}</p>
+          )}
+        </ReportFigure>
+        <ReportFigure title="Valor × desperdício (Lean) — base: duração classificada" note={m.counts.unclassified ? `${m.counts.unclassified} atividade(s) sem classificação.` : undefined}>
+          {m.lean.classifiedHours > 0 ? (
+            <ShareBar
+              label="Distribuição Lean"
+              parts={(['VA', 'NNVA', 'W', 'U'] as const).map((k) => ({ label: LEAN_LABEL[k], value: m.lean.hours[k], color: RC.lean[k] }))}
+            />
+          ) : (
+            <p className="text-[12px] text-ink2">Sem classificação Lean com duração informada.</p>
+          )}
+        </ReportFigure>
+        <ReportFigure title="Tempo por etapa — horas de trabalho ativo, por classe Lean" note="Soma da duração ativa (uma ocorrência por atividade).">
+          {m.byStage.some((g) => g.activeH > 0) ? (
+            <StackedHBars
+              label="Tempo por etapa"
+              rows={m.byStage.map((g) => ({ label: g.key, values: g.lean, display: fmtHours(g.activeH) }))}
+              parts={(['VA', 'NNVA', 'W', 'U'] as const).map((k) => ({ key: k, label: LEAN_LABEL[k], color: RC.lean[k] }))}
+            />
+          ) : (
+            <p className="text-[12px] text-ink2">Sem duração informada nas atividades.</p>
+          )}
+        </ReportFigure>
+        <ReportFigure title="Esforço por responsável — pessoa-hora por execução" note="Ponderado pela frequência de cada atividade.">
+          {ownerEffort.length ? (
+            <HBars label="Esforço por responsável" rows={ownerEffort.map((g) => ({ label: g.key, value: g.effortExecH, display: `${fmtNum(g.effortExecH, 2)} pessoa-h` }))} />
+          ) : (
+            <p className="text-[12px] text-ink2">Sem duração e pessoas informadas por responsável.</p>
+          )}
+        </ReportFigure>
+      </Section>
+
+      {sc && cmp && (
+        <Section n={next()} title={`Impacto estimado — AS-IS × TO-BE “${sc.name}”`} breakBefore>
+          <ReportFigure title="Comparação AS-IS × TO-BE por indicador" note={`Cada linha tem a própria escala. À direita, a variação do TO-BE em relação ao AS-IS.${cmp.business.volumeDiffers ? ' TO-BE normalizado para o volume do AS-IS.' : ''}`}>
+            {pairs.length ? <PairBars label="AS-IS × TO-BE" rows={pairs} /> : <p className="text-[12px] text-ink2">Sem indicadores comparáveis (faltam dados nos dois cenários).</p>}
+          </ReportFigure>
+          {cases.some((x) => x.netBenefitMonth !== null) && (
+            <ReportFigure title="Cenários do business case — benefício líquido por mês" note="Conservador, base e otimista variam a realização do benefício e o investimento. Estimativas, não economia realizada.">
+              <HBars
+                label="Cenários"
+                valueW={250}
+                rows={cases.map((x) => ({
+                  label: CASE_LABEL[x.key],
+                  value: Math.max(0, x.netBenefitMonth ?? 0),
+                  display: x.netBenefitMonth === null ? '—' : `${fmtBRL(x.netBenefitMonth)}/mês`,
+                  sub: x.paybackMonths === null ? '· sem payback' : `· payback ${x.paybackMonths === 0 ? 'imediato' : `${fmtNum(x.paybackMonths, 1)} meses`}`,
+                  color: RC.toBe,
+                }))}
+              />
+            </ReportFigure>
+          )}
+        </Section>
+      )}
+
+      <Section n={next()} title="Processo e escopo" breakBefore>
         <table className={tbl}>
           <tbody>
             <Row k="Descrição" v={w.asIs.description ?? 'não informada'} />
@@ -105,7 +264,7 @@ export default function ReportPage() {
         </table>
       </Section>
 
-      <Section n={2} title="Indicadores do processo atual (AS-IS)">
+      <Section n={next()} title="Indicadores do processo atual (AS-IS)">
         <table className={tbl}>
           <thead>
             <tr>
@@ -133,7 +292,7 @@ export default function ReportPage() {
         )}
       </Section>
 
-      <Section n={3} title="Mapa do processo" breakBefore>
+      <Section n={next()} title="Mapa do processo" breakBefore>
         {svgs === null ? (
           <p className="text-sm text-muted">Desenhando mapas…</p>
         ) : svgs.length === 0 ? (
@@ -155,7 +314,7 @@ export default function ReportPage() {
         )}
       </Section>
 
-      <Section n={4} title="Diagnóstico: gargalos e dados" breakBefore>
+      <Section n={next()} title="Diagnóstico: gargalos e dados" breakBefore>
         <p className="text-[12px] text-ink2">
           Regra de gargalo: participação ≥ {w.bottleneck.thresholdPct}% em “{CRITERION_LABEL[w.bottleneck.criterion]}” (máx. 5). Indica concentração; não prova causa-raiz.
         </p>
@@ -190,7 +349,7 @@ export default function ReportPage() {
         )}
       </Section>
 
-      <Section n={5} title="Recomendações avaliadas">
+      <Section n={next()} title="Recomendações avaliadas">
         <p className="text-[12px] text-ink2">Análise automática baseada em dados e regras (sem IA generativa). {rejected} recomendação(ões) rejeitada(s) não constam abaixo.</p>
         {decided.length ? (
           <table className={`${tbl} mt-2`}>
@@ -222,7 +381,7 @@ export default function ReportPage() {
 
       {sc && cmp && (
         <>
-          <Section n={6} title={`Mudanças propostas — TO-BE “${sc.name}”`} breakBefore>
+          <Section n={next()} title={`Mudanças propostas — TO-BE “${sc.name}”`} breakBefore>
             {sc.changes.length ? (
               <table className={tbl}>
                 <thead>
@@ -248,7 +407,7 @@ export default function ReportPage() {
               <p className="text-sm">Nenhuma mudança registrada.</p>
             )}
           </Section>
-          <Section n={7} title="Comparação AS-IS × TO-BE">
+          <Section n={next()} title="Comparação AS-IS × TO-BE">
             <table className={tbl}>
               <thead>
                 <tr>
@@ -275,7 +434,7 @@ export default function ReportPage() {
             </table>
             {cmp.business.volumeDiffers && <p className="mt-1 text-[12px] text-ink2">Volumes diferentes: TO-BE normalizado para o volume do AS-IS.</p>}
           </Section>
-          <Section n={8} title="Business case (estimado)">
+          <Section n={next()} title="Business case (estimado)">
             <table className={tbl}>
               <tbody>
                 <Row k="Horas potencialmente liberadas" v={cmp.business.freedHoursMonth === null ? `não calculado: ${cmp.business.reasons.freed}` : `${fmtNum(cmp.business.freedHoursMonth)} pessoa-h/mês (capacidade, não caixa)`} b="estimado" />
@@ -313,7 +472,7 @@ export default function ReportPage() {
             </table>
             <p className="mt-1 text-[12px] text-ink2">Fórmulas: benefício bruto = custo comparável AS-IS − TO-BE; líquido = bruto − custo recorrente; payback = investimento ÷ líquido mensal; ROI = (líquido × horizonte − investimento) ÷ investimento.</p>
           </Section>
-          <Section n={9} title="Premissas, riscos e pontos a validar">
+          <Section n={next()} title="Premissas, riscos e pontos a validar">
             <ul className="list-disc pl-5 text-[12px]">
               {sc.assumptions.map((a) => (
                 <li key={a.id}>
@@ -339,7 +498,7 @@ export default function ReportPage() {
         </>
       )}
 
-      <Section n={sc ? 10 : 6} title="Plano de ação" breakBefore={!sc}>
+      <Section n={next()} title="Plano de ação" breakBefore={!sc}>
         {w.actions.length ? (
           <table className={tbl}>
             <thead>
@@ -372,7 +531,7 @@ export default function ReportPage() {
         )}
       </Section>
 
-      <Section n={sc ? 11 : 7} title="Resultados realizados">
+      <Section n={next()} title="Resultados realizados">
         {w.results.filter((r) => !r.noData).length ? (
           <table className={tbl}>
             <thead>
@@ -418,6 +577,19 @@ function Section({ n, title, children, breakBefore }: { n: number; title: string
       </h2>
       {children}
     </section>
+  );
+}
+
+function Kpi({ label, value, sub, b }: { label: string; value: string; sub?: string; b?: 'informado' | 'calculado' | 'estimado' }) {
+  return (
+    <div className="avoid-break rounded-lg border border-line/25 p-2">
+      <p className="text-[11px] font-medium text-ink2">{label}</p>
+      <p className="mt-0.5 text-[16px] font-bold leading-tight text-ink">{value}</p>
+      <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-ink2">
+        {sub}
+        {b && <BasisTag basis={b} />}
+      </p>
+    </div>
   );
 }
 

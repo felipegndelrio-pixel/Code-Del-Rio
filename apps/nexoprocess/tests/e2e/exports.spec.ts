@@ -119,3 +119,39 @@ test('impressão/PDF do plano: legível no tema escuro, tabela na largura da pá
   expect(pdf.match(/\/Type\s*\/Page[^s]/g)?.length, 'páginas do PDF (4 ações cabem em 1)').toBe(1);
   await page.emulateMedia({ media: null });
 });
+
+// Relatório executivo para diretoria: resumo na 1ª página, 5 gráficos na largura da folha,
+// texto escuro no papel mesmo no tema escuro, sem navegação nem avisos impressos.
+test('relatório executivo (PDF): resumo, gráficos na largura da folha e texto escuro no tema escuro', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await prepare(page, { theme: 'dark' });
+  const base = await openDemo(page);
+  await page.goto(`${base}/relatorio`);
+  const report = page.getByTestId('report');
+  await expect(report.getByRole('button', { name: /Imprimir/ })).toBeEnabled();
+  for (const t of ['Resumo executivo', 'Tempo decorrido', 'Gargalos identificados', 'Economia estimada', 'Mensagens-chave', 'Próximos passos']) await expect(report).toContainText(t);
+  await page.emulateMedia({ media: 'print' });
+  const r = await page.evaluate(() => {
+    const rep = document.querySelector('[data-testid="report"]')!;
+    const lum = (el: Element) => {
+      const [r, g, b] = getComputedStyle(el).color.match(/\d+(\.\d+)?/g)!.map(Number);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const visible = (sel: string) => [...document.querySelectorAll(sel)].filter((e) => e.getBoundingClientRect().height > 0 && getComputedStyle(e).display !== 'none').length;
+    const repW = rep.getBoundingClientRect().width;
+    return {
+      title: lum(rep.querySelector('h1')!),
+      firstSection: rep.querySelector('section h2')!.textContent,
+      charts: [...rep.querySelectorAll('figure svg[role="img"]')].map((s) => ({ label: s.getAttribute('aria-label')!.split(':')[0], share: s.getBoundingClientRect().width / repW })),
+      nav: visible('header.sticky, nav, aside') + visible('[aria-live="polite"].fixed'),
+      buttons: visible('[data-testid="report"] button'),
+    };
+  });
+  expect(r.title, 'título escuro no papel').toBeLessThan(90);
+  expect(r.firstSection).toBe('1. Resumo executivo');
+  expect(r.charts.map((c) => c.label)).toEqual(expect.arrayContaining(['Pareto', 'Distribuição Lean', 'Tempo por etapa', 'Esforço por responsável', 'AS-IS × TO-BE']));
+  for (const c of r.charts) expect(c.share, `${c.label} na largura da folha`).toBeGreaterThan(0.95);
+  expect(r.nav, 'menus, barras e avisos fora do papel').toBe(0);
+  expect(r.buttons, 'botões fora do papel').toBe(0);
+  await page.emulateMedia({ media: null });
+});

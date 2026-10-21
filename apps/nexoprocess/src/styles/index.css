@@ -371,6 +371,17 @@ input[type='date']::-webkit-calendar-picker-indicator {
   thead {
     display: table-header-group;
   }
+  /* Título nunca fica sozinho no pé da página, separado do conteúdo. */
+  h2,
+  h3,
+  figcaption {
+    break-after: avoid;
+  }
+  /* Relatório executivo: gráficos SVG em cor no papel, mesmo sem "gráficos de fundo". */
+  [data-testid='report'] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   /* Tabela do relatório (Plano de ação): largura da folha, colunas fixas e texto que
      quebra dentro da célula em vez de empurrar as vizinhas. */
   .np-print-table {
