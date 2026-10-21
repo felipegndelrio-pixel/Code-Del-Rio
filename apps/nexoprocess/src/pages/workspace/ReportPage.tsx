@@ -467,6 +467,8 @@ export default function ReportPage() {
                 {sc.approvedTarget && <Row k="Meta aprovada" v={`${sc.approvedTarget.description}${sc.approvedTarget.value !== undefined ? `: ${fmtNum(sc.approvedTarget.value)} ${sc.approvedTarget.unit ?? ''}` : ''} (por ${sc.approvedTarget.approvedBy ?? '—'}, ${fmtDate(sc.approvedTarget.approvedAt)})`} />}
               </tbody>
             </table>
+            {/* Bloco indivisível: a tabela de 3 cenários e as fórmulas ficam na mesma página. */}
+            <div className="avoid-break">
             <table className={`${tbl} mt-2`}>
               <thead>
                 <tr>
@@ -481,7 +483,7 @@ export default function ReportPage() {
                   <tr key={x.key}>
                     <td className={c}>{CASE_LABEL[x.key]}</td>
                     <td className={c}>
-                      realização {fmtNum(x.realizationPct)}% · investimento {fmtNum(x.investmentPct)}%
+                      realização {fmtNum(x.realizationPct)}% · investimento {fmtNum(x.investmentPct)}%{x.investment !== null && ` (${fmtBRL(x.investment)})`}
                     </td>
                     <td className={c}>{x.netBenefitMonth === null ? '—' : `${fmtBRL(x.netBenefitMonth)}/mês`}</td>
                     <td className={c}>{x.paybackMonths === null ? 'sem payback' : x.paybackMonths === 0 ? 'imediato' : `${fmtNum(x.paybackMonths, 1)} meses`}</td>
@@ -489,7 +491,8 @@ export default function ReportPage() {
                 ))}
               </tbody>
             </table>
-            <p className="mt-1 text-[12px] text-ink2">Fórmulas: benefício bruto = custo comparável AS-IS − TO-BE; líquido = bruto − custo recorrente; payback = investimento ÷ líquido mensal; ROI = (líquido × horizonte − investimento) ÷ investimento.</p>
+            <p className="mt-1 text-[12px] text-ink2">Fórmulas: benefício bruto = custo comparável AS-IS − TO-BE; líquido = bruto − custo recorrente; payback = investimento do cenário ÷ líquido mensal; ROI = (líquido × horizonte − investimento) ÷ investimento.</p>
+            </div>
           </Section>
           <Section n={next()} title="Premissas, riscos e pontos a validar">
             <ul className="list-disc pl-5 text-[12px]">
