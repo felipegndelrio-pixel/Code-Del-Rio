@@ -189,3 +189,29 @@ test('relatório executivo (Safari): sem flex/grid em volta na impressão e nome
   expect(layouts, 'ancestrais flex/grid na impressão').toEqual([]);
   await page.emulateMedia({ media: null });
 });
+
+// Relatório executivo em até 2 toques no celular: Diagnóstico (barra inferior) → "Baixar
+// Relatório Executivo" → impressão do relatório (com resumo e gráficos), não do plano.
+test('atalho do relatório executivo no Diagnóstico: 2 toques no celular até a impressão', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await prepare(page);
+  await page.addInitScript(() => {
+    (window as any).__printed = [];
+    window.print = () => (window as any).__printed.push(document.title);
+  });
+  const base = await openDemo(page);
+  await page.goto(`${base}/visao-geral`);
+  await page.getByRole('navigation', { name: 'Atalhos do projeto' }).getByRole('link', { name: 'Diagnóstico' }).click(); // toque 1
+  await expect(page).toHaveURL(/\/diagnostico$/);
+  const btn = page.getByRole('button', { name: 'Baixar Relatório Executivo' });
+  await expect(btn).toBeInViewport();
+  await btn.click(); // toque 2
+  await expect(page).toHaveURL(/\/relatorio$/); // ?imprimir=1 sai da URL
+  await expect(page.getByTestId('report')).toContainText('Resumo executivo');
+  await expect.poll(() => page.evaluate(() => (window as any).__printed as string[])).toEqual([expect.stringMatching(/^Relatório executivo - /)]);
+  // Recarregar não imprime de novo.
+  await page.reload();
+  await expect(page.getByTestId('report')).toContainText('Resumo executivo');
+  await page.waitForTimeout(800);
+  expect(await page.evaluate(() => (window as any).__printed as string[])).toEqual([]);
+});

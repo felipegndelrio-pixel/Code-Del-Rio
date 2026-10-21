@@ -1,11 +1,13 @@
 import { useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { FileDown } from 'lucide-react';
 import { LeanBar, ParetoChart, SimpleBars, StackedLoad } from '../../components/charts';
-import { Badge, Callout, Card, Field, HowCalc, NumberInput, Select, Stat, Term } from '../../components/ui';
+import { Badge, Button, Callout, Card, Field, HowCalc, NumberInput, Select, Stat, Term } from '../../components/ui';
 import { bottlenecks, CRITERION_LABEL, dataGaps, pareto } from '../../domain/metrics';
 import { LEAN_LABEL, LEAN_REASON_LABEL, MANDATORY_REASONS, PERIOD_LABEL, type BottleneckCriterion, type LeanClass, type LeanReason } from '../../domain/types';
 import { fmtBRL, fmtHours, fmtNum, fmtPct, nowIso } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
+import { demoBlocked } from '../../license/demo';
 
 const UNIT_OF: Record<BottleneckCriterion, string> = {
   duration: 'horas de trabalho ativo por ocorrência',
@@ -17,6 +19,7 @@ const UNIT_OF: Record<BottleneckCriterion, string> = {
 
 export default function DiagnosisTab() {
   const { w, update, metrics: m } = useWorkspace();
+  const nav = useNavigate();
   const p = w.asIs;
   const per = PERIOD_LABEL[p.volumePeriod];
   useEffect(() => {
@@ -34,6 +37,16 @@ export default function DiagnosisTab() {
 
   return (
     <div className="space-y-4">
+      {/* Atalho do relatório executivo: Diagnóstico → este botão → impressão (2 toques no celular). */}
+      <div className="no-print flex flex-col gap-3 rounded-2xl border border-brand/30 bg-brand/5 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="report-shortcut">
+        <div>
+          <p className="font-semibold text-ink">Relatório executivo em PDF</p>
+          <p className="text-sm text-ink2">Resumo, gráficos, mapas do processo e plano de ação em um documento para a diretoria.</p>
+        </div>
+        <Button className="shrink-0" onClick={() => !demoBlocked('exportar') && nav(`/app/p/${w.id}/relatorio?imprimir=1`)}>
+          <FileDown className="h-4 w-4" aria-hidden /> Baixar Relatório Executivo
+        </Button>
+      </div>
       <Card title="Resumo do processo atual" subtitle="Diagnóstico — tudo calculado a partir dos seus dados">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Atividades identificadas" value={m.counts.tasks + m.counts.decisions} sub={`${m.counts.tasks} tarefas · ${m.counts.decisions} decisões`} basis="informado" />

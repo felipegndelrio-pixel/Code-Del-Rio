@@ -1,6 +1,6 @@
 // Relatório executivo imprimível (PDF via "Imprimir → Salvar como PDF").
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { BRAND } from '../../config/brand';
 import { buildBpmn } from '../../bpmn/model';
@@ -43,6 +43,21 @@ export default function ReportPage() {
   const [svgs, setSvgs] = useState<{ label: string; svg: string }[] | null>(null);
   const per = PERIOD_LABEL[w.asIs.volumePeriod];
   useEffect(() => restoreTitle, []);
+  // ?imprimir=1 (atalho "Baixar Relatório Executivo" do Diagnóstico): abre a impressão assim
+  // que os mapas estiverem desenhados. Uma vez só; o parâmetro sai da URL para não repetir
+  // ao recarregar. Se o navegador não abrir sozinho, o botão "Imprimir / salvar PDF" segue no topo.
+  const [params, setParams] = useSearchParams();
+  const autoPrint = useRef(params.get('imprimir') === '1');
+  useEffect(() => {
+    if (!autoPrint.current || svgs === null) return;
+    autoPrint.current = false;
+    // A URL só é limpa dentro do timer: limpá-la antes re-executa este efeito e o cleanup cancelaria a impressão.
+    const t = window.setTimeout(() => {
+      setParams({}, { replace: true });
+      if (!demoBlocked('exportar')) printAs(`Relatório executivo - ${w.asIs.name}`);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [svgs, setParams, w.asIs.name]);
   useEffect(() => {
     if (!w.visited.report) update((d) => void (d.visited.report = nowIso()));
   }, [w.visited.report, update]);
