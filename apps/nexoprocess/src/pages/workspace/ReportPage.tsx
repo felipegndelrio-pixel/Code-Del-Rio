@@ -15,6 +15,7 @@ import { fmtBRL, fmtDate, fmtDateTime, fmtHours, fmtNum, fmtPct, nowIso } from '
 import { useWorkspace } from '../../state/workspace';
 import { ACTION_STATUS } from './PlanTab';
 import { demoBlocked } from '../../license/demo';
+import { printAs, restoreTitle } from '../../state/print';
 import { HBars, PairBars, RC, ReportFigure, ShareBar, StackedHBars } from '../../components/reportCharts';
 
 // Rótulos curtos para o gráfico AS-IS × TO-BE (a tabela completa segue no detalhamento).
@@ -41,6 +42,7 @@ export default function ReportPage() {
   const gaps = dataGaps(w.asIs, m);
   const [svgs, setSvgs] = useState<{ label: string; svg: string }[] | null>(null);
   const per = PERIOD_LABEL[w.asIs.volumePeriod];
+  useEffect(() => restoreTitle, []);
   useEffect(() => {
     if (!w.visited.report) update((d) => void (d.visited.report = nowIso()));
   }, [w.visited.report, update]);
@@ -114,7 +116,7 @@ export default function ReportPage() {
             )}
           </Field>
         )}
-        <Button onClick={() => !demoBlocked('exportar') && window.print()} disabled={svgs === null}>
+        <Button onClick={() => !demoBlocked('exportar') && printAs(`Relatório executivo - ${w.asIs.name}`)} disabled={svgs === null}>
           <Printer className="h-4 w-4" /> Imprimir / salvar PDF
         </Button>
         <p className="w-full text-xs text-muted">Dica: no diálogo de impressão escolha “Salvar como PDF”, papel A4, e ative “Gráficos de plano de fundo”.</p>

@@ -12,6 +12,7 @@ import { actionsToCsv, readPlanFile, type PlanImport } from '../../io/planCsv';
 import { ImportError } from '../../io/parse';
 import { demoBlocked } from '../../license/demo';
 import { download, slug } from '../../state/actions';
+import { printAs, restoreTitle } from '../../state/print';
 import { useWorkspace } from '../../state/workspace';
 import { localDraft } from '../../storage/localDraft';
 
@@ -39,6 +40,7 @@ export default function PlanTab() {
     if (recovered.current) toast('info', 'Recuperamos a ação que você estava editando.');
     recovered.current = false;
   }, [toast]);
+  useEffect(() => restoreTitle, []);
   useEffect(() => {
     if (edit) localDraft.write(draftKey, edit);
     else localDraft.remove(draftKey);
@@ -117,11 +119,7 @@ export default function PlanTab() {
 
   const exportPdf = () => {
     if (demoBlocked('exportar')) return;
-    // O nome do arquivo sugerido pelo "Salvar como PDF" vem do título da página.
-    const prev = document.title;
-    document.title = `Plano de ação - ${w.asIs.name}`;
-    window.addEventListener('afterprint', () => (document.title = prev), { once: true });
-    window.print();
+    printAs(`Plano de ação - ${w.asIs.name}`);
   };
   const exportCsv = async () => {
     if (demoBlocked('exportar')) return;

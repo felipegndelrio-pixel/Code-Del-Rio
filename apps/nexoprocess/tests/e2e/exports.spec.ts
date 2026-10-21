@@ -155,3 +155,37 @@ test('relatório executivo (PDF): resumo, gráficos na largura da folha e texto 
   expect(r.buttons, 'botões fora do papel').toBe(0);
   await page.emulateMedia({ media: null });
 });
+
+// Safari/iPhone: o relatório imprimia só 1 página (conteúdo dentro de item flex não é
+// dividido em páginas pelo WebKit) e o PDF saía com o nome do plano (o iPhone nem sempre
+// dispara afterprint, e o título "Plano de ação - …" ficava preso).
+test('relatório executivo (Safari): sem flex/grid em volta na impressão e nome do PDF correto após imprimir o plano', async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => {
+    (window as any).__printed = [];
+    window.print = () => (window as any).__printed.push(document.title); // sem afterprint, como no iPhone
+  });
+  const base = await openDemo(page);
+  await page.goto(`${base}/plano`);
+  await page.getByRole('button', { name: /Exportar PDF/ }).click();
+  await page.goto(`${base}/exportar`);
+  await page.getByRole('button', { name: 'Abrir relatório' }).click();
+  await expect(page).toHaveURL(/\/relatorio$/);
+  const report = page.getByTestId('report');
+  await expect(report).toContainText('Resumo executivo');
+  await expect(page.getByTestId('plan-print')).toHaveCount(0);
+  await report.getByRole('button', { name: /Imprimir/ }).click();
+  const printed: string[] = await page.evaluate(() => (window as any).__printed);
+  expect(printed.at(-1)).toMatch(/^Relatório executivo - /);
+  await page.emulateMedia({ media: 'print' });
+  const layouts = await page.evaluate(() => {
+    const out: string[] = [];
+    for (let el = document.querySelector('[data-testid="report"]')!.parentElement; el && el !== document.documentElement; el = el.parentElement) {
+      const d = getComputedStyle(el).display;
+      if (/flex|grid/.test(d)) out.push(`${el.tagName.toLowerCase()}.${el.className}: ${d}`);
+    }
+    return out;
+  });
+  expect(layouts, 'ancestrais flex/grid na impressão').toEqual([]);
+  await page.emulateMedia({ media: null });
+});

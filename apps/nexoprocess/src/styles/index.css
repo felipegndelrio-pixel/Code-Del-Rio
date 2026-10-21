@@ -352,6 +352,15 @@ input[type='date']::-webkit-calendar-picker-indicator {
   .min-h-screen {
     min-height: 0 !important;
   }
+  /* Moldura do app (AppShell: flex em coluna) vira bloco no papel. O Safari/WebKit não
+     divide em páginas o conteúdo de um item flex: o relatório de 9 páginas saía com 1. */
+  #root,
+  #root > div:not(.no-print),
+  main#conteudo {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
   body {
     background: #fff !important;
   }
