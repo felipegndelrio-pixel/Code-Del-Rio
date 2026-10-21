@@ -386,6 +386,9 @@ input[type='date']::-webkit-calendar-picker-indicator {
   figcaption {
     break-after: avoid;
   }
+  li {
+    break-inside: avoid;
+  }
   /* Relatório executivo: gráficos SVG em cor no papel, mesmo sem "gráficos de fundo". */
   [data-testid='report'] {
     -webkit-print-color-adjust: exact;

@@ -153,6 +153,14 @@ test('relatório executivo (PDF): resumo, gráficos na largura da folha e texto 
   for (const c of r.charts) expect(c.share, `${c.label} na largura da folha`).toBeGreaterThan(0.95);
   expect(r.nav, 'menus, barras e avisos fora do papel').toBe(0);
   expect(r.buttons, 'botões fora do papel').toBe(0);
+  // Altura do cabeçalho + resumo na largura impressa da A4 (186 mm = 703 px). O Chrome tem 269 mm
+  // úteis; o Safari do iPhone diagrama mais folgado (o PDF real estourou com 208 mm medidos aqui).
+  await page.setViewportSize({ width: 703, height: 1000 });
+  const page1mm = await page.evaluate(() => {
+    const rep = document.querySelector('[data-testid="report"]')!;
+    return ((rep.querySelector('section')!.getBoundingClientRect().bottom - rep.getBoundingClientRect().top) / 96) * 25.4;
+  });
+  expect(page1mm, 'resumo executivo cabe na 1ª página com folga para o Safari').toBeLessThan(190);
   await page.emulateMedia({ media: null });
 });
 

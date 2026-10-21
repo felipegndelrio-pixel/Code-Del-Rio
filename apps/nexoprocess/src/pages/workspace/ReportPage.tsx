@@ -158,7 +158,7 @@ export default function ReportPage() {
           <Kpi label={`Custo por ${per}`} value={m.totalCostPeriod.value === null ? 'não calculado' : fmtBRL(m.totalCostPeriod.value)} b="estimado" />
           <Kpi label="Desperdício (Lean)" value={m.lean.classifiedHours > 0 ? fmtPct(m.lean.pct.W) : 'sem classificação'} sub="do tempo classificado" b="calculado" />
           <Kpi label="Gargalos identificados" value={String(bn.flagged.length)} sub={`regra: ≥ ${w.bottleneck.thresholdPct}%`} b="calculado" />
-          <Kpi label="Economia estimada" value={biz?.netBenefitMonth != null ? `${fmtBRL(biz.netBenefitMonth)}/mês` : 'não calculada'} sub={sc ? `cenário “${sc.name}”` : 'sem cenário TO-BE'} b="estimado" />
+          <Kpi label="Economia estimada" value={biz?.netBenefitMonth != null ? `${fmtBRL(biz.netBenefitMonth)}/mês` : 'não calculada'} sub={sc ? 'benefício líquido do TO-BE' : 'sem cenário TO-BE'} b="estimado" />
           <Kpi label="Payback" value={biz?.paybackMonths != null ? (biz.paybackMonths === 0 ? 'imediato' : `${fmtNum(biz.paybackMonths, 1)} meses`) : 'não calculado'} b="estimado" />
           <Kpi label={`ROI em ${biz?.horizonMonths ?? 12} meses`} value={biz?.roiPct != null ? fmtPct(biz.roiPct) : 'não calculado'} b="estimado" />
         </div>
@@ -172,21 +172,8 @@ export default function ReportPage() {
             </ul>
           </div>
         )}
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 print:grid-cols-2">
-          <div className="avoid-break">
-            <h3 className="text-[13px] font-semibold">Principais gargalos</h3>
-            {bn.flagged.length ? (
-              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[12px]">
-                {bn.flagged.slice(0, 3).map((b) => (
-                  <li key={b.id}>
-                    {name(b.id)} — {fmtPct(b.share, 1)} <span className="text-ink2">({m.graph.byId.get(b.id)?.stage})</span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="mt-1 text-[12px] text-ink2">{bn.reason ?? 'Nenhuma atividade acima do limiar.'}</p>
-            )}
-          </div>
+        {/* Gargalos já estão nas mensagens-chave e no Pareto (em vermelho); aqui, só as próximas ações. */}
+        <div className="mt-3">
           <div className="avoid-break">
             <h3 className="text-[13px] font-semibold">Próximos passos</h3>
             {nextSteps.length ? (
@@ -515,7 +502,8 @@ export default function ReportPage() {
         </>
       )}
 
-      <Section n={next()} title="Plano de ação" breakBefore={!sc}>
+      {/* Sempre em página nova: o Safari ignora "não quebrar linha de tabela" e cortava uma ação ao meio. */}
+      <Section n={next()} title="Plano de ação" breakBefore>
         {w.actions.length ? (
           <table className={tbl}>
             <thead>
@@ -599,13 +587,15 @@ function Section({ n, title, children, breakBefore }: { n: number; title: string
 
 function Kpi({ label, value, sub, b }: { label: string; value: string; sub?: string; b?: 'informado' | 'calculado' | 'estimado' }) {
   return (
+    // Compacto (selo na linha do rótulo, valor sem quebra): no Safari a 1ª página tem menos
+    // altura útil (cabeçalho/rodapé do navegador) e o resumo precisa caber nela.
     <div className="avoid-break rounded-lg border border-line/25 p-2">
-      <p className="text-[11px] font-medium text-ink2">{label}</p>
-      <p className="mt-0.5 text-[16px] font-bold leading-tight text-ink">{value}</p>
-      <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-ink2">
-        {sub}
+      <p className="flex items-start justify-between gap-1 text-[11px] font-medium leading-tight text-ink2">
+        <span>{label}</span>
         {b && <BasisTag basis={b} />}
       </p>
+      <p className="mt-1 whitespace-nowrap text-[15px] font-bold leading-tight text-ink">{value}</p>
+      {sub && <p className="mt-0.5 text-[10px] leading-tight text-ink2">{sub}</p>}
     </div>
   );
 }
