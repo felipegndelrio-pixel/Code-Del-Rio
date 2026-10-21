@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import { Card, Callout } from '../components/ui';
-import { BRAND } from '../config/brand';
+import { BRAND, COMMERCIAL } from '../config/brand';
 import { GLOSSARY } from '../config/glossary';
 import { FIELDS } from '../io/fields';
 import { BackButton } from '../components/BackButton';
+import { SupportLink } from '../components/SupportLink';
+import { LICENSE } from '../license/config';
 
 export default function Help() {
   return (
@@ -70,13 +72,29 @@ export default function Help() {
       <Card title="Privacidade e dados" subtitle="O que fica onde" id="privacidade">
         <ul className="list-disc space-y-1 pl-5 text-sm text-ink2">
           <li>Planilhas são lidas no seu navegador. O conteúdo não é enviado a servidores.</li>
-          <li>Processos, cenários, planos, resultados e rascunhos ficam no IndexedDB deste navegador (banco “nexoprocess”). A preferência de tema fica no localStorage.</li>
+          <li>Processos, cenários, planos, resultados e rascunhos ficam no IndexedDB deste navegador (banco “nexoprocess”). No localStorage ficam a preferência de tema, uma cópia dos rascunhos em edição (para não perder nada ao recarregar) e quais dicas você já viu.</li>
           <li>O site é entregue por uma hospedagem estática. Como em qualquer site, ela recebe as requisições dos arquivos do app (endereço IP, navegador, horário) — não o conteúdo dos seus processos.</li>
-          <li>Não há contas, rastreadores de terceiros ou analytics no app.</li>
+          {LICENSE.required ? (
+            <li>
+              Acesso pela compra: para liberar o app, o e-mail digitado na entrada é conferido no nosso servidor. Lá ficam só o e-mail, a situação da compra (ativa ou cancelada), o produto, a transação e a data — dados que a Hotmart envia quando a
+              compra é aprovada, reembolsada ou cancelada. Nenhum conteúdo dos seus processos vai junto.
+            </li>
+          ) : (
+            <li>Não há contas nem cadastro.</li>
+          )}
+          <li>Não há rastreadores de terceiros nem analytics no app.</li>
           <li>Limpar os dados do navegador apaga os processos. Use “Baixar backup” em Meus processos.</li>
           <li>Você pode apagar tudo a qualquer momento em Meus processos → Apagar dados locais.</li>
         </ul>
       </Card>
+
+      {COMMERCIAL.contactEmail && (
+        <Card title="Suporte" subtitle="Fale com a gente" id="suporte">
+          <p className="text-sm text-ink2">
+            <SupportLink prefix="Dúvidas, problemas de acesso ou sugestões: escreva para" />. Para agilizar, diga o e-mail usado na compra e o aparelho/navegador. Nunca envie seus processos por e-mail sem necessidade.
+          </p>
+        </Card>
+      )}
 
       <Card title="Inteligência artificial" subtitle="Opcional, futuro">
         <p className="text-sm text-ink2">
@@ -86,7 +104,7 @@ export default function Help() {
       </Card>
 
       <Callout tone="info">
-        {BRAND.name} é um nome provisório. O app não é afiliado ao PMI® nem a fornecedores de ferramentas de processos. Diagramas renderizados com bpmn-js (bpmn.io) — a marca d’água do bpmn.io permanece visível conforme a licença.{' '}
+        O {BRAND.name} não é afiliado ao PMI® nem a fornecedores de ferramentas de processos. Diagramas renderizados com bpmn-js (bpmn.io) — a marca d’água do bpmn.io permanece visível conforme a licença.{' '}
         <Link to="/app" className="font-semibold text-brand">
           Voltar ao app
         </Link>

@@ -2,6 +2,7 @@ import { demoWorkspace } from '../domain/demo';
 import { newWorkspace } from '../domain/factory';
 import type { ProcessModel, Workspace } from '../domain/types';
 import { db } from '../storage/db';
+import { askPersistentStorage } from './install';
 
 /** Abre o exemplo (reaproveita o existente para não duplicar). */
 export async function openDemo(reset = false): Promise<Workspace> {
@@ -17,6 +18,7 @@ export async function openDemo(reset = false): Promise<Workspace> {
 export async function createWorkspace(p: ProcessModel, source: Workspace['source']): Promise<Workspace> {
   const w = newWorkspace(p, source, false);
   await db.putWorkspace(w);
+  askPersistentStorage();
   return w;
 }
 

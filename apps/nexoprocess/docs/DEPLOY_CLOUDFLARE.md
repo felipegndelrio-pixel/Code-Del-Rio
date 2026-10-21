@@ -68,6 +68,7 @@ Trocar o par depois desconecta todos os compradores (cada um entra de novo com o
 | `VITE_LICENSE_REQUIRED` | `true` | texto (build) |
 | `VITE_LICENSE_PUBLIC_JWK` | linha pública do passo 2 | texto (build) |
 | `VITE_HOTMART_CHECKOUT_URL` | link do checkout da Hotmart | texto (build) |
+| `VITE_SUPPORT_EMAIL` | e-mail de suporte mostrado ao comprador | texto (build) |
 | `LICENSE_PRIVATE_JWK` | linha secreta do passo 2 | **Secret** |
 | `SUPABASE_URL` | Project URL | texto |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role | **Secret** |
@@ -89,6 +90,7 @@ As variáveis do painel **não** valem para `wrangler pages deploy`: o build é 
 ```bash
 export VITE_LICENSE_PUBLIC_JWK='<linha pública do passo 2>'
 export VITE_HOTMART_CHECKOUT_URL='https://pay.hotmart.com/SEU-PRODUTO'
+export VITE_SUPPORT_EMAIL='suporte@seudominio.com.br'
 npm ci && npm run nexo:build:venda
 cd apps/nexoprocess && npx wrangler pages deploy dist --project-name SEU-PROJETO --branch main
 ```
@@ -173,3 +175,22 @@ Deploy direto, sem Git: `npx wrangler pages deploy apps/nexoprocess/dist --proje
 ## Netlify / GitHub Pages
 
 O app existente na raiz continua com `netlify.toml` e `.github/workflows/pages.yml` intactos. O NexoProcess não altera esses fluxos.
+
+## Passo 6 — Entrega ao comprador (Hotmart)
+
+O app não usa a área de membros da Hotmart: o acesso é liberado pelo webhook e o comprador entra com o **mesmo e-mail da compra**. Na configuração do produto, informe ao comprador onde acessar (página de obrigado/URL de acesso e e-mail de confirmação — os nomes exatos dos campos mudam no painel da Hotmart: **TO VALIDATE**).
+
+Texto pronto para a página de obrigado e para a descrição do produto:
+
+> **Seu acesso ao NexoProcess já está liberado.** Abra **https://SEU-DOMINIO/entrar** no celular ou no computador e digite o **mesmo e-mail usado nesta compra**. Na primeira vez é preciso internet; depois o app funciona offline. No iPhone, toque em Compartilhar → Adicionar à Tela de Início; no Android, menu → Instalar app. Seus processos ficam salvos só no seu aparelho. Dúvidas: **SEU-EMAIL-DE-SUPORTE**.
+
+## Checklist de lançamento
+
+1. Supabase com `schema.sql` aplicado (passo 1) e chaves geradas (passo 2).
+2. Build de venda publicado (`nexo:build:venda` ou build pelo Git com as variáveis do passo 3).
+3. `/app` redireciona para `/entrar` (se abrir direto, o build saiu aberto).
+4. `nexo:test:csp` e `nexo:test:csp:rotas` com `TEST_BASE_URL` do deploy (passo 4).
+5. Webhook cadastrado, `HOTMART_HOTTOK` configurado, "Enviar teste" com log `→ active` (passo 5).
+6. Compra real de teste (ou cupom 100%) → entrar com o e-mail → reembolso → acesso encerrado na próxima renovação.
+7. Validação manual em aparelhos reais: [`COMPATIBILIDADE.md`](COMPATIBILIDADE.md).
+8. Pendências comerciais e jurídicas: [`COMERCIALIZACAO.md`](COMERCIALIZACAO.md).

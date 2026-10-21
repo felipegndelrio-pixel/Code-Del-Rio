@@ -340,7 +340,7 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} className={clsx('safe-bottom flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-line/20 bg-surface shadow-card sm:rounded-2xl', wide ? 'sm:max-w-3xl' : 'sm:max-w-lg')}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} className={clsx('safe-bottom np-dialog-h flex w-full flex-col rounded-t-2xl border border-line/20 bg-surface shadow-card sm:rounded-2xl', wide ? 'sm:max-w-3xl' : 'sm:max-w-lg')}>
         <header className="flex items-center justify-between gap-2 border-b border-line/15 px-4 py-3">
           <h2 id={id} className="text-base font-bold text-ink">
             {title}
@@ -371,7 +371,7 @@ export function Drawer({ open, onClose, title, children, footer }: { open: boole
         role="dialog"
         aria-modal="true"
         aria-labelledby={id}
-        className="safe-bottom absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col rounded-t-2xl border border-line/20 bg-surface shadow-card md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[440px] md:rounded-none md:rounded-l-2xl"
+        className="safe-bottom np-sheet-h absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl border border-line/20 bg-surface shadow-card md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[440px] md:rounded-none md:rounded-l-2xl"
       >
         <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-line/30 md:hidden" aria-hidden />
         <header className="flex items-center justify-between gap-2 border-b border-line/15 px-4 py-3">

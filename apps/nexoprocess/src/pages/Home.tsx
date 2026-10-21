@@ -12,6 +12,7 @@ import { db, exportBackup, parseBackup, restoreBackup, storageMode } from '../st
 import { download, downloadTemplateCsv, downloadTemplateXlsx, openDemo } from '../state/actions';
 import { STEP_PATH } from '../config/nav';
 import { demoBlocked } from '../license/demo';
+import InstallHint from '../components/InstallHint';
 
 type Filter = 'todos' | 'andamento' | 'exemplo';
 
@@ -302,6 +303,7 @@ export default function Home() {
               </Button>
             </div>
           </div>
+          <InstallHint />
         </Card>
       )}
     </div>

@@ -6,6 +6,7 @@ import { ThemeToggle } from '../components/AppShell';
 import { Button, useToast } from '../components/ui';
 import { openDemo } from '../state/actions';
 import { LICENSE } from '../license/config';
+import { startDemo } from '../license/demo';
 
 const FEATURE_ICONS = [GitBranch, BarChart3, Lightbulb, Scale, ScrollText, Lock];
 
@@ -18,6 +19,15 @@ export default function Landing() {
       nav(`/app/p/${w.id}/visao-geral`);
     } catch {
       toast('bad', 'Não conseguimos abrir o exemplo neste navegador. Tente recarregar a página.');
+    }
+  };
+  const tryDemo = async () => {
+    startDemo();
+    try {
+      const w = await openDemo();
+      nav(`/app/p/${w.id}/visao-geral`);
+    } catch {
+      toast('bad', 'Não conseguimos abrir a demonstração neste navegador. Tente recarregar a página.');
     }
   };
   return (
@@ -48,7 +58,7 @@ export default function Landing() {
               <Button size="lg" onClick={() => nav('/app')}>
                 {COMMERCIAL.primaryCta} <ArrowRight className="h-5 w-5" aria-hidden />
               </Button>
-              <SecondaryCta onDemo={demo} />
+              <SecondaryCta onDemo={demo} onTryDemo={tryDemo} />
               {COMMERCIAL.secondaryCta.url && (
                 <a href={COMMERCIAL.secondaryCta.url} className="inline-flex min-h-[52px] items-center rounded-xl px-4 font-semibold text-brand underline-offset-4 hover:underline" rel="noopener">
                   {COMMERCIAL.secondaryCta.label}
@@ -124,13 +134,13 @@ export default function Landing() {
             <Button size="lg" onClick={() => nav('/app')}>
               Começar agora
             </Button>
-            <SecondaryCta onDemo={demo} />
+            <SecondaryCta onDemo={demo} onTryDemo={tryDemo} />
           </div>
         </section>
       </main>
       <footer className="safe-x safe-bottom mx-auto max-w-6xl border-t border-line/15 py-6 text-xs text-muted">
         <p>
-          {BRAND.name} (nome provisório) · versão {BRAND.version}. Diagramas renderizados com bpmn-js (bpmn.io). Não é afiliado ao PMI® nem a fornecedores de ferramentas de processos.
+          {BRAND.name} · versão {BRAND.version}. Diagramas renderizados com bpmn-js (bpmn.io). Não é afiliado ao PMI® nem a fornecedores de ferramentas de processos.
           {COMMERCIAL.contactEmail && (
             <>
               {' '}
@@ -185,18 +195,27 @@ function HeroVisual() {
   );
 }
 
-/** No build de venda, o lugar da demonstração vira o link de compra (a demo exige acesso). */
-function SecondaryCta({ onDemo }: { onDemo: () => void }) {
+/**
+ * Build aberto: demonstração fictícia completa. Build de venda: link de compra e a
+ * versão Demo (navega no exemplo, sem salvar nem exportar).
+ */
+function SecondaryCta({ onDemo, onTryDemo }: { onDemo: () => void; onTryDemo: () => void }) {
   if (!LICENSE.required)
     return (
       <Button size="lg" variant="secondary" onClick={onDemo}>
         Ver demonstração fictícia
       </Button>
     );
-  if (!LICENSE.checkoutUrl) return null;
   return (
-    <a href={LICENSE.checkoutUrl} rel="noopener noreferrer" target="_blank" className="inline-flex min-h-[52px] items-center rounded-xl border border-line/20 bg-surface px-5 font-semibold text-ink hover:border-line/40">
-      Comprar na Hotmart
-    </a>
+    <>
+      {LICENSE.checkoutUrl && (
+        <a href={LICENSE.checkoutUrl} rel="noopener noreferrer" target="_blank" className="inline-flex min-h-[52px] items-center rounded-xl border border-line/20 bg-surface px-5 font-semibold text-ink hover:border-line/40">
+          Comprar na Hotmart
+        </a>
+      )}
+      <Button size="lg" variant="ghost" onClick={onTryDemo}>
+        Experimentar a versão Demo
+      </Button>
+    </>
   );
 }

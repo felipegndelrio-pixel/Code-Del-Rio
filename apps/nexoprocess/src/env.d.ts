@@ -8,4 +8,6 @@ interface ImportMetaEnv {
   readonly VITE_LICENSE_PUBLIC_JWK?: string;
   /** Link de compra na Hotmart, mostrado na entrada e na landing. */
   readonly VITE_HOTMART_CHECKOUT_URL?: string;
+  /** E-mail de suporte exibido ao comprador (entrada, ajuda, erros, rodapé). */
+  readonly VITE_SUPPORT_EMAIL?: string;
 }

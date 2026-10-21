@@ -12,6 +12,7 @@ import { prepare } from './helpers';
 const keys = JSON.parse(readFileSync(new URL('./fixtures/license-test-keys.json', import.meta.url), 'utf8')) as { privateJwk: JsonWebKey; publicJwk: JsonWebKey };
 const CHECKOUT = 'https://pay.hotmart.com/TESTE';
 const BUYER = 'comprador@ex.com';
+const SUPPORT = 'suporte@exemplo.com.br';
 
 async function api(page: Page, licenses: Record<string, LicenseStatus> | null) {
   const store = licenses ? memoryStore(licenses) : null;
@@ -139,8 +140,18 @@ test('landing do modo de venda: acesso por e-mail e link de compra; ajuda segue 
   for (const l of await buy.all()) await expect(l).toHaveAttribute('href', CHECKOUT);
   await expect(page.getByRole('button', { name: 'Ver demonstração fictícia' })).toHaveCount(0);
   await expect(page.getByText('Explore a demonstração fictícia')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Experimentar a versão Demo' })).toHaveCount(2); // topo e chamada final
+  await expect(page.getByText('nome provisório')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: SUPPORT })).toHaveAttribute('href', `mailto:${SUPPORT}`);
   await page.goto('/app/ajuda');
   await expect(page.getByRole('heading', { level: 1, name: 'Ajuda' })).toBeVisible();
+  // Privacidade fiel ao build de venda: o e-mail da compra é conferido no servidor.
+  await expect(page.locator('#privacidade')).toContainText('o e-mail digitado na entrada é conferido no nosso servidor');
+  await expect(page.locator('#privacidade')).not.toContainText('Não há contas');
+  await expect(page.locator('#suporte').getByRole('link', { name: SUPPORT })).toBeVisible();
+  await page.goto('/entrar');
+  await expect(page.getByRole('link', { name: SUPPORT })).toHaveAttribute('href', `mailto:${SUPPORT}`);
+  await expect(page.getByRole('link', { name: 'Como usamos seu e-mail' })).toHaveAttribute('href', '/app/ajuda#privacidade');
 });
 
 for (const theme of ['dark', 'light'] as const) {
@@ -160,8 +171,8 @@ for (const theme of ['dark', 'light'] as const) {
 test('modo demo: navega no exemplo, mas salvar e exportar mostram o convite de compra', async ({ page }) => {
   const { errors } = await prepare(page);
   await api(page, {});
-  await page.goto('/entrar');
-  await page.getByRole('button', { name: 'Experimentar a versão Demo' }).click();
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Experimentar a versão Demo' }).first().click(); // direto da landing
   await expect(page).toHaveURL(/\/app\/p\/[^/]+\/visao-geral$/);
   await expect(page.getByText('Versão de demonstração.')).toBeVisible();
   expect(await stored(page)).toBeNull(); // demo não cria acesso

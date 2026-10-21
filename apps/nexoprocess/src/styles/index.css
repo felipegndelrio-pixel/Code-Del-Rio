@@ -269,6 +269,30 @@ input[type='date']::-webkit-calendar-picker-indicator {
   color: rgb(var(--ink));
 }
 
+/* ---------- Toque (celular e tablet) ---------- */
+/* O Safari do iPhone/iPad dá zoom na página ao focar um campo com fonte menor que
+   16px. Em telas de toque os campos ficam com 16px; no desktop seguem compactos. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Folhas e diálogos: dvh desconta as barras do navegador no celular (Safari/Chrome);
+   vh fica como reserva para navegadores sem dvh. Em @layer para os utilitários (md:) valerem. */
+@layer components {
+  .np-sheet-h {
+    max-height: 88vh;
+    max-height: 88dvh;
+  }
+  .np-dialog-h {
+    max-height: 92vh;
+    max-height: 92dvh;
+  }
+}
+
 /* ---------- Transições ---------- */
 @keyframes np-fade-in {
   from {

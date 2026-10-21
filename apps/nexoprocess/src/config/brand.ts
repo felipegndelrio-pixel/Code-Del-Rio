@@ -7,15 +7,17 @@ export const BRAND = {
     'Transforme uma planilha simples em um mapa visual do processo, encontre gargalos e receba um plano prático de melhoria — sem precisar saber BPMN ou Lean.',
   colors: { navy: '#0d1c38', brand: '#00a8bc' },
   /** Versão exibida em relatórios e exportações. */
-  version: '0.4.0',
+  version: '1.0.0',
 } as const;
 
 // CTA comercial configurável. Deixe `url` vazio para ocultar o botão.
 // Não inclua preços, depoimentos ou números sem comprovação.
+// O e-mail de suporte vem do build (VITE_SUPPORT_EMAIL); obrigatório no build de venda.
+// `?.`: este arquivo também é lido pelo vite.config (Node), onde import.meta.env não existe.
 export const COMMERCIAL = {
   primaryCta: 'Começar agora',
   secondaryCta: { label: 'Fale com a gente', url: '' as string },
-  contactEmail: '' as string,
+  contactEmail: (import.meta.env?.VITE_SUPPORT_EMAIL ?? '').trim(),
 } as const;
 
 export const LANDING = {

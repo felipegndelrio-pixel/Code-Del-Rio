@@ -1,6 +1,6 @@
 // Barra o build de venda sem as variáveis que ligam a cobrança. Sem elas o app sai
 // ABERTO (sem /entrar, sem modo demo, sem bloqueio) — erro silencioso em produção.
-// Uso: VITE_LICENSE_PUBLIC_JWK='{...}' VITE_HOTMART_CHECKOUT_URL='https://pay.hotmart.com/...' npm run nexo:build:venda
+// Uso: VITE_LICENSE_PUBLIC_JWK='{...}' VITE_HOTMART_CHECKOUT_URL='https://pay.hotmart.com/...' VITE_SUPPORT_EMAIL='suporte@...' npm run nexo:build:venda
 const errors = [];
 let jwk = null;
 try {
@@ -11,6 +11,7 @@ try {
 if (!jwk || jwk.kty !== 'EC' || jwk.crv !== 'P-256' || !jwk.x || !jwk.y) errors.push('VITE_LICENSE_PUBLIC_JWK ausente ou inválida (use a linha pública de scripts/license-keys.mjs).');
 else if (jwk.d) errors.push('VITE_LICENSE_PUBLIC_JWK contém a parte PRIVADA ("d"). Use só a linha pública.');
 if (!/^https:\/\/\S+$/.test(process.env.VITE_HOTMART_CHECKOUT_URL ?? '')) errors.push('VITE_HOTMART_CHECKOUT_URL ausente ou sem https:// (link do checkout da Hotmart).');
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((process.env.VITE_SUPPORT_EMAIL ?? '').trim())) errors.push('VITE_SUPPORT_EMAIL ausente ou inválido (e-mail de suporte mostrado ao comprador).');
 if (errors.length) {
   console.error(`Build de venda NÃO gerado:\n- ${errors.join('\n- ')}`);
   process.exit(1);

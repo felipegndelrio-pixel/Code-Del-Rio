@@ -94,6 +94,9 @@ export default defineConfig(({ mode }) => {
         : []),
     ],
     build: {
+      // Mínimos suportados (sintaxe): iOS/Safari 16, Chrome/Edge 107, Firefox 104.
+      // Abaixo disso, theme-init.js mostra um aviso em vez de tela branca.
+      target: ['safari16', 'chrome107', 'edge107', 'firefox104'],
       outDir: single ? 'dist-single' : 'dist',
       emptyOutDir: true,
       chunkSizeWarningLimit: 2500,

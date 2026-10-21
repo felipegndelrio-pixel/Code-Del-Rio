@@ -4,6 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 // Modo de venda (licença por e-mail): segundo build com chave pública SÓ DE TESTE.
 const licenseKeys = JSON.parse(readFileSync(new URL('./tests/e2e/fixtures/license-test-keys.json', import.meta.url), 'utf8'));
 export const LICENSE_TEST_CHECKOUT = 'https://pay.hotmart.com/TESTE';
+export const LICENSE_TEST_SUPPORT = 'suporte@exemplo.com.br';
 
 // E2E do NexoProcess contra o build de produção (vite preview).
 // Usa CHROMIUM_PATH ou o Chromium pré-instalado do ambiente; senão, o do Playwright (CI).
@@ -56,6 +57,7 @@ export default defineConfig({
         VITE_LICENSE_REQUIRED: 'true',
         VITE_LICENSE_PUBLIC_JWK: JSON.stringify(licenseKeys.publicJwk),
         VITE_HOTMART_CHECKOUT_URL: LICENSE_TEST_CHECKOUT,
+        VITE_SUPPORT_EMAIL: LICENSE_TEST_SUPPORT,
         BUNDLE_REPORT: 'false',
       },
     },

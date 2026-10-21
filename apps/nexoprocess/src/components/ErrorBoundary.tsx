@@ -3,6 +3,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
+import { SupportLink } from './SupportLink';
 
 interface Props {
   children: ReactNode;
@@ -38,6 +39,9 @@ export class ErrorBoundary extends Component<Props, State> {
             <h2 className="text-lg font-semibold text-ink">Não foi possível mostrar esta tela</h2>
             <p className="mt-1 text-sm text-ink2">
               Seus dados continuam salvos neste aparelho. Volte à lista de projetos e tente abrir de novo. Se o problema continuar, faça um backup pela tela inicial e avise o suporte.
+            </p>
+            <p className="mt-1 text-sm text-ink2">
+              <SupportLink prefix="Suporte:" />
             </p>
           </div>
         </div>

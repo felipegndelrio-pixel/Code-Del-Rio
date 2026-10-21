@@ -8,6 +8,9 @@ Verificado por teste automatizado: durante o tour completo, a jornada E2E e o us
 | IndexedDB `nexoprocess` → `workspaces` | Processo AS-IS (atual e original), cópias de segurança, cenários TO-BE e mudanças, decisões sobre recomendações, plano de ação, resultados, riscos, RACI, avaliações de automação e histórico |
 | IndexedDB `nexoprocess` → `drafts` | Rascunho do assistente guiado |
 | localStorage `nexo.theme` | Preferência de tema claro/escuro |
+| localStorage `nexo.draft.*` | Cópia dos rascunhos em edição (assistente, formulário, ação do plano), para não perder nada ao recarregar |
+| localStorage `nexo.tour.plano`, `nexo.dica.instalar` | Se as dicas do Plano e de instalação já foram vistas/dispensadas |
+| localStorage `nexo.demo` | Só no build de venda: indica que a pessoa está na versão de demonstração |
 | localStorage `nexo.license` | Só no build de venda: token de acesso assinado (contém o e-mail da compra e a validade) |
 | Cache do service worker | Somente arquivos do app (JS, CSS, HTML, ícones) — **nenhum dado de processo** |
 

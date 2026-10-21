@@ -10,6 +10,7 @@ import { Button, Callout, Field, Input } from '../components/ui';
 import { activate, currentLicense, LICENSE } from '../license/config';
 import { endDemo, startDemo } from '../license/demo';
 import { openDemo } from '../state/actions';
+import { SupportLink } from '../components/SupportLink';
 
 /** Só volta para rotas internas do app (evita redirecionamento aberto). */
 const safeReturn = (v: string | null) => (v && /^\/app(\/|$|\?)/.test(v) && !v.startsWith('//') ? v : '/app');
@@ -126,7 +127,15 @@ export default function Login() {
 
         <p className="mt-4 flex items-start gap-2 text-sm text-muted">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          Só o e-mail é conferido no servidor. Suas planilhas e processos ficam salvos apenas neste aparelho.
+          <span>
+            Só o e-mail é conferido no servidor. Suas planilhas e processos ficam salvos apenas neste aparelho.{' '}
+            <Link to="/app/ajuda#privacidade" className="font-semibold text-accent hover:underline">
+              Como usamos seu e-mail
+            </Link>
+          </span>
+        </p>
+        <p className="mt-2 text-sm text-ink2">
+          <SupportLink prefix="Problemas para entrar? Escreva para" />
         </p>
         {LICENSE.checkoutUrl && (
           <p className="mt-2 text-sm">
