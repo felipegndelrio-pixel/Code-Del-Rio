@@ -57,7 +57,7 @@ export function Privacy() {
       <section>
         <h2>1. Resumo</h2>
         <p>
-          O {BRAND.name} foi feito para que os dados dos seus processos <strong>fiquem só no seu aparelho</strong>. O único dado pessoal que tratamos em servidor é o <strong>e-mail usado na compra</strong>, para liberar o seu acesso.
+          Para liberar seu acesso, tratamos o <strong>e-mail da compra e dados da transação</strong>. Os dados dos seus processos <strong>ficam salvos apenas no seu aparelho</strong>. O site utiliza registros técnicos de acesso (IP, navegador) para segurança, conforme detalhado abaixo.
         </p>
       </section>
       <section>

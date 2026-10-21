@@ -212,7 +212,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('contentinfo').getByRole('link', { name: 'Política de Privacidade' }).click();
     await expect(page).toHaveURL(/\/privacidade$/); // sem compra: não redireciona para /entrar
     await expect(page.getByRole('heading', { level: 1, name: 'Política de Privacidade' })).toBeVisible();
-    for (const t of ['e-mail usado na compra', 'Hotmart', 'Cloudflare', 'Supabase', 'art. 18', 'ANPD', SUPPORT]) await expect(page.locator('article')).toContainText(t);
+    for (const t of ['e-mail da compra e dados da transação', 'registros técnicos de acesso', 'Hotmart', 'Cloudflare', 'Supabase', 'art. 18', 'ANPD', SUPPORT]) await expect(page.locator('article')).toContainText(t);
     expect(await scan()).toEqual([]);
     await page.getByRole('link', { name: 'Termos de Uso' }).click();
     await expect(page).toHaveURL(/\/termos$/);
