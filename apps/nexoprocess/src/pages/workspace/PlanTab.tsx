@@ -449,12 +449,12 @@ export default function PlanTab() {
 /** Versão para impressão/PDF: todas as ações, sem controles, com resumo no topo. */
 const PRINT_COLS = [
   { h: '#', w: '4%' },
-  { h: 'Ação', w: '34%' },
+  { h: 'Ação', w: '30%' },
   { h: 'Responsável', w: '14%' },
   { h: 'Prazo', w: '11%' },
-  { h: 'Prioridade', w: '9%' },
-  { h: 'Situação', w: '11%' },
-  { h: 'Indicador de sucesso', w: '17%' },
+  { h: 'Prioridade', w: '10%' },
+  { h: 'Situação', w: '12%' },
+  { h: 'Indicador de sucesso', w: '19%' },
 ];
 
 function PrintPlan() {

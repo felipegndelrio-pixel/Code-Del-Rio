@@ -380,12 +380,17 @@ input[type='date']::-webkit-calendar-picker-indicator {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* Quebra só entre palavras (palavra longa demais quebra onde precisar). Sem
+     hifenização: o Safari partia "ma-nual", "Priori-dade" — ruim num relatório. */
   .np-print-table th,
   .np-print-table td {
     overflow-wrap: break-word;
     word-break: break-word;
-    hyphens: auto;
+    hyphens: manual;
     vertical-align: top;
+  }
+  .np-print-table th {
+    white-space: nowrap;
   }
   .np-print-table tr {
     page-break-inside: avoid;

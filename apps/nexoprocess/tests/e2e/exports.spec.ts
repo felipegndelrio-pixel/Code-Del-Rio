@@ -102,6 +102,8 @@ test('impressão/PDF do plano: legível no tema escuro, tabela na largura da pá
       title: lum(root.querySelector('h2')!),
       action: lum(table.querySelector('tbody td:nth-child(2)')!),
       layout: getComputedStyle(table).tableLayout,
+      hyphens: getComputedStyle(table.querySelector('tbody td:nth-child(2)')!).hyphens,
+      headerLines: [...table.querySelectorAll('th')].filter((th) => th.getBoundingClientRect().height > 2 * parseFloat(getComputedStyle(th).lineHeight) + 1).length,
       share: table.getBoundingClientRect().width / root.getBoundingClientRect().width,
       toastsVisible: toasts.filter((t) => getComputedStyle(t).display !== 'none').length,
     };
@@ -109,6 +111,8 @@ test('impressão/PDF do plano: legível no tema escuro, tabela na largura da pá
   expect(r.title, 'título escuro no papel').toBeLessThan(90);
   expect(r.action, 'texto da ação escuro no papel').toBeLessThan(90);
   expect(r.layout).toBe('fixed');
+  expect(r.hyphens, 'sem hifenização automática (Safari partia palavras)').not.toBe('auto');
+  expect(r.headerLines, 'títulos de coluna em uma linha').toBe(0);
   expect(r.share).toBeGreaterThan(0.98);
   expect(r.toastsVisible, 'avisos flutuantes não vão para o papel').toBe(0);
   const pdf = (await page.pdf({ format: 'A4', preferCSSPageSize: true })).toString('latin1');
