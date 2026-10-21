@@ -12,6 +12,8 @@ const ImportPage = lazy(() => import('./pages/Import'));
 const WorkspacePage = lazy(() => import('./pages/WorkspacePage'));
 const Help = lazy(() => import('./pages/Help'));
 const Login = lazy(() => import('./pages/Login'));
+const Privacy = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Privacy })));
+const Terms = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Terms })));
 
 export default function App() {
   return (
@@ -21,6 +23,9 @@ export default function App() {
         <Route path="/entrar" element={<Login />} />
         <Route element={<AppShell />}>
           <Route path="/app/ajuda" element={<Help />} />
+          {/* Públicas (LGPD): acessíveis sem compra. */}
+          <Route path="/privacidade" element={<Privacy />} />
+          <Route path="/termos" element={<Terms />} />
           {/* No build de venda (VITE_LICENSE_REQUIRED=true) exige o e-mail da compra; senão, passa direto. */}
           <Route element={<LicenseGate />}>
             <Route path="/app" element={<Home />} />

@@ -200,3 +200,29 @@ test('modo demo: navega no exemplo, mas salvar e exportar mostram o convite de c
   await expect(page).toHaveURL(/\/entrar\?volta=%2Fapp$/); // saiu da demonstração
   expect(errors).toEqual([]);
 });
+
+// LGPD: Política de Privacidade e Termos de Uso públicos (sem compra), linkados na
+// página de vendas, na entrada e na Ajuda; acessíveis (axe) nos dois temas.
+for (const theme of ['dark', 'light'] as const) {
+  test(`privacidade e termos públicos, linkados e acessíveis (${theme})`, async ({ page }) => {
+    const { errors } = await prepare(page, { theme });
+    await api(page, {});
+    const scan = async () => (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`);
+    await page.goto('/');
+    await page.getByRole('contentinfo').getByRole('link', { name: 'Política de Privacidade' }).click();
+    await expect(page).toHaveURL(/\/privacidade$/); // sem compra: não redireciona para /entrar
+    await expect(page.getByRole('heading', { level: 1, name: 'Política de Privacidade' })).toBeVisible();
+    for (const t of ['e-mail usado na compra', 'Hotmart', 'Cloudflare', 'Supabase', 'art. 18', 'ANPD', SUPPORT]) await expect(page.locator('article')).toContainText(t);
+    expect(await scan()).toEqual([]);
+    await page.getByRole('link', { name: 'Termos de Uso' }).click();
+    await expect(page).toHaveURL(/\/termos$/);
+    for (const t of ['7 dias', 'intransferível', '30 dias', 'Baixar backup', 'estimativas']) await expect(page.locator('article')).toContainText(t);
+    expect(await scan()).toEqual([]);
+    await page.goto('/entrar');
+    await expect(page.getByRole('link', { name: 'Termos de Uso' })).toHaveAttribute('href', '/termos');
+    await expect(page.getByRole('link', { name: 'Política de Privacidade' })).toHaveAttribute('href', '/privacidade');
+    await page.goto('/app/ajuda');
+    await expect(page.getByRole('link', { name: 'Política de Privacidade' })).toHaveAttribute('href', '/privacidade');
+    expect(errors).toEqual([]);
+  });
+}

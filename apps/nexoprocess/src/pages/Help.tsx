@@ -86,6 +86,16 @@ export default function Help() {
           <li>Limpar os dados do navegador apaga os processos. Use “Baixar backup” em Meus processos.</li>
           <li>Você pode apagar tudo a qualquer momento em Meus processos → Apagar dados locais.</li>
         </ul>
+        <p className="mt-3 text-sm">
+          Documentos completos:{' '}
+          <Link to="/privacidade" className="font-semibold text-accent underline">
+            Política de Privacidade
+          </Link>{' '}
+          ·{' '}
+          <Link to="/termos" className="font-semibold text-accent underline">
+            Termos de Uso
+          </Link>
+        </p>
       </Card>
 
       {COMMERCIAL.contactEmail && (

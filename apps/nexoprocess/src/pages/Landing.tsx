@@ -148,6 +148,15 @@ export default function Landing() {
             </>
           )}
         </p>
+        <p className="mt-2">
+          <Link to="/privacidade" className="underline">
+            Política de Privacidade
+          </Link>{' '}
+          ·{' '}
+          <Link to="/termos" className="underline">
+            Termos de Uso
+          </Link>
+        </p>
       </footer>
     </div>
   );

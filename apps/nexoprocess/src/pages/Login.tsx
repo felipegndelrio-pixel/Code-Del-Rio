@@ -137,6 +137,17 @@ export default function Login() {
         <p className="mt-2 text-sm text-ink2">
           <SupportLink prefix="Problemas para entrar? Escreva para" />
         </p>
+        <p className="mt-2 text-xs text-muted">
+          Ao entrar, você concorda com os{' '}
+          <Link to="/termos" className="underline">
+            Termos de Uso
+          </Link>{' '}
+          e a{' '}
+          <Link to="/privacidade" className="underline">
+            Política de Privacidade
+          </Link>
+          .
+        </p>
         {LICENSE.checkoutUrl && (
           <p className="mt-2 text-sm">
             Ainda não tem acesso?{' '}
