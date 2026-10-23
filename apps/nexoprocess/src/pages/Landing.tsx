@@ -1,5 +1,5 @@
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, BarChart3, FileSpreadsheet, GitBranch, Lightbulb, Lock, Scale, ScrollText, Wand2 } from 'lucide-react';
+import { ArrowRight, BarChart3, FileSpreadsheet, GitBranch, HelpCircle, Lightbulb, Lock, Scale, ScrollText, Wand2 } from 'lucide-react';
 import { BRAND, COMMERCIAL, LANDING } from '../config/brand';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/AppShell';
@@ -68,6 +68,10 @@ export default function Landing() {
             <p className="mt-3 text-sm text-muted">
               {LICENSE.required ? 'Acesso com o e-mail usado na compra.' : 'Sem cadastro.'} Suas planilhas são lidas no navegador e ficam salvas só neste aparelho.
             </p>
+            {/* No celular o cabeçalho não tem espaço para "Como funciona": a Ajuda fica aqui. */}
+            <Link to="/app/ajuda" className="mt-1 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-brand underline-offset-4 hover:underline sm:hidden">
+              <HelpCircle className="h-4 w-4" aria-hidden /> Como funciona
+            </Link>
           </div>
           <HeroVisual />
         </section>
@@ -155,6 +159,10 @@ export default function Landing() {
           ·{' '}
           <Link to="/termos" className="underline">
             Termos de Uso
+          </Link>{' '}
+          ·{' '}
+          <Link to="/app/ajuda" className="underline">
+            Ajuda
           </Link>
         </p>
       </footer>

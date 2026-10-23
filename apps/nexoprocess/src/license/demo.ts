@@ -4,14 +4,14 @@
 // experiência completa (salvar, exportar, criar projetos), não um segredo.
 import { LICENSE } from './config';
 
-const KEY = 'nexo.demo';
+export const DEMO_KEY = 'nexo.demo';
 export const DEMO_EVENT = 'nexo:demo-bloqueado';
 export const DEMO_MESSAGE = 'Modo de demonstração. Compre o acesso na Hotmart para salvar.';
 
 export function isDemo(): boolean {
   if (!LICENSE.required) return false;
   try {
-    return localStorage.getItem(KEY) === '1';
+    return localStorage.getItem(DEMO_KEY) === '1';
   } catch {
     return false;
   }
@@ -19,7 +19,7 @@ export function isDemo(): boolean {
 
 export function startDemo() {
   try {
-    localStorage.setItem(KEY, '1');
+    localStorage.setItem(DEMO_KEY, '1');
   } catch {
     /* sem armazenamento: a demonstração vale até recarregar */
   }
@@ -27,7 +27,7 @@ export function startDemo() {
 
 export function endDemo() {
   try {
-    localStorage.removeItem(KEY);
+    localStorage.removeItem(DEMO_KEY);
   } catch {
     /* nada a limpar */
   }

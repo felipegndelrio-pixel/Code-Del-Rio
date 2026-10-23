@@ -16,15 +16,19 @@ export const LICENSE = {
   publicJwk: parseJwk(import.meta.env.VITE_LICENSE_PUBLIC_JWK),
   checkoutUrl: import.meta.env.VITE_HOTMART_CHECKOUT_URL ?? '',
   endpoint: '/api/license',
-  /** Renova em segundo plano quando o token tem mais que isso (reembolso revoga). */
-  refreshAfterSec: 7 * 86_400,
+  /**
+   * Com conexão, confere a compra no servidor (em segundo plano) quando o token tem mais
+   * que isso. Curto de propósito: um reembolso dentro da garantia de 7 dias precisa
+   * encerrar o acesso na próxima abertura, não só quando o token envelhecer.
+   */
+  refreshAfterSec: 3600,
 };
 
-const KEY = 'nexo.license';
+export const TOKEN_KEY = 'nexo.license';
 
 export function loadToken(): string | null {
   try {
-    return localStorage.getItem(KEY);
+    return localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
@@ -32,7 +36,7 @@ export function loadToken(): string | null {
 
 export function saveToken(token: string) {
   try {
-    localStorage.setItem(KEY, token);
+    localStorage.setItem(TOKEN_KEY, token);
   } catch {
     /* armazenamento bloqueado: o acesso vale só nesta sessão */
   }
@@ -40,7 +44,7 @@ export function saveToken(token: string) {
 
 export function clearToken() {
   try {
-    localStorage.removeItem(KEY);
+    localStorage.removeItem(TOKEN_KEY);
   } catch {
     /* nada a limpar */
   }

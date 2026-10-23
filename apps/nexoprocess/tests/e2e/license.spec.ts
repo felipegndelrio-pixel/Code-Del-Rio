@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { handleLicense } from '../../api/_lib/handlers';
 import { memoryStore, type LicenseStatus } from '../../api/_lib/store';
 import { signToken } from '../../src/license/token';
-import { openDemo, prepare } from './helpers';
+import { expectNoHorizontalScroll, openDemo, prepare, readWorkspaces } from './helpers';
 
 // Modo de venda (projeto "licenca", build com VITE_LICENSE_REQUIRED=true na porta 4181).
 // /api/license é atendido pelo handler REAL da API (memória + chave SÓ DE TESTE), então
@@ -176,6 +176,7 @@ test('modo demo: navega no exemplo, mas salvar e exportar mostram o convite de c
   await expect(page).toHaveURL(/\/app\/p\/[^/]+\/visao-geral$/);
   await expect(page.getByText('Versão de demonstração.')).toBeVisible();
   expect(await stored(page)).toBeNull(); // demo não cria acesso
+  await expect(page.getByRole('button', { name: 'Sair deste aparelho' })).toHaveCount(0); // a faixa já tem "Já comprei"
 
   const base = page.url().replace(/\/visao-geral$/, '');
   await page.goto(`${base}/plano`);
@@ -240,3 +241,189 @@ test('meus projetos: links diretos para Privacidade e Termos', async ({ page }) 
   await expect(page.getByRole('link', { name: 'Política de Privacidade' }).first()).toHaveAttribute('href', '/privacidade');
   await expect(page.getByRole('link', { name: 'Termos de Uso' }).first()).toHaveAttribute('href', '/termos');
 });
+
+// Reembolso dentro da garantia: a sessão anterior é recente (2 h), não de 8 dias.
+// Antes da v2.4 a renovação só acontecia com token de mais de 7 dias, e o acesso seguia aberto.
+test('licenca revogada com sessao recente: a revalidacao encerra o acesso', async ({ page }) => {
+  await prepare(page);
+  await api(page, { [BUYER]: 'revoked' });
+  const now = Math.floor(Date.now() / 1000);
+  const recent = await signToken({ v: 1, sub: BUYER, iat: now - 2 * 3600, exp: now + 30 * 86_400 - 2 * 3600 }, keys.privateJwk);
+  await page.addInitScript((t) => {
+    if (!sessionStorage.getItem('semeado')) {
+      localStorage.setItem('nexo.license', t);
+      sessionStorage.setItem('semeado', '1');
+    }
+  }, recent);
+  await page.goto('/app');
+  await expect(page).toHaveURL(/\/entrar\?motivo=revogado$/);
+  expect(await stored(page)).toBeNull();
+  // A sessão anterior não volta: a rota protegida confere de novo e o e-mail não entra.
+  await page.goto('/app');
+  await expect(page).toHaveURL(/\/entrar\?volta=%2Fapp$/);
+  await login(page, BUYER);
+  await expect(page.getByRole('alert')).toContainText('Não encontramos uma compra ativa para este e-mail.');
+  expect(await stored(page)).toBeNull();
+});
+
+// Sair (v2.4): remove só a autorização local; projetos, tema e outros dados ficam.
+const local = (page: Page) =>
+  page.evaluate(() => ({ license: localStorage.getItem('nexo.license'), demo: localStorage.getItem('nexo.demo'), theme: localStorage.getItem('nexo.theme'), draft: localStorage.getItem('nexo.teste.rascunho') }));
+const ids = async (page: Page) => (await readWorkspaces(page)).map((w) => w.id).sort();
+
+test('sair: limpa so o acesso, preserva projetos e dados locais, e protege as rotas depois', async ({ page }) => {
+  const { errors } = await prepare(page);
+  await api(page, { [BUYER]: 'active' });
+  await page.goto('/entrar');
+  await login(page, BUYER);
+  await expect(page).toHaveURL(/\/app$/);
+  const out = page.getByRole('button', { name: 'Sair deste aparelho' });
+  await expect(out).toBeVisible();
+
+  const base = await openDemo(page); // projeto salvo no IndexedDB
+  const before = await ids(page);
+  expect(before.length).toBeGreaterThan(0);
+  await page.getByRole('button', { name: /^Mudar para tema/ }).click();
+  await page.evaluate(() => localStorage.setItem('nexo.teste.rascunho', 'texto local'));
+  const prev = await local(page);
+  expect(prev.license).toMatch(/^v1\./);
+
+  await out.click();
+  await expect(page).toHaveURL(/\/entrar\?motivo=saiu$/);
+  await expect(page.getByRole('status').filter({ hasText: 'Você saiu deste aparelho' })).toBeVisible();
+  const after = await local(page);
+  expect(after).toEqual({ license: null, demo: null, theme: prev.theme, draft: 'texto local' });
+  expect(await ids(page)).toEqual(before);
+
+  // Voltar, recarregar e URL direta não reabrem a área protegida.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/entrar/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Entrar no NexoProcess' })).toBeVisible();
+  await page.reload();
+  await expect(page).toHaveURL(/\/entrar/);
+  await page.goto(`${base}/visao-geral`);
+  await expect(page).toHaveURL(/\/entrar\?volta=%2Fapp%2Fp%2F/);
+  await page.goto('/app');
+  await expect(page).toHaveURL(/\/entrar\?volta=%2Fapp$/);
+
+  // Entrar de novo com o mesmo e-mail: a compra continua valendo e o projeto está lá.
+  await login(page, BUYER);
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Meus projetos' })).toBeVisible();
+  expect(await ids(page)).toEqual(before);
+  expect(errors).toEqual([]);
+});
+
+test('sair em outra aba encerra o acesso nesta tambem', async ({ page, context }) => {
+  await prepare(page);
+  await api(page, { [BUYER]: 'active' });
+  await page.goto('/entrar');
+  await login(page, BUYER);
+  await expect(page).toHaveURL(/\/app$/);
+  const other = await context.newPage();
+  await prepare(other);
+  await api(other, { [BUYER]: 'active' });
+  await other.goto('/app/ajuda');
+  await other.getByRole('button', { name: 'Sair deste aparelho' }).click();
+  await expect(other).toHaveURL(/\/entrar\?motivo=saiu$/);
+  await expect(page).toHaveURL(/\/entrar\?volta=%2Fapp$/);
+});
+
+test('cabecalho: Meus projetos e Ajuda levam ao destino certo e mostram onde se esta', async ({ page }) => {
+  await prepare(page);
+  await api(page, { [BUYER]: 'active' });
+  await page.goto('/entrar');
+  await login(page, BUYER);
+  await openDemo(page);
+  const header = page.getByRole('navigation', { name: 'Principal' });
+  const projects = header.getByRole('link', { name: 'Meus projetos' });
+  const help = header.getByRole('link', { name: 'Ajuda' });
+
+  // De dentro de um projeto para a listagem.
+  await projects.click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Meus projetos' })).toBeVisible();
+  await expect(projects).toHaveAttribute('aria-current', 'page');
+
+  // Já na listagem: volta ao topo e leva o foco ao título (sem rota nova).
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await projects.click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(page.getByRole('heading', { level: 1, name: 'Meus projetos' })).toBeFocused();
+
+  await help.click();
+  await expect(page).toHaveURL(/\/app\/ajuda$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Ajuda' })).toBeVisible();
+  await expect(help).toHaveAttribute('aria-current', 'page');
+  await expect(projects).not.toHaveAttribute('aria-current', 'page');
+  await page.goBack();
+  await expect(page).toHaveURL(/\/app$/);
+  await page.goForward();
+  await expect(page).toHaveURL(/\/app\/ajuda$/);
+  await projects.click();
+  await expect(page).toHaveURL(/\/app$/);
+});
+
+for (const width of [320, 390] as const) {
+  test.describe(`celular ${width} px`, () => {
+    test.use({ viewport: { width, height: 760 }, hasTouch: true });
+
+    test(`cabecalho com rotulos visiveis, alvos de 44 px, sem rolagem lateral, inclusive offline (${width})`, async ({ page, context }) => {
+      const { errors } = await prepare(page);
+      await api(page, { [BUYER]: 'active' });
+      await page.goto('/entrar');
+      await login(page, BUYER);
+      await openDemo(page);
+      await page.goto('/app');
+      const header = page.getByRole('navigation', { name: 'Principal' });
+      const items = [header.getByRole('link', { name: 'Meus projetos' }), header.getByRole('link', { name: 'Ajuda' }), header.getByRole('button', { name: 'Sair deste aparelho' })];
+      const labels = ['Projetos', 'Ajuda', 'Sair'];
+      for (const [i, it] of items.entries()) {
+        await expect(it).toBeVisible();
+        await expect(it).toContainText(labels[i]);
+        const b = (await it.boundingBox())!;
+        expect(b.width).toBeGreaterThanOrEqual(44);
+        expect(b.height).toBeGreaterThanOrEqual(44);
+        expect(b.x + b.width).toBeLessThanOrEqual(width);
+      }
+      await expectNoHorizontalScroll(page);
+
+      await context.setOffline(true);
+      await expect(page.getByRole('status').filter({ hasText: 'Offline' })).toBeAttached();
+      await expectNoHorizontalScroll(page);
+      const themeBox = (await page.getByRole('button', { name: /^Mudar para tema/ }).boundingBox())!;
+      expect(themeBox.x + themeBox.width).toBeLessThanOrEqual(width);
+
+      // Sem internet, sair pede confirmação (entrar de novo exige conexão).
+      await items[2].tap();
+      const dialog = page.getByRole('dialog', { name: 'Sair sem internet?' });
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole('button', { name: 'Cancelar' }).click();
+      await expect(page).toHaveURL(/\/app$/);
+      expect(await stored(page)).toMatch(/^v1\./);
+      await items[2].tap();
+      await dialog.getByRole('button', { name: 'Sair mesmo assim' }).click();
+      await expect(page).toHaveURL(/\/entrar\?motivo=saiu$/);
+      expect(await stored(page)).toBeNull();
+      await expectNoHorizontalScroll(page);
+      await context.setOffline(false);
+      expect(errors).toEqual([]);
+    });
+
+    test(`pagina de vendas: Ajuda visivel e funcionando no celular (${width})`, async ({ page }) => {
+      await prepare(page);
+      await page.goto('/');
+      const help = page.getByRole('link', { name: 'Como funciona' });
+      await expect(help).toBeVisible();
+      expect((await help.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await expectNoHorizontalScroll(page);
+      await help.tap();
+      await expect(page).toHaveURL(/\/app\/ajuda$/);
+      await expect(page.getByRole('heading', { level: 1, name: 'Ajuda' })).toBeVisible();
+      await expectNoHorizontalScroll(page);
+      // Visitante sem sessão: a Ajuda é pública e não mostra "Sair".
+      await expect(page.getByRole('button', { name: 'Sair deste aparelho' })).toHaveCount(0);
+    });
+  });
+}

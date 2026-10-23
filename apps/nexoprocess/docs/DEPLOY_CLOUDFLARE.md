@@ -15,7 +15,7 @@
 | Uso comercial no plano gratuito | **a validar nos termos atuais do Cloudflare** (não encontrei restrição nem permissão explícita) | — |
 | Supabase (tabela de licenças) | plano gratuito; projetos pausam por inatividade (limites atuais a validar) | — |
 
-Ordem de grandeza: cada comprador gera 1 requisição na ativação e até 1 a cada 7 dias de uso com internet; cada venda gera de 1 a 2 webhooks. **100 mil/dia sobra muito para o início.** O plano pago do Workers remove o limite diário.
+Ordem de grandeza: cada comprador gera 1 requisição na ativação e até 1 por hora de uso com internet (ex.: 1.000 compradores abrindo 4 vezes por dia ≈ 4 mil/dia); cada venda gera de 1 a 2 webhooks. **100 mil/dia sobra muito para o início.** O plano pago do Workers remove o limite diário.
 
 ## Como funciona
 
@@ -24,7 +24,7 @@ Comprador ──compra──▶ Hotmart ──webhook──▶ /api/hotmart-webh
     │                                                                          ▲
     └─▶ app (PWA) /entrar ──e-mail──▶ /api/license ──consulta───────────────────┘
                      ◀── token assinado (ECDSA, 30 dias) ──
-        token salvo no aparelho → app abre offline; renova a cada 7 dias (reembolso revoga)
+        token salvo no aparelho → app abre offline; confere a compra em 2º plano se o token tem > 1 h (reembolso revoga)
 ```
 
 Processos e planilhas nunca saem do aparelho; só o e-mail vai ao servidor (`docs/PRIVACIDADE.md`). Sem configuração, ninguém entra: a API responde 503.

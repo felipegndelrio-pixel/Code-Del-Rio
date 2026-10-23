@@ -25,7 +25,7 @@ O navegador baixa os arquivos estáticos do app da hospedagem (ex.: Cloudflare P
 | Momento | O que sai do aparelho | Para onde |
 |---|---|---|
 | Ativação (tela "Entrar") | **Só o e-mail digitado** | `POST /api/license` (função do servidor na mesma origem: Cloudflare Pages Functions ou Vercel) |
-| Renovação, no máximo a cada 7 dias e só com internet | O token salvo (contém o e-mail) | `POST /api/license` |
+| Renovação, no máximo 1 vez por hora de uso e só com internet (em segundo plano) | O token salvo (contém o e-mail) | `POST /api/license` |
 | Compra, reembolso ou chargeback na Hotmart | Nada do aparelho: a **Hotmart** envia e-mail, produto, transação e evento | `POST /api/hotmart-webhook` |
 
 No servidor fica só a tabela `nexo_licenses` (Supabase): e-mail, situação (`active`/`revoked`), produto, transação, evento e data. **Processos, planilhas e demais dados continuam só no aparelho**, como no build aberto. O log da função mostra o e-mail mascarado (`a***@dominio.com`).

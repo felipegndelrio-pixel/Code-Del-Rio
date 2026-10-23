@@ -19,7 +19,7 @@ Comprador ──compra──▶ Hotmart ──webhook──▶ /api/hotmart-webh
     │                                                                          ▲
     └─▶ app (PWA) /entrar ──e-mail──▶ /api/license ──consulta───────────────────┘
                      ◀── token assinado (ECDSA, 30 dias) ──
-        token salvo no aparelho → app abre offline; renova a cada 7 dias (reembolso revoga)
+        token salvo no aparelho → app abre offline; confere a compra em 2º plano se o token tem > 1 h (reembolso revoga)
 ```
 
 - **Processos e planilhas nunca saem do aparelho.** Só o e-mail vai ao servidor (`docs/PRIVACIDADE.md`).
@@ -117,7 +117,7 @@ Se o log mostrar `ignorado: sem e-mail` ou `401`, abra o **Histórico** do webho
 ## Passo 6 — Teste de ponta a ponta
 
 1. **Com allowlist:** coloque seu e-mail em `LICENSE_ALLOWLIST` → Redeploy → `/entrar` → entra.
-2. **Com compra real de teste:** compre o produto com valor mínimo ou cupom → confira a linha em `nexo_licenses` → `/entrar` com esse e-mail → entra → reembolse → em até 7 dias, com internet, o acesso sai. Para testar na hora, use "Meus processos → Apagar dados locais" (remove também o acesso) e tente entrar de novo.
+2. **Com compra real de teste:** compre o produto com valor mínimo ou cupom → confira a linha em `nexo_licenses` → `/entrar` com esse e-mail → entra → reembolse → na próxima abertura do app com internet (token com mais de 1 hora), o acesso sai. Para testar a entrada de novo na hora, use **Sair** no cabeçalho (remove só o acesso; os projetos ficam).
 
 ## Operação
 

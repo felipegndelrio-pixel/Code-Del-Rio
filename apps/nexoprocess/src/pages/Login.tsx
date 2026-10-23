@@ -72,6 +72,13 @@ export default function Login() {
         <h1 className="text-2xl font-extrabold tracking-tight">Entrar no {BRAND.name}</h1>
         <p className="mt-2 text-ink2">Use o e-mail com que você comprou na Hotmart. Na primeira vez é preciso estar conectado; depois o app funciona offline.</p>
 
+        {params.get('motivo') === 'saiu' && (
+          <div className="mt-4">
+            <Callout tone="ok" title="Você saiu deste aparelho">
+              Seus projetos continuam salvos aqui. Para voltar, entre com o e-mail da compra.
+            </Callout>
+          </div>
+        )}
         {params.get('motivo') === 'revogado' && (
           <div className="mt-4">
             <Callout tone="warn" title="Acesso encerrado neste aparelho">
