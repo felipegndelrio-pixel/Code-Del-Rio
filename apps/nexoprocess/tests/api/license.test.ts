@@ -1,6 +1,6 @@
 // API de licença e webhook da Hotmart — handlers puros, com chaves geradas no teste.
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { handleLicense, handleWebhook, licenseDepsFromEnv, maskEmail, safeEqual, webhookDepsFromEnv } from '../../api/_lib/handlers';
+import { handleLicense, handleWebhook, licenseDepsFromEnv, maskEmail, safeEqual, WEBHOOK_MAX_BYTES, webhookDepsFromEnv } from '../../api/_lib/handlers';
 import { classify } from '../../api/_lib/hotmart';
 import { allowlistStore, memoryStore, storeFromEnv, supabaseStore } from '../../api/_lib/store';
 import { normalizeEmail, readToken, verifyToken } from '../../src/license/token';
@@ -68,6 +68,93 @@ describe('webhook da Hotmart', () => {
     expect(['PURCHASE_APPROVED', 'PURCHASE_COMPLETE', 'approved', 'completed'].map(classify)).toEqual(['grant', 'grant', 'grant', 'grant']);
     expect(['PURCHASE_REFUNDED', 'PURCHASE_CHARGEBACK', 'PURCHASE_CANCELED', 'PURCHASE_EXPIRED', 'PURCHASE_PROTEST', 'refunded'].map(classify)).toEqual(Array(6).fill('revoke'));
     expect(['PURCHASE_BILLET_PRINTED', 'PURCHASE_DELAYED', ''].map(classify)).toEqual(['ignore', 'ignore', 'ignore']);
+  });
+});
+
+// Endurecimento do webhook: limite de tamanho, JSON inválido, duplicatas e ordem dos eventos.
+describe('webhook da Hotmart — endurecimento', () => {
+  const deps = (store = memoryStore()) => ({ store, hottok: 'segredo', productId: '123' });
+
+  it('payload válido de compra aprovada concede acesso (com filtro de produto)', async () => {
+    const d = deps();
+    const r = await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com'), d);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ok: true, status: 'active' });
+    expect(d.store.data.get('ana@ex.com')?.status).toBe('active');
+  });
+
+  it('token inválido → 401 e nada é gravado', async () => {
+    const d = deps();
+    expect((await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com', {}, 'outro'), d)).status).toBe(401);
+    expect(d.store.data.size).toBe(0);
+  });
+
+  it('produto incorreto → 200 ignorado e nada é gravado', async () => {
+    const d = { ...deps(), productId: '8775718' };
+    const r = await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com'), d);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ignored: 'outro_produto' });
+    expect(d.store.data.size).toBe(0);
+  });
+
+  it('corpo acima do limite → 413 antes do parse, nada gravado (com e sem Content-Length)', async () => {
+    const d = deps();
+    const big = 'x'.repeat(WEBHOOK_MAX_BYTES);
+    // Sem Content-Length: o limite vale na leitura do fluxo.
+    const streamed = await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com', { pad: big }), d);
+    expect(streamed.status).toBe(413);
+    expect(await streamed.json()).toEqual({ error: 'grande_demais' });
+    // Content-Length declarado acima do limite: recusado sem ler o corpo.
+    const declared = post('/api/hotmart-webhook', { event: 'PURCHASE_APPROVED' }, { 'X-HOTMART-HOTTOK': 'segredo', 'Content-Length': String(WEBHOOK_MAX_BYTES + 1) });
+    expect((await handleWebhook(declared, d)).status).toBe(413);
+    expect(d.store.data.size).toBe(0);
+  });
+
+  it('corpo no limite exato ainda é aceito', async () => {
+    const d = deps();
+    const base = JSON.stringify({ event: 'PURCHASE_APPROVED', version: '2.0.0', data: { buyer: { email: 'ana@ex.com' }, product: { id: 123 }, purchase: { transaction: 'HP1' } }, pad: '' });
+    const body = base.replace('"pad":""', `"pad":"${'x'.repeat(WEBHOOK_MAX_BYTES - base.length)}"`);
+    expect(new TextEncoder().encode(body).length).toBe(WEBHOOK_MAX_BYTES);
+    expect((await handleWebhook(post('/api/hotmart-webhook', body, { 'X-HOTMART-HOTTOK': 'segredo' }), d)).status).toBe(200);
+    expect(d.store.data.get('ana@ex.com')?.status).toBe('active');
+  });
+
+  it('JSON inválido → nada é gravado (401 sem token; 200 ignorado com token válido, para a Hotmart não reenviar)', async () => {
+    const d = deps();
+    expect((await handleWebhook(post('/api/hotmart-webhook', '{"event": "PURCHASE_APPROVED", '), d)).status).toBe(401);
+    const r = await handleWebhook(post('/api/hotmart-webhook', '{"event": "PURCHASE_APPROVED", ', { 'X-HOTMART-HOTTOK': 'segredo' }), { store: d.store, hottok: 'segredo' });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toHaveProperty('ignored');
+    expect(d.store.data.size).toBe(0);
+  });
+
+  it('evento duplicado é idempotente: mesma licença, mesmo estado', async () => {
+    const d = deps();
+    for (let i = 0; i < 3; i++) expect((await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com'), d)).status).toBe(200);
+    expect(d.store.data.size).toBe(1);
+    expect(d.store.data.get('ana@ex.com')).toMatchObject({ status: 'active', transaction: 'HP1', event: 'PURCHASE_APPROVED' });
+    for (let i = 0; i < 2; i++) expect((await handleWebhook(hook('PURCHASE_REFUNDED', 'ana@ex.com'), d)).status).toBe(200);
+    expect(d.store.data.get('ana@ex.com')?.status).toBe('revoked');
+  });
+
+  it('compra aprovada e depois reembolso: concede e revoga', async () => {
+    const d = deps();
+    await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com'), d);
+    expect(d.store.data.get('ana@ex.com')?.status).toBe('active');
+    await handleWebhook(hook('PURCHASE_REFUNDED', 'ana@ex.com'), d);
+    expect(d.store.data.get('ana@ex.com')?.status).toBe('revoked');
+  });
+
+  // LIMITAÇÃO CONHECIDA (documentada, não corrigida): sem campo de data/sequência confirmado na
+  // documentação oficial da Hotmart, vale o último evento recebido. Um APPROVED reenviado depois
+  // de um REFUND reativa o acesso. Este teste fixa o comportamento atual; quando a regra de
+  // precedência for aprovada, ele deve passar a esperar 'revoked'.
+  it('eventos fora de ordem: hoje vale o último recebido (limitação documentada)', async () => {
+    const d = deps();
+    await handleWebhook(hook('PURCHASE_REFUNDED', 'ana@ex.com'), d); // reembolso chega primeiro
+    expect(d.store.data.get('ana@ex.com')?.status).toBe('revoked');
+    await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com'), d); // aprovação atrasada / reenviada
+    expect(d.store.data.get('ana@ex.com')?.status).toBe('active');
   });
 });
 

@@ -79,6 +79,11 @@ try {
   step('ativação antes da compra → 404 sem_licenca', r.status === 404 && r.json?.error === 'sem_licenca', `${r.status}`);
   r = await hook('PURCHASE_APPROVED', 123, 'errado');
   step('webhook com hottok errado → 401, nada gravado', r.status === 401 && rows.size === 0, `${r.status}`);
+  const raw = (body) => fetch(base + '/api/hotmart-webhook', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-HOTMART-HOTTOK': HOTTOK }, body });
+  let res = await raw(JSON.stringify({ event: 'PURCHASE_APPROVED', data: { buyer: { email: BUYER }, product: { id: 123 } }, pad: 'x'.repeat(70 * 1024) }));
+  step('webhook com corpo acima de 64 KB → 413, nada gravado', res.status === 413 && rows.size === 0, `${res.status}`);
+  res = await raw('{"event": "PURCHASE_APPROVED", ');
+  step('webhook com JSON inválido → 200 ignorado, nada gravado', res.status === 200 && rows.size === 0, `${res.status}`);
   r = await hook('PURCHASE_APPROVED');
   step('webhook PURCHASE_APPROVED → 200 e grava active', r.status === 200 && rows.get(BUYER)?.status === 'active', `${r.status} ${JSON.stringify(rows.get(BUYER))}`);
   r = await call('/api/license', { body: { email: '  Comprador@EX.com ' } });

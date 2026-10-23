@@ -29,10 +29,44 @@ export function classify(event: string): HotmartAction {
   return 'ignore';
 }
 
+/**
+ * Lê o corpo sem passar de `maxBytes`: recusa pelo Content-Length declarado e, sem ele
+ * (ou se mentir), para de ler ao ultrapassar o limite. null = grande demais.
+ */
+export async function readBodyLimited(req: Request, maxBytes: number): Promise<string | null> {
+  const declared = Number(req.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  if (!req.body) return '';
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
 export async function parseHotmart(req: Request): Promise<HotmartEvent> {
-  const type = req.headers.get('content-type') ?? '';
+  return parseHotmartText(await req.text(), req.headers);
+}
+
+/** Mesmo parse de parseHotmart, sobre um corpo já lido (e com tamanho já conferido). */
+export function parseHotmartText(text: string, headers: Headers): HotmartEvent {
+  const type = headers.get('content-type') ?? '';
   let body: unknown;
-  const text = await req.text();
   if (/json/i.test(type) || /^\s*\{/.test(text)) {
     try {
       body = JSON.parse(text);
@@ -43,7 +77,7 @@ export async function parseHotmart(req: Request): Promise<HotmartEvent> {
 
   const event = str(get(body, ['event'])) ?? str(get(body, ['status'])) ?? str(get(body, ['data', 'purchase', 'status'])) ?? '';
   return {
-    hottok: req.headers.get('x-hotmart-hottok') ?? str(get(body, ['hottok'])),
+    hottok: headers.get('x-hotmart-hottok') ?? str(get(body, ['hottok'])),
     event,
     email: str(get(body, ['data', 'buyer', 'email'])) ?? str(get(body, ['buyer', 'email'])) ?? str(get(body, ['email'])),
     productId: str(get(body, ['data', 'product', 'id'])) ?? str(get(body, ['prod'])) ?? str(get(body, ['product', 'id'])),

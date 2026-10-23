@@ -1,6 +1,6 @@
 // Lógica das rotas, sem dependência da Vercel: Request → Response (testável).
 import { normalizeEmail, signToken, verifyToken } from '../../src/license/token.js';
-import { parseHotmart } from './hotmart.js';
+import { parseHotmartText, readBodyLimited } from './hotmart.js';
 import { storeFromEnv, supabaseServiceKey, supabaseUrl, type Env, type LicenseStore } from './store.js';
 
 export interface LicenseDeps {
@@ -71,6 +71,12 @@ function notConfigured(route: string, missing: string[] | undefined, message?: s
   return json(503, { error: 'nao_configurado', ...(message ? { message } : {}), ...(faltando ? { faltando } : {}) });
 }
 
+/**
+ * Teto do corpo do webhook: 64 KB. Um evento de compra da Hotmart tem poucos KB; acima
+ * disso é abuso ou erro, recusado (413) antes de qualquer parse e sem gravar nada.
+ */
+export const WEBHOOK_MAX_BYTES = 64 * 1024;
+
 const NOT_FOUND = { error: 'sem_licenca', message: 'Não encontramos uma compra ativa para este e-mail.' };
 
 /**
@@ -116,7 +122,12 @@ export async function handleLicense(req: Request, deps: LicenseDeps): Promise<Re
 export async function handleWebhook(req: Request, deps: WebhookDeps): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'metodo' });
   if (!deps.hottok) return notConfigured('/api/hotmart-webhook', deps.missing);
-  const ev = await parseHotmart(req);
+  const text = await readBodyLimited(req, WEBHOOK_MAX_BYTES);
+  if (text === null) {
+    console.log(`hotmart: corpo recusado (acima de ${WEBHOOK_MAX_BYTES} bytes)`);
+    return json(413, { error: 'grande_demais' });
+  }
+  const ev = parseHotmartText(text, req.headers);
   if (!ev.hottok || !safeEqual(ev.hottok, deps.hottok)) return json(401, { error: 'hottok_invalido' });
   const log = (result: string) => console.log(`hotmart ${ev.event || '(sem evento)'} → ${result}${ev.email ? ` (${maskEmail(ev.email)})` : ''}`);
   if (deps.productId && ev.productId !== deps.productId) {
