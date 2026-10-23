@@ -252,6 +252,17 @@ describe('armazenamento', () => {
     expect((calls[1].init?.headers as Record<string, string>).Authorization).toBe('Bearer srv');
   });
 
+  it('Supabase com e-mail duplicado na tabela: qualquer linha revoked nega o acesso (falha fechada)', async () => {
+    const answer = (rows: { status: string }[]) => (async () => new Response(JSON.stringify(rows), { status: 200 })) as typeof fetch;
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'revoked' }])).lookup('a@ex.com')).toBe('revoked');
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'revoked' }, { status: 'active' }])).lookup('a@ex.com')).toBe('revoked');
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'active' }])).lookup('a@ex.com')).toBe('active');
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([])).lookup('a@ex.com')).toBeNull();
+    // De ponta a ponta: a ativação devolve 404 (sem acesso) com a linha duplicada.
+    const deps = { store: supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'revoked' }])), privateJwk: priv };
+    expect((await handleLicense(post('/api/license', { email: 'a@ex.com' }), deps)).status).toBe(404);
+  });
+
   it('escolha pelo ambiente: Supabase > lista fixa > nenhum', () => {
     expect(storeFromEnv({ SUPABASE_URL: 'u', SUPABASE_SERVICE_ROLE_KEY: 'k', LICENSE_ALLOWLIST: 'a@b.co' })?.kind).toBe('supabase');
     expect(storeFromEnv({ LICENSE_ALLOWLIST: 'a@b.co' })?.kind).toBe('allowlist');

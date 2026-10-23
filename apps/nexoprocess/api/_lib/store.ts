@@ -32,6 +32,10 @@ export function supabaseStore(url: string, serviceKey: string, fetchImpl: typeof
       const r = await fetchImpl(`${base}?email=eq.${encodeURIComponent(email)}&select=status`, { headers });
       if (!r.ok) throw new Error(`Supabase lookup: HTTP ${r.status}`);
       const rows = (await r.json()) as { status: LicenseStatus }[];
+      // Uma linha por e-mail é garantida pelo schema.sql; se a tabela tiver duplicidade
+      // (criada sem a chave única), qualquer linha 'revoked' prevalece: falha fechada.
+      if (rows.length > 1) console.error(`Supabase: ${rows.length} linhas para o mesmo e-mail — rode o schema.sql`);
+      if (rows.some((x) => x.status === 'revoked')) return 'revoked';
       return rows[0]?.status ?? null;
     },
     async upsert(rec) {
