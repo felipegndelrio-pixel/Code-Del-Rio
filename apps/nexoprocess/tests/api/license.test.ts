@@ -69,6 +69,32 @@ describe('webhook da Hotmart', () => {
     expect(['PURCHASE_REFUNDED', 'PURCHASE_CHARGEBACK', 'PURCHASE_CANCELED', 'PURCHASE_EXPIRED', 'PURCHASE_PROTEST', 'refunded'].map(classify)).toEqual(Array(6).fill('revoke'));
     expect(['PURCHASE_BILLET_PRINTED', 'PURCHASE_DELAYED', ''].map(classify)).toEqual(['ignore', 'ignore', 'ignore']);
   });
+
+  // Nomes de revogação (eventos 2.0 e status do formato 1.0), em grafias e caixas diferentes:
+  // nenhum pode cair em "ignorar" nem em "conceder".
+  const REVOGACAO = [
+    'PURCHASE_REFUNDED', 'PURCHASE_CANCELED', 'PURCHASE_CANCELLED', 'PURCHASE_CHARGEBACK', 'PURCHASE_PROTEST', 'PURCHASE_EXPIRED',
+    'SUBSCRIPTION_CANCELLATION', 'refunded', 'canceled', 'cancelled', 'chargeback', 'protested', 'expired', 'dispute', ' Purchase_Refunded ',
+  ];
+  it('todos os nomes de reembolso/cancelamento/chargeback revogam', () => {
+    for (const n of REVOGACAO) expect(classify(n.trim()), n).toBe('revoke');
+  });
+
+  it('PURCHASE_REFUNDED, PURCHASE_CANCELED e PURCHASE_CHARGEBACK revogam de ponta a ponta (formato 2.0 e 1.0)', async () => {
+    for (const ev of ['PURCHASE_REFUNDED', 'PURCHASE_CANCELED', 'PURCHASE_CHARGEBACK']) {
+      const store = memoryStore({ 'ana@ex.com': 'active' });
+      const r = await handleWebhook(hook(ev, 'ana@ex.com'), { store, hottok: 'segredo', productId: '123' });
+      expect(r.status, ev).toBe(200);
+      expect(await r.json(), ev).toEqual({ ok: true, status: 'revoked' });
+      expect(store.data.get('ana@ex.com')?.status, ev).toBe('revoked');
+    }
+    for (const st of ['refunded', 'canceled', 'chargeback']) {
+      const store = memoryStore({ 'b@c.com': 'active' });
+      const req = new Request('https://x.test/api/hotmart-webhook', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `hottok=segredo&email=b%40c.com&status=${st}&prod=9` });
+      expect((await handleWebhook(req, { store, hottok: 'segredo' })).status, st).toBe(200);
+      expect(store.data.get('b@c.com')?.status, st).toBe('revoked');
+    }
+  });
 });
 
 // Endurecimento do webhook: limite de tamanho, JSON inválido, duplicatas e ordem dos eventos.
