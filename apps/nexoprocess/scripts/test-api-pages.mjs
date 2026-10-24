@@ -12,13 +12,16 @@ const rows = new Map(); // email → registro
 const failures = [];
 const results = [];
 
-// Supabase falso: só o que a API usa (select por e-mail e upsert por e-mail).
+// Supabase falso: só o que a API usa — select por e-mail; UPDATE condicional (PATCH com
+// email=eq. e or=(status.eq.active,transaction.neq.T) ou status=eq.active); INSERT com
+// on_conflict=email (ignore-duplicates ou merge-duplicates). A atomicidade real no
+// PostgreSQL é provada em tests/integration/store.postgres.test.ts, não aqui.
 const fake = createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.headers.apikey !== SERVICE_KEY || req.headers.authorization !== `Bearer ${SERVICE_KEY}`) return res.writeHead(401).end();
   if (url.pathname !== '/rest/v1/nexo_licenses') return res.writeHead(404).end();
+  const email = (url.searchParams.get('email') ?? '').replace(/^eq\./, '');
   if (req.method === 'GET') {
-    const email = (url.searchParams.get('email') ?? '').replace(/^eq\./, '');
     const r = rows.get(email);
     return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(r ? [{ status: r.status }] : []));
   }
@@ -26,7 +29,24 @@ const fake = createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     const rec = JSON.parse(body);
+    const out = (list) => res.writeHead(req.method === 'PATCH' ? 200 : 201, { 'Content-Type': 'application/json' }).end(JSON.stringify(list));
+    if (req.method === 'PATCH') {
+      const cur = rows.get(email);
+      const or = /^\(status\.eq\.active,transaction\.neq\.([A-Za-z0-9_-]+)\)$/.exec(url.searchParams.get('or') ?? '');
+      const ok = cur && (cur.status === 'active' || (or && cur.transaction != null && cur.transaction !== or[1]));
+      if (!ok) return out([]);
+      rows.set(email, { ...cur, ...rec });
+      return out([{ email, status: rec.status, transaction: rows.get(email).transaction }]);
+    }
+    const prefer = req.headers.prefer ?? '';
+    if (/ignore-duplicates/.test(prefer)) {
+      if (rows.has(rec.email)) return out([]);
+      rows.set(rec.email, rec);
+      return out([{ email: rec.email }]);
+    }
     rows.set(rec.email, { ...rows.get(rec.email), ...rec });
+    // Como o PostgREST: return=representation devolve a linha gravada; return=minimal, corpo vazio.
+    if (/return=representation/.test(prefer)) return out([{ email: rec.email, status: rows.get(rec.email).status }]);
     res.writeHead(201).end();
   });
 });
@@ -66,8 +86,8 @@ try {
     }
     return { status: r.status, json, text, type: r.headers.get('content-type') ?? '', csp: r.headers.get('content-security-policy') ?? '' };
   };
-  const hook = (event, productId = 123, hottok = HOTTOK) =>
-    call('/api/hotmart-webhook', { body: { event, version: '2.0.0', data: { buyer: { email: BUYER }, product: { id: productId }, purchase: { transaction: 'HP0001' } } }, headers: { 'X-HOTMART-HOTTOK': hottok } });
+  const hook = (event, productId = 123, hottok = HOTTOK, transaction = 'HP0001') =>
+    call('/api/hotmart-webhook', { body: { event, version: '2.0.0', data: { buyer: { email: BUYER }, product: { id: productId }, purchase: { transaction } } }, headers: { 'X-HOTMART-HOTTOK': hottok } });
   const step = (name, ok, detail) => {
     results.push(`${ok ? 'ok ' : 'FALHOU'} ${name}${detail ? ` — ${detail}` : ''}`);
     if (!ok) failures.push(name);
@@ -98,6 +118,10 @@ try {
   step('webhook PURCHASE_REFUNDED → 200 e grava revoked', r.status === 200 && rows.get(BUYER)?.status === 'revoked', `${r.status}`);
   r = await call('/api/license', { body: { token } });
   step('renovação após reembolso → 404 (acesso sai)', r.status === 404, `${r.status}`);
+  r = await hook('PURCHASE_APPROVED');
+  step('reenvio da aprovação da transação reembolsada → 200 ignorado, continua revoked', r.status === 200 && r.json?.ignored === 'licenca_revogada' && rows.get(BUYER)?.status === 'revoked', `${r.status} ${JSON.stringify(r.json)}`);
+  r = await hook('PURCHASE_APPROVED', 123, HOTTOK, 'HP0002');
+  step('compra nova (outra transação, mesmo e-mail) → active', r.status === 200 && rows.get(BUYER)?.status === 'active' && rows.get(BUYER)?.transaction === 'HP0002', `${r.status} ${JSON.stringify(rows.get(BUYER))}`);
   r = await call('/app/p/teste/mapa', { method: 'GET' });
   step('rotas do app continuam servindo o index.html com CSP', r.status === 200 && /<div id="root">/.test(r.text) && /script-src 'self'/.test(r.csp), `${r.status} csp=${r.csp ? 'sim' : 'não'}`);
 } catch (e) {

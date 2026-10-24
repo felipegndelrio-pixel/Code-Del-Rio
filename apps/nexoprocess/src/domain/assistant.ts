@@ -35,6 +35,8 @@ export interface DraftDecision {
 }
 export interface AssistantDraft {
   version: 1;
+  /** Identifica o rascunho: o mesmo rascunho nunca vira dois projetos (ver state/draftCommit). */
+  draftId?: string;
   step: string;
   name: string;
   trigger?: string;
@@ -53,7 +55,7 @@ export interface AssistantDraft {
 }
 
 export function emptyDraft(): AssistantDraft {
-  return { version: 1, step: 'name', name: '', stages: [], decisions: [], period: 'mes', detailIndex: 0 };
+  return { version: 1, draftId: uid('rd'), step: 'name', name: '', stages: [], decisions: [], period: 'mes', detailIndex: 0 };
 }
 
 /**
@@ -110,19 +112,58 @@ export function allActivities(d: AssistantDraft): (DraftActivity & { stage: stri
   return d.stages.filter((s) => !s.skipped).flatMap((s) => s.activities.map((a) => ({ ...a, stage: s.name })));
 }
 
-/** Converte o rascunho em processo AS-IS. Valores "não sei" ficam ausentes (nunca zero). */
+export type DecisionProblem = 'sem_pergunta' | 'atividade_removida' | 'destino_removido';
+export interface DroppedStage {
+  key: string;
+  name: string;
+  /** pulada = "Ainda não sei — completo depois"; sem_atividades = nenhuma atividade com nome; sem_nome = etapa sem nome. */
+  reason: 'pulada' | 'sem_atividades' | 'sem_nome';
+  activities: string[];
+}
+/** O que o rascunho vira no projeto: a revisão e a gravação usam esta mesma análise. */
+export interface DraftAnalysis {
+  stages: DraftStage[];
+  flat: { s: DraftStage; a: DraftActivity }[];
+  decisions: DraftDecision[];
+  invalidDecisions: { decision: DraftDecision; n: number; problem: DecisionProblem }[];
+  droppedStages: DroppedStage[];
+}
+
+export function analyzeDraft(d: AssistantDraft): DraftAnalysis {
+  const named = (s: DraftStage) => s.activities.filter((a) => a.name.trim());
+  const stages = d.stages.filter((s) => !s.skipped && s.name.trim() && named(s).length > 0);
+  const droppedStages: DroppedStage[] = d.stages
+    .filter((s) => !stages.includes(s))
+    .filter((s) => s.name.trim() || named(s).length > 0)
+    .map((s) => ({ key: s.key, name: s.name.trim(), reason: !s.name.trim() ? 'sem_nome' : s.skipped ? 'pulada' : 'sem_atividades', activities: named(s).map((a) => a.name.trim()) }));
+  const flat = stages.flatMap((s) => named(s).map((a) => ({ s, a })));
+  const keys = new Set(flat.map((x) => x.a.key));
+  const decisions: DraftDecision[] = [];
+  const invalidDecisions: DraftAnalysis['invalidDecisions'] = [];
+  d.decisions.forEach((x, i) => {
+    const problem: DecisionProblem | null = !x.question.trim() ? 'sem_pergunta' : !keys.has(x.afterKey) ? 'atividade_removida' : x.noTarget !== '__end' && !keys.has(x.noTarget) ? 'destino_removido' : null;
+    if (problem) invalidDecisions.push({ decision: x, n: i + 1, problem });
+    else decisions.push(x);
+  });
+  return { stages, flat, decisions, invalidDecisions, droppedStages };
+}
+
+/**
+ * Converte o rascunho em processo AS-IS. Valores "não sei" ficam ausentes (nunca zero).
+ * Só entra o que analyzeDraft considera válido; a revisão mostra o resto antes de criar.
+ * Várias decisões depois da mesma atividade viram uma sequência (sim → próxima decisão).
+ */
 export function draftToProcess(d: AssistantDraft): ProcessModel {
   const p = newProcess(d.name.trim() || 'Novo processo');
   p.description = [d.trigger && `Início: ${d.trigger.trim()}`, d.outcome && `Resultado: ${d.outcome.trim()}`].filter(Boolean).join(' · ') || undefined;
   p.volume = d.volumeUnknown ? undefined : d.volume;
   p.volumePeriod = d.period;
   p.defaultCostPerHour = d.costUnknown ? undefined : d.costPerHour;
-  const stages = d.stages.filter((s) => !s.skipped && s.name.trim() && s.activities.some((a) => a.name.trim()));
-  const flat = stages.flatMap((s) => s.activities.filter((a) => a.name.trim()).map((a) => ({ s, a })));
+  const { stages, flat, decisions } = analyzeDraft(d);
   if (!flat.length) return p;
   const idOf = new Map(flat.map((x, i) => [x.a.key, `A${i + 1}`]));
-  const decisions = d.decisions.filter((x) => x.question.trim() && idOf.has(x.afterKey) && (x.noTarget === '__end' || idOf.has(x.noTarget)));
-  const decAfter = new Map(decisions.map((x, i) => [x.afterKey, { ...x, id: `D${i + 1}` }]));
+  const decAfter = new Map<string, (DraftDecision & { id: string })[]>();
+  decisions.forEach((x, i) => decAfter.set(x.afterKey, [...(decAfter.get(x.afterKey) ?? []), { ...x, id: `D${i + 1}` }]));
   const acts: Activity[] = [];
   let order = 0;
   const firstStage = flat[0].s.name.trim();
@@ -146,17 +187,14 @@ export function draftToProcess(d: AssistantDraft): ProcessModel {
       lean: a.lean && a.lean !== 'nao_sei' ? a.lean : undefined,
       notes: [a.durationUnknown && 'Duração ainda não medida.', a.waitState === 'nao_sei' && 'Espera ainda não medida.', a.rework === 'nao_sei' && 'Retrabalho: não se sabe.'].filter(Boolean).join(' ') || undefined,
     });
-    const dec = decAfter.get(a.key);
-    if (dec) {
-      act.next = [dec.id];
-      acts.push(act);
+    const chain = decAfter.get(a.key) ?? [];
+    act.next = [chain[0]?.id ?? nextId];
+    acts.push(act);
+    chain.forEach((dec, j) => {
       const no = dec.noTarget === '__end' ? 'FIM_NAO' : idOf.get(dec.noTarget)!;
       if (dec.noTarget === '__end') needsNoEnd = true;
-      acts.push(newActivity({ id: dec.id, stage: s.name.trim(), name: dec.question.trim(), type: 'decision', order: ++order, nextYes: nextId, nextNo: no }));
-    } else {
-      act.next = [nextId];
-      acts.push(act);
-    }
+      acts.push(newActivity({ id: dec.id, stage: s.name.trim(), name: dec.question.trim(), type: 'decision', order: ++order, nextYes: chain[j + 1]?.id ?? nextId, nextNo: no }));
+    });
   });
   acts.push(newActivity({ id: 'FIM', stage: lastStage, name: d.outcome?.trim() || 'Fim', type: 'end', order: ++order }));
   if (needsNoEnd) acts.push(newActivity({ id: 'FIM_NAO', stage: lastStage, name: 'Encerrado (resposta não)', type: 'end', order: ++order }));

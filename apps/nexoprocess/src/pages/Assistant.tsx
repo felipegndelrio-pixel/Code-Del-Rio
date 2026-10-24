@@ -3,18 +3,21 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import { ArrowDown, ArrowLeft, ArrowUp, Bot, Check, ChevronLeft, ChevronRight, ListPlus, Map as MapIcon, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, Bot, Check, ChevronLeft, ChevronRight, Download, ListPlus, Map as MapIcon, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { Badge, Button, Callout, Field, Input, NumberInput, Segmented, Select, Textarea, useConfirm, useToast } from '../components/ui';
-import { allActivities, draftActivityFrom, draftToProcess, emptyDraft, parseList, type AssistantDraft, type DraftActivity, type DraftStage } from '../domain/assistant';
+import { allActivities, analyzeDraft, draftActivityFrom, draftToProcess, emptyDraft, parseList, type AssistantDraft, type DecisionProblem, type DraftActivity, type DraftAnalysis, type DraftStage } from '../domain/assistant';
 import type { DurationUnit, LeanClass, Period } from '../domain/types';
 import { fmtNum, uid } from '../domain/units';
 import { validateProcess } from '../domain/validation';
-import { db } from '../storage/db';
-import { createWorkspace } from '../state/actions';
+import { checkStorage, db } from '../storage/db';
+import { shareProject } from '../state/actions';
+import { createFromDraft, DraftAlreadyUsedError, DraftDivergedError, resumeDraft, staleFromSave, type StaleDraft } from '../state/draftCommit';
+import { StaleDraftNotice } from '../components/StaleDraftNotice';
 import { useHardwareBack } from '../state/backNav';
 import { localDraft } from '../storage/localDraft';
 import { demoBlocked } from '../license/demo';
 import { recommend } from '../domain/recommendations';
+import { stepRequirements } from '../domain/journey';
 import type { Workspace } from '../domain/types';
 
 const DRAFT = 'assistant';
@@ -59,6 +62,9 @@ export default function Assistant() {
   const confirm = useConfirm();
   // A cópia do localStorage é lida de forma síncrona: ao recarregar, a tela já abre
   // na pergunta em que a pessoa estava (sem piscar na primeira pergunta).
+  // Se essa cópia já virou projeto, o registro durável no IndexedDB diz (resumeDraft abaixo).
+  const [already, setAlready] = useState<{ workspaceId: string; exists: boolean } | undefined>();
+  // Rascunho antigo (sem draftId) não ganha identidade só na memória: createFromDraft a grava antes de criar.
   const [local] = useState(() => {
     const x = localDraft.read<AssistantDraft>(DRAFT);
     return x && x.version === 1 && x.name ? x : undefined;
@@ -67,29 +73,53 @@ export default function Assistant() {
   const [loaded, setLoaded] = useState(!!local);
   const [restored, setRestored] = useState(!!local);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<Workspace | null>(null);
+  const [done, setDone] = useState<{ w: Workspace; durable: boolean; cleanup: 'ok' | 'falhou'; reused: boolean } | null>(null);
+  const [storage, setStorage] = useState<'indexeddb' | 'memoria' | null>(null);
+  const [ackDropped, setAckDropped] = useState('');
+  // Esta aba perdeu o direito de editar (outra aba criou o projeto): não salva nem cria; o conteúdo fica na tela.
+  const [stale, setStale] = useState<StaleDraft | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (local) return;
-    db.getDraft<AssistantDraft>(DRAFT)
-      .then((x) => {
-        if (x && x.version === 1 && x.name) {
-          setD(x);
+    void checkStorage().then(setStorage);
+    // Rascunho (ou cópia local) que já virou projeto não é restaurado; a limpeza é refeita.
+    resumeDraft<AssistantDraft>(DRAFT, local?.draftId)
+      .then((r) => {
+        if (r.usedBy) setAlready(r.usedBy);
+        const x = r.draft;
+        const next = x && x.version === 1 && x.name ? x : undefined;
+        if (r.localUsed) {
+          setD(next ?? emptyDraft());
+          setRestored(!!next);
+        } else if (!local && next) {
+          setD(next);
           setRestored(true);
         }
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
   }, [local]);
+  // Criando o projeto: o auto-save para. Mesmo um salvamento já agendado não recria o rascunho:
+  // db.saveDraft não grava rascunho cujo registro "criado" já existe.
+  const committing = useRef(false);
   useEffect(() => {
-    if (!loaded || done) return;
-    // Auto-save: cópia imediata no localStorage + IndexedDB com debounce.
-    if (d.name) localDraft.write(DRAFT, d);
-    const t = setTimeout(() => void db.putDraft(DRAFT, d).catch(() => {}), 250);
+    if (!loaded || done || stale) return;
+    // Auto-save: cópia imediata no localStorage + IndexedDB com debounce. Fora de 'salvo'
+    // (o rascunho virou projeto em outra aba ou foi assumido por ela), esta aba fica desatualizada.
+    if (d.name && !committing.current) localDraft.write(DRAFT, d);
+    const t = setTimeout(() => {
+      if (committing.current) return;
+      void db
+        .saveDraft(DRAFT, d)
+        .then((r) => staleFromSave(r, d.draftId))
+        .then((st) => {
+          if (st && !committing.current) setStale(st);
+        })
+        .catch(() => {});
+    }, 250);
     return () => clearTimeout(t);
-  }, [d, loaded, done]);
+  }, [d, loaded, done, stale]);
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
     composerRef.current?.querySelector<HTMLElement>('input,textarea,button:not([data-back])')?.focus({ preventScroll: true });
@@ -139,24 +169,51 @@ export default function Assistant() {
 
   const acts = allActivities(d);
   const owners = [...new Set(acts.map((a) => a.owner?.trim()).filter(Boolean) as string[])];
+  // Mesma análise usada na gravação (draftToProcess): a revisão mostra exatamente o que entra.
+  const analysis = useMemo(() => analyzeDraft(d), [d]);
   const process = useMemo(() => (d.step === 'review' ? draftToProcess(d) : null), [d]);
   const issues = useMemo(() => (process ? validateProcess(process).filter((i) => i.severity !== 'info') : []), [process]);
+  const droppedSig = analysis.droppedStages.map((x) => `${x.key}:${x.reason}:${x.activities.length}`).join('|');
+  const needsAck = droppedSig !== '' && ackDropped !== droppedSig;
+  const blockReason = stale
+    ? 'Esta aba não cria o projeto: ele já foi criado em outra aba. Copie seus dados acima.'
+    : !analysis.flat.length
+    ? 'Falta pelo menos uma atividade: complete uma etapa para criar o projeto.'
+    : issues.some((i) => i.severity === 'error')
+      ? 'Corrija os pontos em vermelho acima para criar o projeto.'
+      : analysis.invalidDecisions.length
+        ? 'Corrija ou remova as decisões destacadas para criar o projeto.'
+        : needsAck
+          ? 'Confirme acima que deseja criar o projeto sem os itens que não serão salvos.'
+          : null;
 
   const finish = async () => {
-    if (!process || issues.some((i) => i.severity === 'error')) return;
+    if (!process || blockReason || stale) return;
     if (demoBlocked('salvar')) return;
     setBusy(true);
+    committing.current = true;
     try {
-      const w = await createWorkspace(process, { kind: 'wizard' });
-      await db.deleteDraft(DRAFT).catch(() => {});
-      localDraft.remove(DRAFT);
-      setDone(w);
+      // Rascunho antigo sem identidade: a recebida (já gravada antes de criar) passa a valer nesta tela.
+      const r = await createFromDraft(DRAFT, d, process, { kind: 'wizard' }, { onDraftId: (id) => setD((x) => ({ ...x, draftId: id })) });
+      setDone(r);
       window.scrollTo({ top: 0 });
-    } catch {
-      toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
+    } catch (e) {
+      committing.current = false;
+      // Outra aba criou o projeto (com outro conteúdo) ou ele foi excluído: esta aba para e mantém o conteúdo.
+      if (e instanceof DraftDivergedError) setStale({ reason: 'divergente', workspaceId: e.workspaceId });
+      else if (e instanceof DraftAlreadyUsedError) setStale({ reason: 'excluido' });
+      // A criação falhou: nada foi gravado, o rascunho continua e a pessoa pode tentar de novo.
+      else toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
     } finally {
       setBusy(false);
     }
+  };
+  /** Sai do modo "aba desatualizada" só por escolha da pessoa (depois de copiar). */
+  const startOver = () => {
+    localDraft.remove(DRAFT);
+    setStale(null);
+    setD(emptyDraft());
+    setRestored(false);
   };
   const discard = async () => {
     if (!(await confirm({ title: 'Começar do zero?', body: 'As respostas até aqui serão apagadas deste aparelho.', confirm: 'Apagar e recomeçar', danger: true }))) return;
@@ -170,7 +227,7 @@ export default function Assistant() {
   const answered = order.slice(0, idx).map((step) => ({ step, ...summary(step, d) })).filter((x) => x.q);
   const section = sectionOf(d.step);
 
-  if (done) return <Success w={done} warnings={issues.length} onOpen={(path) => nav(`/app/p/${done.id}/${path}`, { replace: true })} />;
+  if (done) return <Success w={done.w} durable={done.durable} cleanupFailed={done.cleanup === 'falhou'} reused={done.reused} warnings={issues.length} onOpen={(path) => nav(`/app/p/${done.w.id}/${path}`, { replace: true })} />;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-6 pt-4 sm:pt-8">
@@ -192,11 +249,40 @@ export default function Assistant() {
           <span className="font-medium text-ink2">
             Etapa {section + 1} de {SECTIONS.length}: {SECTIONS[section]}
           </span>
-          <span>Rascunho salvo neste aparelho</span>
+          <span data-testid="draft-storage">{stale ? 'Esta aba não está salvando' : storage === 'memoria' ? 'Rascunho só nesta aba' : 'Rascunho salvo neste aparelho'}</span>
         </p>
       </div>
 
-      {restored && (
+      {storage === 'memoria' && (
+        <div className="mb-3">
+          <Callout tone="warn" title="Este navegador bloqueou o armazenamento local">
+            Você pode montar o projeto, mas ele ficará só nesta aba e some ao fechá-la. Depois de criar, baixe o arquivo do projeto para não perder nada.
+          </Callout>
+        </div>
+      )}
+      {stale && (
+        <div className="mb-3">
+          <StaleDraftNotice
+            reason={stale.reason}
+            noun="projeto"
+            text={draftText(d)}
+            onOpen={stale.workspaceId ? () => nav(`/app/p/${stale.workspaceId}/visao-geral`) : undefined}
+            onNew={stale.reason === 'excluido' ? startOver : undefined}
+          />
+        </div>
+      )}
+      {already && !restored && !stale && (
+        <div className="mb-3">
+          <Callout
+            tone="info"
+            title={already.exists ? 'Seu último rascunho já virou um projeto.' : 'Seu último rascunho já tinha virado um projeto, que foi excluído depois.'}
+            action={already.exists ? <Button size="sm" variant="ghost" onClick={() => nav(`/app/p/${already.workspaceId}/visao-geral`)}>Abrir o projeto</Button> : undefined}
+          >
+            Não vamos criá-lo de novo. Este é um rascunho novo.
+          </Callout>
+        </div>
+      )}
+      {restored && !stale && (
         <div className="mb-3">
           <Callout tone="info" title="Continuamos de onde você parou." action={<Button size="sm" variant="ghost" onClick={() => void discard()}>Começar do zero</Button>} />
         </div>
@@ -305,7 +391,7 @@ export default function Assistant() {
             );
           })()}
         {d.step === 'details' && <DetailsStep d={d} owners={owners} setAct={setAct} set={set} nextLabel={nextLabel} onNext={() => next()} />}
-        {d.step === 'decisions' && <DecisionsStep d={d} set={set} nextLabel={nextLabel} onNext={() => next({ decisionsAnswered: true })} />}
+        {d.step === 'decisions' && <DecisionsStep d={d} analysis={analysis} set={set} nextLabel={nextLabel} onNext={() => next({ decisionsAnswered: true })} />}
         {d.step === 'volume' && (
           <div className="space-y-4">
             <Bubble>Quantas vezes esse processo acontece?</Bubble>
@@ -349,16 +435,49 @@ export default function Assistant() {
         {d.step === 'review' && process && (
           <div className="space-y-4">
             <Bubble>Tudo pronto! Confira o resumo antes de criarmos o projeto.</Bubble>
-            <dl className="divide-y divide-line/10 rounded-lg border border-line/15 text-sm">
+            <dl className="divide-y divide-line/10 rounded-lg border border-line/15 text-sm" data-testid="assistant-review">
               <ReviewRow label="Processo" value={d.name} onEdit={() => go('name')} />
               <ReviewRow label="Início · fim" value={`${d.trigger || 'Início'} → ${d.outcome || 'Fim'}`} onEdit={() => go('trigger')} />
-              <ReviewRow label="Etapas" value={d.stages.filter((s) => !s.skipped).map((s) => `${s.name} (${s.activities.length})`).join(' → ') || '—'} onEdit={() => go('stages')} />
+              <ReviewRow label="Etapas" value={analysis.stages.map((s) => `${s.name.trim()} (${s.activities.filter((a) => a.name.trim()).length})`).join(' → ') || '—'} onEdit={() => go('stages')} />
               <ReviewRow label="Detalhes" value={`${acts.filter((a) => a.duration !== undefined).length}/${acts.length} com tempo · ${acts.filter((a) => a.owner).length}/${acts.length} com responsável`} onEdit={() => set({ step: 'details', detailIndex: 0 })} />
-              <ReviewRow label="Decisões" value={d.decisions.length ? d.decisions.map((x) => x.question).join('; ') : 'Nenhuma'} onEdit={() => go('decisions')} />
+              <ReviewRow label="Decisões" value={analysis.decisions.length ? analysis.decisions.map((x) => x.question.trim()).join('; ') : 'Nenhuma'} onEdit={() => go('decisions')} />
               <ReviewRow label="Volume" value={d.volumeUnknown || d.volume === undefined ? 'Não informado' : `${fmtNum(d.volume)} por ${PERIOD_TXT[d.period]}`} onEdit={() => go('volume')} />
               <ReviewRow label="Custo-hora" value={d.costUnknown || d.costPerHour === undefined ? 'Não informado' : `R$ ${fmtNum(d.costPerHour)}`} onEdit={() => go('cost')} />
             </dl>
-            {issues.length === 0 ? (
+            {analysis.invalidDecisions.length > 0 && (
+              <Callout tone="bad" title={plural(analysis.invalidDecisions.length, 'decisão precisa de correção', 'decisões precisam de correção')} action={<Button size="sm" variant="secondary" onClick={() => go('decisions')}>Corrigir decisões</Button>}>
+                <ul className="list-disc pl-4" data-testid="invalid-decisions">
+                  {analysis.invalidDecisions.map((x) => (
+                    <li key={x.decision.key}>
+                      Decisão {x.n}
+                      {x.decision.question.trim() ? ` “${x.decision.question.trim()}”` : ''}: {PROBLEM_TXT[x.problem]}
+                    </li>
+                  ))}
+                </ul>
+              </Callout>
+            )}
+            {analysis.droppedStages.length > 0 && (
+              <Callout tone="warn" title="Não serão salvos no projeto">
+                <ul className="space-y-2" data-testid="dropped-items">
+                  {analysis.droppedStages.map((x) => (
+                    <li key={x.key} className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        Etapa “{x.name || 'sem nome'}” — {DROP_TXT[x.reason]}
+                        {x.activities.length ? ` (${plural(x.activities.length, 'atividade', 'atividades')}: ${x.activities.join('; ')})` : ''}
+                      </span>
+                      <Button size="sm" variant="ghost" onClick={() => (x.reason === 'sem_nome' ? go('stages') : setD((y) => ({ ...y, step: `acts:${x.key}`, returnToReview: true })))}>
+                        Completar agora
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+                <label className="mt-3 flex min-h-[44px] items-center gap-2 font-medium text-ink">
+                  <input type="checkbox" className="h-5 w-5" checked={!needsAck} onChange={(e) => setAckDropped(e.target.checked ? droppedSig : '')} />
+                  Entendi: criar o projeto sem esses itens
+                </label>
+              </Callout>
+            )}
+            {issues.length === 0 && !analysis.invalidDecisions.length && !analysis.droppedStages.length ? (
               <Callout tone="ok">Tudo certo por aqui. Você pode completar ou ajustar qualquer dado depois.</Callout>
             ) : (
               issues.slice(0, 6).map((i) => (
@@ -368,7 +487,12 @@ export default function Assistant() {
               ))
             )}
             <Actions>
-              <Button data-primary onClick={() => void finish()} loading={busy} disabled={issues.some((i) => i.severity === 'error') || !acts.length}>
+              {blockReason && (
+                <p className="w-full text-right text-sm text-ink2" id="assistant-block-reason" data-testid="assistant-block-reason">
+                  {blockReason}
+                </p>
+              )}
+              <Button data-primary onClick={() => void finish()} loading={busy} disabled={!!blockReason} aria-describedby={blockReason ? 'assistant-block-reason' : undefined}>
                 <Check className="h-4 w-4" aria-hidden /> Criar meu projeto
               </Button>
             </Actions>
@@ -378,6 +502,21 @@ export default function Assistant() {
       <div ref={endRef} />
     </div>
   );
+}
+
+/** Texto simples do rascunho, para a pessoa copiar quando esta aba fica desatualizada. */
+function draftText(d: AssistantDraft): string {
+  const lines = [`Processo: ${d.name || '(sem nome)'}`];
+  if (d.trigger) lines.push(`Começa quando: ${d.trigger}`);
+  if (d.outcome) lines.push(`Termina com: ${d.outcome}`);
+  for (const s of d.stages) {
+    lines.push('', `Etapa: ${s.name || '(sem nome)'}${s.skipped ? ' (para completar depois)' : ''}`);
+    for (const a of s.activities) lines.push(`- ${a.name}${a.owner ? ` · ${a.owner}` : ''}${a.duration !== undefined ? ` · ${fmtNum(a.duration)} ${UNIT_TXT[a.unit]}` : ''}`);
+  }
+  if (d.decisions.length) lines.push('', 'Decisões:', ...d.decisions.map((x) => `- ${x.question}`));
+  if (d.volume !== undefined && !d.volumeUnknown) lines.push('', `Volume: ${fmtNum(d.volume)} por ${PERIOD_TXT[d.period]}`);
+  if (d.costPerHour !== undefined && !d.costUnknown) lines.push(`Custo-hora: R$ ${fmtNum(d.costPerHour)}`);
+  return lines.join('\n');
 }
 
 function summary(step: string, d: AssistantDraft): { q: string; a: string } {
@@ -399,6 +538,17 @@ function summary(step: string, d: AssistantDraft): { q: string; a: string } {
   if (step === 'cost') return { q: 'Custo-hora médio', a: d.costUnknown || d.costPerHour === undefined ? 'Não informado' : `R$ ${fmtNum(d.costPerHour)}` };
   return { q: '', a: '' };
 }
+
+const PROBLEM_TXT: Record<DecisionProblem, string> = {
+  sem_pergunta: 'falta escrever a pergunta.',
+  atividade_removida: 'a atividade escolhida em “Acontece depois de” foi removida ou está numa etapa que não entra no projeto.',
+  destino_removido: 'a atividade escolhida em “Se a resposta for NÃO” foi removida ou está numa etapa que não entra no projeto.',
+};
+const DROP_TXT: Record<'pulada' | 'sem_atividades' | 'sem_nome', string> = {
+  pulada: 'marcada para completar depois',
+  sem_atividades: 'sem atividades',
+  sem_nome: 'sem nome',
+};
 
 // Perguntas de resposta única: corrigidas a partir do resumo, voltam direto ao resumo.
 const SINGLE_ANSWER = new Set(['name', 'trigger', 'outcome', 'decisions', 'volume', 'cost']);
@@ -727,54 +877,82 @@ function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: Assista
   );
 }
 
-function DecisionsStep({ d, set, nextLabel, onNext }: { d: AssistantDraft; set: (p: Partial<AssistantDraft>) => void; nextLabel: string; onNext: () => void }) {
-  const acts = allActivities(d);
+function DecisionsStep({ d, analysis, set, nextLabel, onNext }: { d: AssistantDraft; analysis: DraftAnalysis; set: (p: Partial<AssistantDraft>) => void; nextLabel: string; onNext: () => void }) {
+  // Só atividades que entram no projeto podem ser escolhidas (as de etapas puladas, não).
+  const acts = analysis.flat.map(({ s, a }) => ({ key: a.key, name: a.name.trim(), stage: s.name.trim() }));
+  const valid = new Set(acts.map((a) => a.key));
   const setDec = (key: string, patch: Partial<AssistantDraft['decisions'][number]>) => set({ decisions: d.decisions.map((x) => (x.key === key ? { ...x, ...patch } : x)) });
   const add = () => set({ decisions: [...d.decisions, { key: uid('dc'), question: '', afterKey: acts[0]?.key ?? '', noTarget: '__end' }] });
-  const incomplete = d.decisions.some((x) => !x.question.trim() || !x.afterKey);
+  const problems = new Map(analysis.invalidDecisions.map((x) => [x.decision.key, x.problem]));
+  const blocked = problems.size > 0;
   return (
     <div className="space-y-4">
       <Bubble>Em algum momento o caminho depende de uma resposta sim ou não?</Bubble>
-      <p className="text-sm text-ink2">Ex.: “Orçamento aprovado?”. Com “sim”, o fluxo segue; com “não”, volta para uma atividade (retrabalho) ou encerra.</p>
-      {d.decisions.map((x, n) => (
-        <div key={x.key} className="space-y-3 rounded-lg border border-violet/30 bg-violet/5 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">Decisão {n + 1}</p>
-            <Button size="sm" variant="ghost" aria-label={`Remover decisão ${n + 1}`} onClick={() => set({ decisions: d.decisions.filter((y) => y.key !== x.key) })}>
-              <Trash2 className="h-4 w-4" aria-hidden />
-            </Button>
+      <p className="text-sm text-ink2">Ex.: “Orçamento aprovado?”. Com “sim”, o fluxo segue; com “não”, volta para uma atividade (retrabalho) ou encerra. Pode haver mais de uma decisão depois da mesma atividade: elas ficam em sequência.</p>
+      {d.decisions.map((x, n) => {
+        const problem = problems.get(x.key);
+        const afterOk = valid.has(x.afterKey);
+        const noOk = x.noTarget === '__end' || valid.has(x.noTarget);
+        return (
+          <div key={x.key} className={clsx('space-y-3 rounded-lg border p-3', problem ? 'border-bad/50 bg-bad/5' : 'border-violet/30 bg-violet/5')} data-testid="assistant-decision">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">Decisão {n + 1}</p>
+              <Button size="sm" variant="ghost" aria-label={`Remover decisão ${n + 1}`} onClick={() => set({ decisions: d.decisions.filter((y) => y.key !== x.key) })}>
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </Button>
+            </div>
+            {problem && (
+              <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-bad">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {problem === 'sem_pergunta' ? 'Escreva a pergunta desta decisão (ou remova a decisão).' : `${PROBLEM_TXT[problem].charAt(0).toUpperCase()}${PROBLEM_TXT[problem].slice(1)} Escolha outra atividade ou remova a decisão.`}
+              </p>
+            )}
+            <Field label="Pergunta">{(f) => <Input {...f} value={x.question} onChange={(e) => setDec(x.key, { question: e.target.value })} placeholder="Ex.: Orçamento aprovado?" />}</Field>
+            <Field label="Acontece depois de qual atividade?">
+              {(f) => (
+                <Select {...f} value={afterOk ? x.afterKey : ''} onChange={(e) => setDec(x.key, { afterKey: e.target.value })} aria-invalid={!afterOk || undefined}>
+                  {!afterOk && (
+                    <option value="" disabled>
+                      Escolha a atividade…
+                    </option>
+                  )}
+                  {acts.map((a) => (
+                    <option key={a.key} value={a.key}>
+                      {a.stage} › {a.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label="Se a resposta for NÃO, vai para…">
+              {(f) => (
+                <Select {...f} value={noOk ? x.noTarget : ''} onChange={(e) => setDec(x.key, { noTarget: e.target.value })} aria-invalid={!noOk || undefined}>
+                  {!noOk && (
+                    <option value="" disabled>
+                      Escolha para onde vai…
+                    </option>
+                  )}
+                  <option value="__end">Encerrar o processo</option>
+                  {acts.map((a) => (
+                    <option key={a.key} value={a.key}>
+                      Voltar/ir para: {a.stage} › {a.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
           </div>
-          <Field label="Pergunta">{(f) => <Input {...f} value={x.question} onChange={(e) => setDec(x.key, { question: e.target.value })} placeholder="Ex.: Orçamento aprovado?" />}</Field>
-          <Field label="Acontece depois de qual atividade?">
-            {(f) => (
-              <Select {...f} value={x.afterKey} onChange={(e) => setDec(x.key, { afterKey: e.target.value })}>
-                {acts.map((a) => (
-                  <option key={a.key} value={a.key}>
-                    {a.stage} › {a.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field label="Se a resposta for NÃO, vai para…">
-            {(f) => (
-              <Select {...f} value={x.noTarget} onChange={(e) => setDec(x.key, { noTarget: e.target.value })}>
-                <option value="__end">Encerrar o processo</option>
-                {acts.map((a) => (
-                  <option key={a.key} value={a.key}>
-                    Voltar/ir para: {a.stage} › {a.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        </div>
-      ))}
+        );
+      })}
+      {blocked && (
+        <p className="text-sm text-ink2" data-testid="decisions-block-reason">
+          Para continuar, corrija ou remova as decisões destacadas.
+        </p>
+      )}
       <Actions>
         <Button variant="secondary" onClick={add} disabled={!acts.length}>
           <Plus className="h-4 w-4" aria-hidden /> {d.decisions.length ? 'Outra decisão' : 'Sim, adicionar decisão'}
         </Button>
-        <Button data-primary onClick={onNext} disabled={incomplete}>
+        <Button data-primary onClick={onNext} disabled={blocked}>
           {d.decisions.length ? nextLabel : `Não há decisões — ${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}`} <ChevronRight className="h-4 w-4" aria-hidden />
         </Button>
       </Actions>
@@ -783,12 +961,16 @@ function DecisionsStep({ d, set, nextLabel, onNext }: { d: AssistantDraft; set: 
 }
 
 /** "Aha!": o que acabou de ser mapeado, com números reais do processo criado. */
-function Success({ w, warnings, onOpen }: { w: Workspace; warnings: number; onOpen: (path: string) => void }) {
+function Success({ w, durable, cleanupFailed, reused, warnings, onOpen }: { w: Workspace; durable: boolean; cleanupFailed: boolean; reused: boolean; warnings: number; onOpen: (path: string) => void }) {
   const p = w.asIs;
   const tasks = p.activities.filter((a) => a.type === 'task');
   const owners = new Set(tasks.map((a) => a.owner?.trim()).filter(Boolean)).size;
   const decisions = p.activities.filter((a) => a.type === 'decision').length;
+  const timed = tasks.filter((a) => typeof a.duration === 'number').length;
+  // Requisito real do diagnóstico (domain/journey): pelo menos uma atividade com duração.
+  const diagReady = stepRequirements('diagnostico', w).every((r) => r.kind !== 'obrigatório' || r.ok);
   const recs = useMemo(() => recommend(p, w.bottleneck.criterion, w.bottleneck.thresholdPct).length, [p, w.bottleneck]);
+  const toast = useToast();
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), []);
   const facts = [
@@ -797,32 +979,75 @@ function Success({ w, warnings, onOpen }: { w: Workspace; warnings: number; onOp
     decisions ? plural(decisions, 'ponto de decisão', 'pontos de decisão') : null,
     recs ? plural(recs, 'oportunidade de melhoria para avaliar', 'oportunidades de melhoria para avaliar') : null,
   ].filter(Boolean) as string[];
+  const download = async () => {
+    try {
+      await shareProject(w);
+    } catch {
+      toast('bad', 'Não foi possível gerar o arquivo do projeto. Tente de novo.');
+    }
+  };
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-10 pt-6 sm:pt-12" data-testid="assistant-success">
-      <div className="np-fade-in rounded-2xl border border-ok/30 bg-surface p-6 text-center shadow-card sm:p-8">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-ok/15 text-ok" aria-hidden>
-          <Sparkles className="h-7 w-7" />
+      <div className={clsx('np-fade-in rounded-2xl border bg-surface p-6 text-center shadow-card sm:p-8', durable ? 'border-ok/30' : 'border-amber/50')}>
+        <span className={clsx('mx-auto flex h-14 w-14 items-center justify-center rounded-full', durable ? 'bg-ok/15 text-ok' : 'bg-amber/15 text-amber')} aria-hidden>
+          {durable ? <Sparkles className="h-7 w-7" /> : <AlertTriangle className="h-7 w-7" />}
         </span>
         <h1 ref={headingRef} tabIndex={-1} className="mt-4 text-2xl font-extrabold tracking-tight outline-none">
-          Excelente! Seu processo foi mapeado com {plural(p.stageOrder.length, 'etapa', 'etapas')}.
+          {durable ? 'Excelente! ' : ''}Seu processo foi mapeado com {plural(p.stageOrder.length, 'etapa', 'etapas')}.
         </h1>
-        <p className="mt-2 text-ink2">“{p.name}” já está salvo neste aparelho, com o mapa desenhado e o diagnóstico calculado a partir das suas respostas.</p>
+        {durable ? (
+          <p className="mt-2 text-ink2" data-testid="success-storage">
+            “{p.name}” foi criado e está salvo neste aparelho, com o mapa do processo pronto para ver.
+          </p>
+        ) : (
+          <div className="mt-3 text-left" data-testid="success-storage">
+            <Callout tone="warn" title="Ainda não está salvo neste aparelho" action={<Button size="sm" onClick={() => void download()}><Download className="h-4 w-4" aria-hidden /> Baixar arquivo do projeto</Button>}>
+              O navegador bloqueou o armazenamento local: “{p.name}” existe só nesta aba e some ao fechá-la. Baixe o arquivo do projeto e importe-o depois em “Meus projetos → Importar projeto”.
+            </Callout>
+          </div>
+        )}
         <ul className="mx-auto mt-5 max-w-sm space-y-2 text-left text-sm">
           {facts.map((f) => (
             <li key={f} className="flex items-start gap-2">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-ok" aria-hidden /> {f}
             </li>
           ))}
+          <li className="flex items-start gap-2" data-testid="success-diagnosis">
+            {diagReady ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-ok" aria-hidden /> : <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden />}
+            <span>
+              {!diagReady
+                ? 'Diagnóstico ainda não calculado: falta a duração das atividades. Informe o tempo de cada atividade em “Dados”.'
+                : timed < tasks.length
+                  ? `Diagnóstico calculado com ${timed} de ${tasks.length} atividades com duração; complete as demais para um resultado completo.`
+                  : 'Diagnóstico calculado com a duração de todas as atividades.'}
+            </span>
+          </li>
           {warnings > 0 && (
             <li className="flex items-start gap-2 text-ink2">
               <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden /> {plural(warnings, 'ponto para completar quando puder', 'pontos para completar quando puder')}
             </li>
           )}
         </ul>
+        {reused && (
+          <p className="mt-4 text-xs text-muted" data-testid="success-reused">
+            Este rascunho já tinha virado este projeto; nada foi criado de novo.
+          </p>
+        )}
+        {cleanupFailed && (
+          <p className="mt-4 text-xs text-muted" data-testid="success-cleanup">
+            O projeto foi criado. Não conseguimos apagar o rascunho antigo deste aparelho; ele não será reaberto nem criará outro projeto.
+          </p>
+        )}
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <Button size="lg" onClick={() => onOpen('plano')}>
-            Ver meu Plano de Ação <ChevronRight className="h-4 w-4" aria-hidden />
-          </Button>
+          {diagReady ? (
+            <Button size="lg" onClick={() => onOpen('plano')}>
+              Ver meu Plano de Ação <ChevronRight className="h-4 w-4" aria-hidden />
+            </Button>
+          ) : (
+            <Button size="lg" onClick={() => onOpen('dados')}>
+              Informar as durações <ChevronRight className="h-4 w-4" aria-hidden />
+            </Button>
+          )}
           <Button size="lg" variant="secondary" onClick={() => onOpen(warnings ? 'validar' : 'mapa')}>
             <MapIcon className="h-4 w-4" aria-hidden /> {warnings ? 'Revisar os dados' : 'Ver o mapa'}
           </Button>

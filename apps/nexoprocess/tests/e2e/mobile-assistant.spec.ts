@@ -74,6 +74,11 @@ test('assistente cria projeto a partir de respostas curtas e texto livre', async
   await step.getByRole('button', { name: 'Voltar à revisão' }).click();
   await expect(step.getByText('200 por mês')).toBeVisible();
   await expectNoHorizontalScroll(page);
+  // v2.4.2: a etapa pulada aparece como "não será salva" e criar exige confirmação explícita.
+  await expect(step.getByTestId('dropped-items')).toContainText('Etapa “Compra” — marcada para completar depois');
+  await expect(step.getByRole('button', { name: 'Criar meu projeto' })).toBeDisabled();
+  await expect(step.getByTestId('assistant-block-reason')).toContainText('Confirme acima');
+  await step.getByLabel('Entendi: criar o projeto sem esses itens').check();
   await step.getByRole('button', { name: 'Criar meu projeto' }).click();
   const success = page.getByTestId('assistant-success');
   await expect(success.getByRole('heading', { level: 1 })).toHaveText('Excelente! Seu processo foi mapeado com 2 etapas.');

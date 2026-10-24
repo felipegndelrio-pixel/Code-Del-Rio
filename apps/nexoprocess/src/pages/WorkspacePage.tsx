@@ -10,7 +10,7 @@ import { MOBILE_TABS, NAV, NAV_ITEMS, STEP_PATH, type NavItem } from '../config/
 import { journey, STEP_OBJECTIVE, stepRequirements, type JourneyStep } from '../domain/journey';
 import type { Workspace } from '../domain/types';
 import { fmtDateTime } from '../domain/units';
-import { db } from '../storage/db';
+import { db, storageMode } from '../storage/db';
 import { useWorkspace, WorkspaceProvider } from '../state/workspace';
 import { BackButton } from '../components/BackButton';
 
@@ -89,6 +89,12 @@ function SaveIndicator() {
           <button type="button" onClick={retrySave} className="font-semibold underline">
             Tentar de novo
           </button>
+        </span>
+      ) : storageMode() === 'memoria' ? (
+        // Banco local bloqueado: os dados estão só na memória desta aba, não no aparelho.
+        <span className="inline-flex items-center gap-1 text-amber">
+          <CloudOff className="h-3.5 w-3.5" aria-hidden />
+          Só nesta aba<span className="sr-only sm:not-sr-only"> · não salvo no aparelho</span>
         </span>
       ) : (
         <>

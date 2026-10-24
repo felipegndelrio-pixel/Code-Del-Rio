@@ -1,6 +1,6 @@
 // Lógica das rotas, sem dependência da Vercel: Request → Response (testável).
 import { normalizeEmail, signToken, verifyToken } from '../../src/license/token.js';
-import { parseHotmartText, readBodyLimited } from './hotmart.js';
+import { parseHotmartText, readBodyLimited, redactPayload } from './hotmart.js';
 import { storeFromEnv, supabaseServiceKey, supabaseUrl, type Env, type LicenseStore } from './store.js';
 
 export interface LicenseDeps {
@@ -128,10 +128,20 @@ export async function handleWebhook(req: Request, deps: WebhookDeps): Promise<Re
     return json(413, { error: 'grande_demais' });
   }
   const ev = parseHotmartText(text, req.headers);
-  if (!ev.hottok || !safeEqual(ev.hottok, deps.hottok)) return json(401, { error: 'hottok_invalido' });
-  const log = (result: string) => console.log(`hotmart ${ev.event || '(sem evento)'} → ${result}${ev.email ? ` (${maskEmail(ev.email)})` : ''}`);
+  if (!ev.hottok || !safeEqual(ev.hottok, deps.hottok)) {
+    // Sem o valor do hottok: só se veio e por onde (cabeçalho ou corpo).
+    const where = req.headers.get('x-hotmart-hottok') ? 'cabeçalho' : ev.hottok ? 'corpo' : 'ausente';
+    console.log(`hotmart ${ev.event || '(sem evento)'} → 401 hottok inválido (hottok: ${where})`);
+    return json(401, { error: 'hottok_invalido' });
+  }
+  const log = (result: string) => console.log(`hotmart ${ev.event || '(sem evento)'} → ${result}${ev.email ? ` (${maskEmail(ev.email)})` : ''} tx=${ev.transaction ?? '-'} prod=${ev.productId ?? '-'}`);
+  // TEMPORÁRIO (v2.4.5): todo evento autenticado, com o nome exato e como foi classificado.
+  console.log(`hotmart recebido: evento="${ev.event}" ação=${ev.action} tx=${ev.transaction ?? '-'} prod=${ev.productId ?? '-'}${ev.email ? ` (${maskEmail(ev.email)})` : ''}`);
+  // TEMPORÁRIO (v2.4.5): tudo o que não é aprovação (reembolso com qualquer nome, ou evento
+  // não reconhecido) vai para o log com o payload mascarado. Remover depois do diagnóstico.
+  if (ev.action !== 'grant') console.log(`hotmart DEBUG payload (${ev.event || 'sem evento'} → ${ev.action}): ${redactPayload(text, req.headers)}`);
   if (deps.productId && ev.productId !== deps.productId) {
-    log('ignorado: outro produto');
+    log(`ignorado: outro produto (esperado ${deps.productId})`);
     return json(200, { ignored: 'outro_produto' });
   }
   if (ev.action === 'ignore') {
@@ -144,11 +154,26 @@ export async function handleWebhook(req: Request, deps: WebhookDeps): Promise<Re
     return json(200, { ignored: 'sem_email' }); // 200: evita reenvio infinito de um payload que nunca vai servir
   }
   if (!deps.store) return notConfigured('/api/hotmart-webhook', deps.missing); // Hotmart reenvia depois
-  const status = ev.action === 'grant' ? 'active' : 'revoked';
+  if (ev.transactionInvalid) log('transação fora do formato: tratada como ausente');
+  // Regra em LicenseStore.grant(): reembolso é definitivo para a mesma transação; só uma
+  // compra com outra transação reativa. Revogação sempre grava (falha fechada).
+  const rec = { email, product_id: ev.productId, transaction: ev.transaction, event: ev.event };
+  let status: 'active' | 'revoked';
   try {
-    await deps.store.upsert({ email, status, product_id: ev.productId, transaction: ev.transaction, event: ev.event });
+    if (ev.action === 'grant') {
+      if ((await deps.store.grant(rec)) === 'blocked') {
+        log('ignorado: licença revogada; aprovação sem transação nova não reativa');
+        return json(200, { ignored: 'licenca_revogada', status: 'revoked' }); // 200: reenviar não muda nada
+      }
+      status = 'active';
+    } else {
+      await deps.store.revoke(rec);
+      status = 'revoked';
+    }
   } catch (e) {
-    console.error('webhook upsert falhou', e instanceof Error ? e.message : e);
+    // Erro de leitura ou gravação: 500 para a Hotmart reenviar; nada é concedido.
+    // Erro exato do Supabase (status HTTP e corpo da resposta, que não contêm a chave).
+    console.error(`hotmart ${ev.event || '(sem evento)'}: ERRO ao gravar no Supabase (${ev.action === 'grant' ? 'conceder' : 'revogar'}) tx=${ev.transaction ?? '-'} (${maskEmail(email)}) — ${e instanceof Error ? e.message : String(e)}`);
     return json(500, { error: 'falha_armazenamento' });
   }
   log(status);

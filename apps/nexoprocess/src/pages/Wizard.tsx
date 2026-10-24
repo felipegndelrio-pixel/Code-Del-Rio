@@ -8,8 +8,9 @@ import { newActivity, newProcess, normalizeStages } from '../domain/factory';
 import type { Activity, DurationUnit, LeanClass, Period, ProcessModel } from '../domain/types';
 import { uid } from '../domain/units';
 import { validateProcess } from '../domain/validation';
-import { db } from '../storage/db';
-import { createWorkspace } from '../state/actions';
+import { checkStorage, db } from '../storage/db';
+import { createFromDraft, DraftAlreadyUsedError, DraftDivergedError, resumeDraft, staleFromSave, type StaleDraft } from '../state/draftCommit';
+import { StaleDraftNotice } from '../components/StaleDraftNotice';
 import { demoBlocked } from '../license/demo';
 import { useHardwareBack } from '../state/backNav';
 import { localDraft } from '../storage/localDraft';
@@ -32,6 +33,8 @@ interface WStage {
   items: WItem[];
 }
 interface WState {
+  /** Identifica o rascunho: o mesmo rascunho nunca vira dois projetos (ver state/draftCommit). */
+  draftId?: string;
   step: number;
   name: string;
   description: string;
@@ -50,6 +53,7 @@ const TARGET = ['o processo', 'as etapas', 'as atividades', 'volume e custos', '
 const DRAFT = 'wizard';
 const blankItem = (): WItem => ({ key: uid('i'), name: '', unit: 'min' });
 const initial = (): WState => ({
+  draftId: uid('rd'),
   step: 0,
   name: '',
   description: '',
@@ -61,6 +65,21 @@ const initial = (): WState => ({
   period: 'mes',
 });
 
+/** O que o formulário vira no projeto: a revisão e a gravação usam esta mesma análise. */
+export function analyzeWizard(s: WState) {
+  const named = (st: WStage) => st.items.filter((i) => i.name.trim());
+  const stages = s.stages.filter((st) => st.name.trim() && named(st).length > 0);
+  const dropped = s.stages
+    .filter((st) => !stages.includes(st))
+    .filter((st) => st.name.trim() || named(st).length > 0)
+    .map((st) => ({ key: st.key, name: st.name.trim(), reason: (st.name.trim() ? 'sem_atividades' : 'sem_nome') as 'sem_atividades' | 'sem_nome', activities: named(st).map((i) => i.name.trim()) }));
+  const flat = stages.flatMap((st) => named(st).map((i) => ({ st, i })));
+  const keys = new Set(flat.map((x) => x.i.key));
+  // "Se não" apontando para item removido ou que não entra no projeto: o caminho se perderia.
+  const invalidDecisions = flat.filter(({ i }) => i.isDecision && i.noTarget && i.noTarget !== '__end' && !keys.has(i.noTarget)).map(({ st, i }) => ({ key: i.key, name: i.name.trim(), stage: st.name.trim() }));
+  return { stages, flat, dropped, invalidDecisions };
+}
+
 export function wizardToProcess(s: WState): ProcessModel {
   const p = newProcess(s.name.trim() || 'Novo processo');
   p.description = s.description.trim() || undefined;
@@ -68,8 +87,7 @@ export function wizardToProcess(s: WState): ProcessModel {
   p.volume = s.volume;
   p.volumePeriod = s.period;
   p.defaultCostPerHour = s.costPerHour;
-  const stages = s.stages.filter((st) => st.name.trim() && st.items.some((i) => i.name.trim()));
-  const flat = stages.flatMap((st) => st.items.filter((i) => i.name.trim()).map((i) => ({ st, i })));
+  const { stages, flat } = analyzeWizard(s);
   const idOf = new Map(flat.map((x, n) => [x.i.key, `A${n + 1}`]));
   let order = 0;
   const acts: Activity[] = [];
@@ -115,6 +133,11 @@ export default function Wizard() {
   const nav = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
+  // Se a cópia local já virou processo, o registro durável no IndexedDB diz (resumeDraft abaixo).
+  const [already, setAlready] = useState<{ workspaceId: string; exists: boolean } | undefined>();
+  const [storage, setStorage] = useState<'indexeddb' | 'memoria' | null>(null);
+  const [ackDropped, setAckDropped] = useState('');
+  // Rascunho antigo (sem draftId) não ganha identidade só na memória: createFromDraft a grava antes de criar.
   const [local] = useState(() => {
     const d = localDraft.read<WState>(DRAFT);
     return d && Array.isArray(d.stages) && (d.name || d.stages.some((st) => st.name)) ? d : undefined;
@@ -124,25 +147,48 @@ export default function Wizard() {
   const [restored, setRestored] = useState(!!local);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // Esta aba perdeu o direito de editar (outra aba criou o processo): não salva nem cria; o conteúdo fica na tela.
+  const [stale, setStale] = useState<StaleDraft | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
-    if (local) return;
-    db.getDraft<WState>(DRAFT)
-      .then((d) => {
-        if (d && (d.name || d.stages.some((st) => st.name))) {
-          setS(d);
+    void checkStorage().then(setStorage);
+    // Rascunho (ou cópia local) que já virou processo não é restaurado; a limpeza é refeita.
+    resumeDraft<WState>(DRAFT, local?.draftId)
+      .then((r) => {
+        if (r.usedBy) setAlready(r.usedBy);
+        const d = r.draft;
+        const next = d && Array.isArray(d.stages) && (d.name || d.stages.some((st) => st.name)) ? d : undefined;
+        if (r.localUsed) {
+          setS(next ?? initial());
+          setRestored(!!next);
+        } else if (!local && next) {
+          setS(next);
           setRestored(true);
         }
       })
+      .catch(() => {})
       .finally(() => setLoaded(true));
   }, [local]);
+  // Criando o processo: o auto-save para. Mesmo um salvamento já agendado não recria o rascunho:
+  // db.saveDraft não grava rascunho cujo registro "criado" já existe.
+  const committing = useRef(false);
   useEffect(() => {
-    if (!loaded) return;
-    if (s.name || s.stages.some((st) => st.name)) localDraft.write(DRAFT, s);
-    const t = setTimeout(() => void db.putDraft(DRAFT, s).catch(() => {}), 300);
+    if (!loaded || stale) return;
+    if ((s.name || s.stages.some((st) => st.name)) && !committing.current) localDraft.write(DRAFT, s);
+    // Fora de 'salvo' (virou processo em outra aba ou foi assumido por ela), esta aba fica desatualizada.
+    const t = setTimeout(() => {
+      if (committing.current) return;
+      void db
+        .saveDraft(DRAFT, s)
+        .then((r) => staleFromSave(r, s.draftId))
+        .then((st) => {
+          if (st && !committing.current) setStale(st);
+        })
+        .catch(() => {});
+    }, 300);
     return () => clearTimeout(t);
-  }, [s, loaded]);
+  }, [s, loaded, stale]);
   useEffect(() => headingRef.current?.focus(), [s.step]);
 
   const set = (patch: Partial<WState>) => setS((x) => ({ ...x, ...patch }));
@@ -151,7 +197,19 @@ export default function Wizard() {
     setS((x) => ({ ...x, stages: x.stages.map((st) => (st.key === sk ? { ...st, items: st.items.map((i) => (i.key === ik ? { ...i, ...patch } : i)) } : st)) }));
 
   const process = useMemo(() => wizardToProcess(s), [s]);
+  const analysis = useMemo(() => analyzeWizard(s), [s]);
   const issues = useMemo(() => (s.step === 4 ? validateProcess(process) : []), [s.step, process]);
+  const droppedSig = analysis.dropped.map((x) => `${x.key}:${x.reason}:${x.activities.length}`).join('|');
+  const needsAck = droppedSig !== '' && ackDropped !== droppedSig;
+  const blockReason = stale
+    ? 'Esta aba não cria o processo: ele já foi criado em outra aba. Copie seus dados acima.'
+    : analysis.invalidDecisions.length
+    ? 'Corrija o caminho do “não” nas decisões destacadas para criar o processo.'
+    : issues.some((i) => i.severity === 'error')
+      ? 'Corrija os pontos em vermelho acima para criar o processo.'
+      : needsAck
+        ? 'Confirme acima que deseja criar o processo sem os itens que não serão salvos.'
+        : null;
 
   const check = (step: number): boolean => {
     const e: Record<string, string> = {};
@@ -165,7 +223,12 @@ export default function Wizard() {
     if (step === 2) {
       const any = s.stages.some((st) => st.name.trim() && st.items.some((i) => i.name.trim()));
       if (!any) e.items = 'Faltou só uma coisinha: descreva pelo menos uma atividade.';
-      for (const st of s.stages) for (const i of st.items) if (i.isDecision && i.name.trim() && !i.noTarget) e[`no_${i.key}`] = 'Para onde o fluxo vai quando a resposta é “não”?';
+      const namedKeys = new Set(s.stages.flatMap((st) => st.items.filter((i) => i.name.trim()).map((i) => i.key)));
+      for (const st of s.stages)
+        for (const i of st.items) {
+          if (i.isDecision && i.name.trim() && !i.noTarget) e[`no_${i.key}`] = 'Para onde o fluxo vai quando a resposta é “não”?';
+          else if (i.isDecision && i.name.trim() && i.noTarget !== '__end' && !namedKeys.has(i.noTarget!)) e[`no_${i.key}`] = 'A atividade escolhida para o “não” foi removida. Escolha outra ou “Encerrar o processo”.';
+        }
     }
     setErrors(e);
     return !Object.keys(e).length;
@@ -180,23 +243,48 @@ export default function Wizard() {
 
   const finish = async () => {
     if (!check(0) || !check(1) || !check(2)) return;
-    if (issues.some((i) => i.severity === 'error')) {
-      toast('bad', 'Quase lá: falta ajustar os pontos destacados antes de criar o processo.');
+    if (blockReason) {
+      toast('bad', `Quase lá: ${blockReason.charAt(0).toLowerCase()}${blockReason.slice(1)}`);
       return;
     }
-    if (demoBlocked('salvar')) return;
+    if (stale || demoBlocked('salvar')) return;
     setBusy(true);
+    committing.current = true;
+    let r;
     try {
-      const w = await createWorkspace(process, { kind: 'wizard' });
-      await db.deleteDraft(DRAFT);
-      localDraft.remove(DRAFT);
-      toast('ok', 'Pronto! Seu processo foi criado. Vamos conferir os dados?');
-      nav(`/app/p/${w.id}/validar`);
-    } catch {
-      toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
-    } finally {
+      // Rascunho antigo sem identidade: a recebida (já gravada antes de criar) passa a valer nesta tela.
+      r = await createFromDraft(DRAFT, s, process, { kind: 'wizard' }, { onDraftId: (id) => setS((x) => ({ ...x, draftId: id })) });
+    } catch (e) {
+      committing.current = false;
       setBusy(false);
+      // Outra aba criou o processo (com outro conteúdo) ou ele foi excluído: esta aba para e mantém o conteúdo.
+      if (e instanceof DraftDivergedError) {
+        setStale({ reason: 'divergente', workspaceId: e.workspaceId });
+        return;
+      }
+      if (e instanceof DraftAlreadyUsedError) {
+        setStale({ reason: 'excluido' });
+        return;
+      }
+      // A criação falhou: nada foi gravado, o rascunho continua e a pessoa pode tentar de novo.
+      toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
+      return;
     }
+    setBusy(false);
+    // Criado. A limpeza do rascunho é separada: se falhar, não é erro de criação.
+    if (r.reused) toast('info', 'Este rascunho já tinha virado este processo; nada foi criado de novo.');
+    if (!r.durable) toast('bad', 'Processo criado só nesta aba: o navegador bloqueou o armazenamento local. Gere o arquivo do projeto na Visão geral antes de fechar.');
+    else toast('ok', 'Pronto! Seu processo foi criado e salvo neste aparelho. Vamos conferir os dados?');
+    if (r.cleanup === 'falhou') toast('info', 'Não conseguimos apagar o rascunho antigo deste aparelho; ele não será reaberto nem criará outro processo.');
+    nav(`/app/p/${r.w.id}/validar`);
+  };
+
+  /** Sai do modo "aba desatualizada" só por escolha da pessoa (depois de copiar). */
+  const startOver = () => {
+    localDraft.remove(DRAFT);
+    setStale(null);
+    setS(initial());
+    setRestored(false);
   };
 
   const discard = async () => {
@@ -222,7 +310,7 @@ export default function Wizard() {
             <span className="font-medium text-ink2">
               Etapa {s.step + 1} de {STEPS.length}: {STEPS[s.step]}
             </span>
-            <span>Salvo neste aparelho</span>
+            <span data-testid="draft-storage">{stale ? 'Esta aba não está salvando' : storage === 'memoria' ? 'Rascunho só nesta aba' : 'Salvo neste aparelho'}</span>
           </div>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label="Progresso do assistente" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${pct}%` }} />
@@ -230,7 +318,30 @@ export default function Wizard() {
         </div>
       </div>
 
-      {restored && (
+      {storage === 'memoria' && (
+        <Callout tone="warn" title="Este navegador bloqueou o armazenamento local">
+          Você pode preencher o formulário, mas o processo ficará só nesta aba e some ao fechá-la. Depois de criar, gere o arquivo do projeto na Visão geral.
+        </Callout>
+      )}
+      {stale && (
+        <StaleDraftNotice
+          reason={stale.reason}
+          noun="processo"
+          text={wizardText(s)}
+          onOpen={stale.workspaceId ? () => nav(`/app/p/${stale.workspaceId}/visao-geral`) : undefined}
+          onNew={stale.reason === 'excluido' ? startOver : undefined}
+        />
+      )}
+      {already && !restored && !stale && (
+        <Callout
+          tone="info"
+          title={already.exists ? 'Seu último rascunho já virou um processo.' : 'Seu último rascunho já tinha virado um processo, que foi excluído depois.'}
+          action={already.exists ? <Button size="sm" variant="ghost" onClick={() => nav(`/app/p/${already.workspaceId}/visao-geral`)}>Abrir o processo</Button> : undefined}
+        >
+          Não vamos criá-lo de novo. Este é um rascunho novo.
+        </Callout>
+      )}
+      {restored && !stale && (
         <Callout tone="info" title="Continuamos de onde você parou." action={<Button size="sm" variant="ghost" onClick={() => void discard()}>Começar do zero</Button>}>
           Suas respostas ficaram salvas neste aparelho.
         </Callout>
@@ -435,7 +546,38 @@ export default function Wizard() {
               ))}
           </ol>
           <div className="mt-4 space-y-2">
-            {issues.filter((i) => i.severity !== 'info').length === 0 ? (
+            {analysis.invalidDecisions.length > 0 && (
+              <Callout tone="bad" title="Decisões com o caminho do “não” perdido" action={<Button size="sm" variant="secondary" onClick={() => set({ step: 2 })}>Corrigir nas atividades</Button>}>
+                <ul className="list-disc pl-4" data-testid="wizard-invalid-decisions">
+                  {analysis.invalidDecisions.map((x) => (
+                    <li key={x.key}>
+                      “{x.name}” ({x.stage}): a atividade escolhida para o “não” foi removida ou não entra no processo.
+                    </li>
+                  ))}
+                </ul>
+              </Callout>
+            )}
+            {analysis.dropped.length > 0 && (
+              <Callout tone="warn" title="Não serão salvos no processo">
+                <ul className="space-y-2" data-testid="wizard-dropped-items">
+                  {analysis.dropped.map((x) => (
+                    <li key={x.key} className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        {x.reason === 'sem_nome' ? `Etapa sem nome com ${x.activities.length === 1 ? '1 atividade' : `${x.activities.length} atividades`}: ${x.activities.join('; ')}` : `Etapa “${x.name}” — sem atividades`}
+                      </span>
+                      <Button size="sm" variant="ghost" onClick={() => set({ step: x.reason === 'sem_nome' ? 1 : 2 })}>
+                        {x.reason === 'sem_nome' ? 'Dar nome à etapa' : 'Adicionar atividades'}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+                <label className="mt-3 flex min-h-[44px] items-center gap-2 font-medium text-ink">
+                  <input type="checkbox" className="h-5 w-5" checked={!needsAck} onChange={(e) => setAckDropped(e.target.checked ? droppedSig : '')} />
+                  Entendi: criar o processo sem esses itens
+                </label>
+              </Callout>
+            )}
+            {issues.filter((i) => i.severity !== 'info').length === 0 && !analysis.dropped.length && !analysis.invalidDecisions.length ? (
               <Callout tone="ok">Tudo certo por aqui. Vamos criar o processo?</Callout>
             ) : (
               issues
@@ -476,13 +618,35 @@ export default function Wizard() {
             </Button>
           </div>
         ) : (
-          <Button className="w-full sm:w-auto" onClick={() => void finish()} loading={busy}>
-            Criar processo e ver o mapa
-          </Button>
+          <div className="flex w-full flex-col items-stretch gap-1 sm:w-auto sm:items-end">
+            {blockReason && (
+              <p className="text-sm text-ink2" id="wizard-block-reason" data-testid="wizard-block-reason">
+                {blockReason}
+              </p>
+            )}
+            <Button className="w-full sm:w-auto" onClick={() => void finish()} loading={busy} disabled={!!blockReason} aria-describedby={blockReason ? 'wizard-block-reason' : undefined}>
+              Criar processo e ver o mapa
+            </Button>
+          </div>
         )}
       </div>
     </div>
   );
+}
+
+/** Texto simples do formulário, para a pessoa copiar quando esta aba fica desatualizada. */
+function wizardText(s: WState): string {
+  const lines = [`Processo: ${s.name || '(sem nome)'}`];
+  if (s.description) lines.push(`Para que serve: ${s.description}`);
+  if (s.area) lines.push(`Área: ${s.area}`);
+  for (const st of s.stages) {
+    if (!st.name && !st.items.some((i) => i.name)) continue;
+    lines.push('', `Etapa: ${st.name || '(sem nome)'}`);
+    for (const i of st.items.filter((x) => x.name)) lines.push(`- ${i.isDecision ? 'Decisão: ' : ''}${i.name}${i.owner ? ` · ${i.owner}` : ''}${i.duration !== undefined && !i.isDecision ? ` · ${i.duration} ${i.unit}` : ''}`);
+  }
+  if (s.volume !== undefined) lines.push('', `Volume: ${s.volume} por ${s.period}`);
+  if (s.costPerHour !== undefined) lines.push(`Custo-hora: R$ ${s.costPerHour}`);
+  return lines.join('\n');
 }
 
 function move<T>(arr: T[], i: number, d: number): T[] {

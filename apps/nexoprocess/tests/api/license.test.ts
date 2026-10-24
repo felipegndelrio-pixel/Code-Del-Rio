@@ -171,16 +171,15 @@ describe('webhook da Hotmart — endurecimento', () => {
     expect(d.store.data.get('ana@ex.com')?.status).toBe('revoked');
   });
 
-  // LIMITAÇÃO CONHECIDA (documentada, não corrigida): sem campo de data/sequência confirmado na
-  // documentação oficial da Hotmart, vale o último evento recebido. Um APPROVED reenviado depois
-  // de um REFUND reativa o acesso. Este teste fixa o comportamento atual; quando a regra de
-  // precedência for aprovada, ele deve passar a esperar 'revoked'.
-  it('eventos fora de ordem: hoje vale o último recebido (limitação documentada)', async () => {
+  // Antes da v2.4.1 valia o último evento recebido e este teste esperava 'active'.
+  it('eventos fora de ordem: aprovação atrasada da mesma transação não reativa o reembolso', async () => {
     const d = deps();
     await handleWebhook(hook('PURCHASE_REFUNDED', 'ana@ex.com'), d); // reembolso chega primeiro
     expect(d.store.data.get('ana@ex.com')?.status).toBe('revoked');
-    await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com'), d); // aprovação atrasada / reenviada
-    expect(d.store.data.get('ana@ex.com')?.status).toBe('active');
+    const r = await handleWebhook(hook('PURCHASE_APPROVED', 'ana@ex.com'), d); // aprovação atrasada / reenviada
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ignored: 'licenca_revogada', status: 'revoked' });
+    expect(d.store.data.get('ana@ex.com')?.status).toBe('revoked');
   });
 });
 
@@ -222,7 +221,7 @@ describe('ativação /api/license', () => {
     const store = memoryStore({ 'ana@ex.com': 'active' });
     const { token } = (await (await handleLicense(post('/api/license', { email: 'ana@ex.com' }), { store, privateJwk: priv })).json()) as { token: string };
     expect((await handleLicense(post('/api/license', { token }), { store, privateJwk: priv })).status).toBe(200);
-    await store.upsert({ email: 'ana@ex.com', status: 'revoked' });
+    await store.revoke({ email: 'ana@ex.com' });
     expect((await handleLicense(post('/api/license', { token }), { store, privateJwk: priv })).status).toBe(404);
     expect((await handleLicense(post('/api/license', { token: 'v1.lixo.lixo' }), { store, privateJwk: priv })).status).toBe(401);
   });
@@ -237,19 +236,29 @@ describe('ativação /api/license', () => {
 });
 
 describe('armazenamento', () => {
-  it('Supabase: consulta e upsert pela API REST (PostgREST) com a chave de serviço', async () => {
+  it('Supabase: consulta, concessão condicional e revogação pela API REST (PostgREST) com a chave de serviço', async () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     const fake = (async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
-      return new Response(init?.method === 'POST' ? null : JSON.stringify([{ status: 'active' }]), { status: init?.method === 'POST' ? 201 : 200 });
+      if (!init?.method) return new Response(JSON.stringify([{ status: 'active' }]), { status: 200 });
+      if (init.method === 'PATCH') return new Response(JSON.stringify([{ email: 'a@ex.com' }]), { status: 200 });
+      // revogação com return=representation: o PostgREST devolve a linha gravada
+      return new Response(JSON.stringify([{ email: 'a@ex.com', status: 'revoked' }]), { status: 201 });
     }) as typeof fetch;
     const s = supabaseStore('https://abc.supabase.co/', 'srv', fake);
     expect(await s.lookup('a+b@ex.com')).toBe('active');
-    await s.upsert({ email: 'a@ex.com', status: 'revoked' });
+    expect(await s.grant({ email: 'a@ex.com', transaction: 'HP1' })).toBe('active');
+    await s.revoke({ email: 'a@ex.com', transaction: 'HP1' });
     expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?email=eq.a%2Bb%40ex.com&select=status');
-    expect(calls[1].url).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?on_conflict=email');
-    expect((calls[1].init?.headers as Record<string, string>).Prefer).toContain('resolution=merge-duplicates');
-    expect((calls[1].init?.headers as Record<string, string>).Authorization).toBe('Bearer srv');
+    // Concessão: UM UPDATE com a regra no filtro (não é leitura seguida de gravação).
+    expect(calls[1].init?.method).toBe('PATCH');
+    expect(calls[1].url).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?email=eq.a%40ex.com&or=(status.eq.active,transaction.neq.HP1)&select=email,status,transaction');
+    expect(JSON.parse(String(calls[1].init?.body))).toMatchObject({ status: 'active', transaction: 'HP1' });
+    expect(calls[2].url).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?on_conflict=email&select=email,status');
+    expect((calls[2].init?.headers as Record<string, string>).Prefer).toContain('resolution=merge-duplicates');
+    expect((calls[2].init?.headers as Record<string, string>).Prefer).toContain('return=representation');
+    expect(JSON.parse(String(calls[2].init?.body))).toMatchObject({ email: 'a@ex.com', status: 'revoked', transaction: 'HP1' });
+    expect((calls[2].init?.headers as Record<string, string>).Authorization).toBe('Bearer srv');
   });
 
   it('Supabase com e-mail duplicado na tabela: qualquer linha revoked nega o acesso (falha fechada)', async () => {
@@ -309,5 +318,258 @@ describe('configuração pelo painel (diagnóstico do 503)', () => {
     const r = await handleLicense(post('/api/license', { email: 'a@b.co' }), d);
     expect(r.status).toBe(200);
     expect(await verifyToken(((await r.json()) as { token: string }).token, pub)).not.toBeNull();
+  });
+});
+
+// v2.4.1 — ordem, idempotência e concorrência do webhook. TESTES UNITÁRIOS: memoryStore e
+// um PostgREST simulado (fetch falso). Não provam o PostgreSQL; a prova com banco real está
+// em tests/integration/store.postgres.test.ts.
+describe('webhook da Hotmart — reembolso definitivo por transação (unitário)', () => {
+  const ev = (event: string, transaction?: unknown, email = 'ana@ex.com') =>
+    post('/api/hotmart-webhook', { event, version: '2.0.0', data: { buyer: { email }, product: { id: 123 }, purchase: transaction === undefined ? {} : { transaction } } }, { 'X-HOTMART-HOTTOK': 'segredo' });
+  const deps = (store = memoryStore()) => ({ store, hottok: 'segredo', productId: '123' });
+  const state = (d: ReturnType<typeof deps>) => d.store.data.get('ana@ex.com');
+
+  it('1) aprovação e reembolso da mesma transação: revogada', async () => {
+    const d = deps();
+    expect(await (await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d)).json()).toEqual({ ok: true, status: 'active' });
+    expect(await (await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d)).json()).toEqual({ ok: true, status: 'revoked' });
+    expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP1' });
+  });
+
+  it('2) reenvio da aprovação da transação reembolsada: continua revogada (200, sem reenvio infinito)', async () => {
+    const d = deps();
+    await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d);
+    await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d);
+    for (const name of ['PURCHASE_APPROVED', 'PURCHASE_COMPLETE', 'PURCHASE_APPROVED']) {
+      const r = await handleWebhook(ev(name, 'HP1'), d);
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ ignored: 'licenca_revogada', status: 'revoked' });
+    }
+    expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
+  });
+
+  it('3) reembolso repetido: continua revogada (idempotente); aprovação repetida também', async () => {
+    const d = deps();
+    for (let i = 0; i < 3; i++) expect((await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d)).status).toBe(200);
+    expect(state(d)?.status).toBe('active');
+    for (let i = 0; i < 3; i++) expect((await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d)).status).toBe(200);
+    expect(d.store.data.size).toBe(1);
+    expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP1' });
+  });
+
+  it('4) nova compra (outra transação, mesmo e-mail) depois do reembolso: ativa', async () => {
+    const d = deps();
+    await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d);
+    await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d);
+    expect(await (await handleWebhook(ev('PURCHASE_APPROVED', 'HP2'), d)).json()).toEqual({ ok: true, status: 'active' });
+    expect(state(d)).toMatchObject({ status: 'active', transaction: 'HP2' });
+    // E o login volta a funcionar.
+    expect((await handleLicense(post('/api/license', { email: 'ana@ex.com' }), { store: d.store, privateJwk: priv })).status).toBe(200);
+  });
+
+  it('5) fora de ordem: reembolso antes da aprovação bloqueia a aprovação; reembolso atrasado de compra antiga revoga (falha fechada)', async () => {
+    const d = deps();
+    await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d); // e-mail nunca visto: grava revoked
+    expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP1' });
+    await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d);
+    expect(state(d)?.status).toBe('revoked');
+    // LIMITAÇÃO (um registro por e-mail, sem histórico por transação): compra nova HP2 e,
+    // depois, reembolso atrasado de HP1 → revoga, mesmo com HP2 válida. Erra para o lado seguro.
+    await handleWebhook(ev('PURCHASE_APPROVED', 'HP2'), d);
+    expect(state(d)?.status).toBe('active');
+    await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d);
+    expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP1' });
+  });
+
+  it('5b) LIMITAÇÃO: só a última transação reembolsada é lembrada', async () => {
+    // HP1 reembolsada, HP2 comprada e reembolsada; um reenvio tardio da aprovação de HP1
+    // reativa, porque a linha só guarda HP2. Fechar isso exige histórico por transação (schema).
+    const d = deps();
+    for (const [name, t] of [['PURCHASE_APPROVED', 'HP1'], ['PURCHASE_REFUNDED', 'HP1'], ['PURCHASE_APPROVED', 'HP2'], ['PURCHASE_REFUNDED', 'HP2']] as const) await handleWebhook(ev(name, t), d);
+    expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP2' });
+    await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d);
+    expect(state(d)?.status).toBe('active'); // comportamento atual documentado, não desejado
+  });
+
+  it('6) concorrência na memória: aprovação e reembolso simultâneos terminam revogados em qualquer ordem', async () => {
+    for (let i = 0; i < 50; i++) {
+      const d = deps();
+      await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d);
+      const pair = [handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d), handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d)];
+      await Promise.all(i % 2 ? pair : pair.reverse());
+      expect(state(d)?.status).toBe('revoked');
+    }
+  });
+
+  it('6b) PostgREST simulado: linha criada por outra requisição entre o UPDATE e o INSERT segue a mesma regra', async () => {
+    // Sequência de respostas: UPDATE sem linha → INSERT em conflito (linha criada por outra
+    // requisição) → UPDATE de novo. O resultado depende só do terceiro passo.
+    const seq = (third: unknown[]) => {
+      const answers = [[], [], third];
+      const urls: string[] = [];
+      const f = (async (url: string) => {
+        urls.push(url);
+        return new Response(JSON.stringify(answers.shift()), { status: 200 });
+      }) as typeof fetch;
+      return { f, urls };
+    };
+    const a = seq([{ email: 'a@ex.com' }]); // a outra era uma aprovação: ativa
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', a.f).grant({ email: 'a@ex.com', transaction: 'HP1' })).toBe('active');
+    const b = seq([]); // a outra era o reembolso da mesma transação: bloqueada
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', b.f).grant({ email: 'a@ex.com', transaction: 'HP1' })).toBe('blocked');
+    expect(b.urls).toHaveLength(3);
+    expect(b.urls[1]).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?on_conflict=email&select=email');
+  });
+
+  it('7) transação ausente ou inválida: concede só a e-mail novo ou ativo; nunca reativa; reembolso sem transação revoga e bloqueia', async () => {
+    const d = deps();
+    expect(await (await handleWebhook(ev('PURCHASE_APPROVED'), d)).json()).toEqual({ ok: true, status: 'active' }); // e-mail novo
+    await handleWebhook(ev('PURCHASE_REFUNDED'), d); // reembolso sem transação: revoga
+    expect(state(d)).toMatchObject({ status: 'revoked', transaction: null });
+    for (const t of [undefined, 'HP 1', 'HP1;drop', 'HP1),status.eq.revoked', 'x'.repeat(65), 12.5, '', 'HP2']) {
+      const r = await handleWebhook(ev('PURCHASE_APPROVED', t), d);
+      expect(await r.json()).toEqual({ ignored: 'licenca_revogada', status: 'revoked' }); // nem a HP2: não há como saber se é nova
+    }
+    expect(state(d)?.status).toBe('revoked');
+    // Número é aceito como texto (formato 1.0 manda tudo como texto).
+    const d2 = deps();
+    await handleWebhook(ev('PURCHASE_APPROVED', 777), d2);
+    expect(state(d2)).toMatchObject({ status: 'active', transaction: '777' });
+  });
+
+  it('7b) transação inválida nunca entra no filtro do PostgREST', async () => {
+    const urls: string[] = [];
+    const f = (async (url: string) => {
+      urls.push(url);
+      return new Response(JSON.stringify([{ email: 'ana@ex.com' }]), { status: 200 });
+    }) as typeof fetch;
+    const r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1),status.eq.revoked'), { store: supabaseStore('https://abc.supabase.co', 'srv', f), hottok: 'segredo' });
+    expect(r.status).toBe(200);
+    expect(urls[0]).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?email=eq.ana%40ex.com&status=eq.active&select=email,status,transaction');
+  });
+
+  const failing = (fail: (url: string, init?: RequestInit) => Response | null) =>
+    (async (url: string, init?: RequestInit) => fail(url, init) ?? new Response(JSON.stringify([]), { status: 200 })) as typeof fetch;
+
+  it('8) erro de leitura no Supabase: 500 para a Hotmart reenviar, nada concedido; login devolve 502', async () => {
+    for (const bad of [new Response('erro', { status: 500 }), new Response('<html>', { status: 200 }), new Response('{"a":1}', { status: 200 })]) {
+      const f = failing((_u, init) => (init?.method === 'PATCH' ? bad.clone() : null));
+      const r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), { store: supabaseStore('https://abc.supabase.co', 'srv', f), hottok: 'segredo' });
+      expect(r.status).toBe(500);
+      expect(await r.json()).toEqual({ error: 'falha_armazenamento' });
+    }
+    const lookupFails = failing(() => new Response('erro', { status: 503 }));
+    expect((await handleLicense(post('/api/license', { email: 'ana@ex.com' }), { store: supabaseStore('https://abc.supabase.co', 'srv', lookupFails), privateJwk: priv })).status).toBe(502);
+  });
+
+  it('9) erro de gravação no Supabase: 500 na criação e na revogação', async () => {
+    const insertFails = failing((_u, init) => (init?.method === 'POST' ? new Response('{"code":"42P10"}', { status: 400 }) : null));
+    let r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), { store: supabaseStore('https://abc.supabase.co', 'srv', insertFails), hottok: 'segredo' });
+    expect(r.status).toBe(500);
+    r = await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), { store: supabaseStore('https://abc.supabase.co', 'srv', insertFails), hottok: 'segredo' });
+    expect(r.status).toBe(500);
+    expect(await r.json()).toEqual({ error: 'falha_armazenamento' });
+  });
+});
+
+describe('v2.4.5 — reembolso com payload real da Hotmart 2.0 e log de diagnóstico mascarado', () => {
+  // Forma do webhook 2.0.0: e-mail em data.buyer, transação em data.purchase (níveis diferentes).
+  // Dados fictícios.
+  const realRefund = (event = 'PURCHASE_REFUNDED') => ({
+    id: 'a1b2c3d4-0000-0000-0000-000000000000',
+    creation_date: 1761250000000,
+    event,
+    version: '2.0.0',
+    data: {
+      product: { id: 123, ucode: 'abc-123', name: 'NexoProcess', has_co_production: false },
+      buyer: { email: 'Fulana.Teste@Hotmail.com', name: 'Fulana Teste', first_name: 'Fulana', last_name: 'Teste', checkout_phone: '11999990000', document: '12345678900', document_type: 'CPF', address: { city: 'Campinas', zipcode: '13000000', street: 'Rua X', number: '10' } },
+      producer: { name: 'Produtor' },
+      purchase: { transaction: 'HP2938880363', status: 'REFUNDED', order_date: 1761240000000, approved_date: 1761240000000, price: { value: 5, currency_value: 'BRL' }, payment: { type: 'PIX', installments_number: 1 }, buyer_ip: '200.1.2.3' },
+    },
+  });
+  const send = (payload: unknown, hottok = 'segredo') => post('/api/hotmart-webhook', payload, { 'X-HOTMART-HOTTOK': hottok });
+  const logs = () => vi.mocked(console.log).mock.calls.map((c) => c.map(String).join(' '));
+
+  it('compra aprovada e reembolso no formato real: e-mail (data.buyer) e transação (data.purchase) lidos; revoga', async () => {
+    const store = memoryStore();
+    const deps = { store, hottok: 'segredo', productId: '123' };
+    const approved = realRefund('PURCHASE_APPROVED');
+    approved.data.purchase.status = 'APPROVED';
+    expect(await (await handleWebhook(send(approved), deps)).json()).toEqual({ ok: true, status: 'active' });
+    expect(store.data.get('fulana.teste@hotmail.com')).toMatchObject({ status: 'active', transaction: 'HP2938880363', product_id: '123' });
+    for (const ev of ['PURCHASE_REFUNDED', 'PURCHASE_CANCELED', 'PURCHASE_CHARGEBACK']) {
+      expect(await (await handleWebhook(send(realRefund(ev)), deps)).json(), ev).toEqual({ ok: true, status: 'revoked' });
+      expect(store.data.get('fulana.teste@hotmail.com')?.status, ev).toBe('revoked');
+    }
+  });
+
+  it('log de diagnóstico do reembolso: mostra estrutura, evento, transação e status; nunca e-mail completo, nome, documento, telefone, endereço, IP ou hottok', async () => {
+    vi.mocked(console.log).mockClear();
+    await handleWebhook(send(realRefund()), { store: memoryStore(), hottok: 'segredo' });
+    const all = logs().join('\n');
+    const dbg = logs().find((l) => l.includes('DEBUG payload'))!;
+    expect(dbg).toContain('PURCHASE_REFUNDED → revoke');
+    for (const keep of ['"event":"PURCHASE_REFUNDED"', '"transaction":"HP2938880363"', '"status":"REFUNDED"', '"id":123', '"version":"2.0.0"', '"buyer":{', '"email":"F***@Hotmail.com"']) expect(dbg, keep).toContain(keep);
+    for (const leak of ['Fulana.Teste@', 'Fulana Teste', '12345678900', '11999990000', 'Campinas', '13000000', 'Rua X', '200.1.2.3', 'segredo']) expect(all, leak).not.toContain(leak);
+    expect(all).toContain('tx=HP2938880363');
+  });
+
+  it('aprovação não gera log de payload; evento não reconhecido gera (para achar nomes inesperados)', async () => {
+    vi.mocked(console.log).mockClear();
+    const ok = realRefund('PURCHASE_APPROVED');
+    await handleWebhook(send(ok), { store: memoryStore(), hottok: 'segredo' });
+    expect(logs().some((l) => l.includes('DEBUG payload'))).toBe(false);
+    await handleWebhook(send(realRefund('PURCHASE_ALGO_NOVO')), { store: memoryStore(), hottok: 'segredo' });
+    expect(logs().find((l) => l.includes('DEBUG payload'))).toContain('PURCHASE_ALGO_NOVO → ignore');
+  });
+
+  it('hottok errado: 401 registrado no log com a origem do hottok, sem o valor e sem payload', async () => {
+    vi.mocked(console.log).mockClear();
+    const r = await handleWebhook(send(realRefund(), 'hottok-errado-123'), { store: memoryStore(), hottok: 'segredo' });
+    expect(r.status).toBe(401);
+    const all = logs().join('\n');
+    expect(all).toContain('PURCHASE_REFUNDED → 401 hottok inválido (hottok: cabeçalho)');
+    for (const leak of ['hottok-errado-123', 'segredo', 'DEBUG payload', 'Fulana']) expect(all, leak).not.toContain(leak);
+  });
+
+  it('produto diferente do configurado: log mostra o id recebido e o esperado', async () => {
+    vi.mocked(console.log).mockClear();
+    const store = memoryStore({ 'fulana.teste@hotmail.com': 'active' });
+    expect(await (await handleWebhook(send(realRefund()), { store, hottok: 'segredo', productId: '999' })).json()).toEqual({ ignored: 'outro_produto' });
+    expect(store.data.get('fulana.teste@hotmail.com')?.status).toBe('active'); // reembolso de outro produto não revoga
+    expect(logs().join('\n')).toContain('ignorado: outro produto (esperado 999) (F***@Hotmail.com) tx=HP2938880363 prod=123');
+  });
+});
+
+describe('v2.4.5 — revogação só responde 200 com a gravação confirmada pelo banco', () => {
+  const ev = () => post('/api/hotmart-webhook', { event: 'PURCHASE_REFUNDED', version: '2.0.0', data: { buyer: { email: 'ana@ex.com' }, product: { id: 123 }, purchase: { transaction: 'HP1' } } }, { 'X-HOTMART-HOTTOK': 'segredo' });
+  const reply = (status: number, body: string | null) => (async () => new Response(body, { status })) as unknown as typeof fetch;
+
+  it('PostgREST responde sem a linha (ex.: return=minimal ou nada gravado): 500, para a Hotmart reenviar', async () => {
+    vi.mocked(console.error).mockClear();
+    const r = await handleWebhook(ev(), { store: supabaseStore('https://abc.supabase.co', 'srv', reply(201, '[]')), hottok: 'segredo' });
+    expect(r.status).toBe(500);
+    const err = vi.mocked(console.error).mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(err).toContain('PURCHASE_REFUNDED: ERRO ao gravar no Supabase (revogar) tx=HP1 (a***@ex.com) — Supabase revoke: gravação não confirmada (0 linha(s) devolvida(s))');
+  });
+
+  it('erro do Supabase (ex.: 401 chave errada, 42P10 sem chave única): 500 e o erro exato no log, sem a chave', async () => {
+    vi.mocked(console.error).mockClear();
+    const body = '{"code":"42P10","message":"there is no unique or exclusion constraint matching the ON CONFLICT specification"}';
+    const r = await handleWebhook(ev(), { store: supabaseStore('https://abc.supabase.co', 'chave-secreta-xyz', reply(400, body)), hottok: 'segredo' });
+    expect(r.status).toBe(500);
+    const err = vi.mocked(console.error).mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(err).toContain('Supabase revoke: HTTP 400');
+    expect(err).toContain('42P10');
+    expect(err).not.toContain('chave-secreta-xyz');
+  });
+
+  it('todo evento autenticado registra o nome exato e a classificação', async () => {
+    vi.mocked(console.log).mockClear();
+    const store = memoryStore();
+    await handleWebhook(ev(), { store, hottok: 'segredo' });
+    expect(vi.mocked(console.log).mock.calls.map((c) => c.join(' ')).join('\n')).toContain('hotmart recebido: evento="PURCHASE_REFUNDED" ação=revoke tx=HP1 prod=123 (a***@ex.com)');
+    expect(store.data.get('ana@ex.com')?.status).toBe('revoked');
   });
 });
