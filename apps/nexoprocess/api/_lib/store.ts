@@ -7,9 +7,15 @@ export type LicenseStatus = 'active' | 'revoked';
 export interface LicenseRecord {
   email: string;
   status: LicenseStatus;
+  platform?: string | null;
   product_id?: string | null;
   transaction?: string | null;
   event?: string | null;
+  amount?: number | null;
+  refund_amount?: number | null;
+  currency?: string | null;
+  provider_event_id?: string | null;
+  occurred_at?: string | null;
 }
 
 export interface GrantResult {
@@ -25,7 +31,6 @@ export interface LicenseStore {
 }
 
 export type Env = Record<string, string | undefined>;
-const TABLE = 'nexo_licenses';
 const isStatus = (s: unknown): s is LicenseStatus =>
   s === 'active' || s === 'revoked';
 
@@ -39,7 +44,6 @@ export function supabaseStore(
   fetchImpl: typeof fetch = fetch,
 ): LicenseStore {
   const root = `${url.replace(/\/$/, '')}/rest/v1`;
-  const base = `${root}/${TABLE}`;
   const headers = {
     apikey: serviceKey,
     Authorization: `Bearer ${serviceKey}`,
@@ -55,10 +59,16 @@ export function supabaseStore(
       method: 'POST',
       headers,
       body: JSON.stringify({
-        p_email: normalizeEmail(rec.email),
+        p_platform: rec.platform?.trim().toLowerCase() || 'hotmart',
         p_transaction: normalizeTransaction(rec.transaction),
+        p_email: normalizeEmail(rec.email),
         p_product_id: rec.product_id ?? null,
         p_event: rec.event ?? null,
+        p_amount: rec.amount ?? null,
+        p_refund_amount: rec.refund_amount ?? null,
+        p_currency: rec.currency?.trim().toUpperCase() ?? null,
+        p_provider_event_id: rec.provider_event_id ?? null,
+        p_occurred_at: rec.occurred_at ?? null,
       }),
     });
 
@@ -77,30 +87,25 @@ export function supabaseStore(
 
     async lookup(email) {
       const normalizedEmail = normalizeEmail(email);
-      const r = await fetchImpl(
-        `${base}?email=eq.${encodeURIComponent(normalizedEmail)}&select=status`,
-        { headers },
-      );
+      const r = await fetchImpl(`${root}/rpc/nexo_lookup_license`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ p_email: normalizedEmail }),
+      });
 
       if (!r.ok) {
         throw new Error(`Supabase lookup: HTTP ${r.status}`);
       }
 
-      const rows = (await r.json()) as { status: LicenseStatus }[];
-
-      if (rows.length > 1) {
-        console.error(
-          `Supabase: ${rows.length} linhas para o mesmo e-mail — rode o schema.sql`,
-        );
-      }
-
-      if (rows.some((x) => x.status === 'revoked')) return 'revoked';
-      return rows[0]?.status ?? null;
+      const body: unknown = await r.json().catch(() => null);
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+      const status = (body as Record<string, unknown>).status;
+      return isStatus(status) ? status : null;
     },
 
     async grant(rec) {
       const { result, status } = await rpc(
-        'nexo_grant_license',
+        'nexo_grant_purchase',
         rec,
         'grant',
       );
@@ -118,7 +123,7 @@ export function supabaseStore(
 
     async revoke(rec) {
       const { status } = await rpc(
-        'nexo_revoke_license',
+        'nexo_revoke_purchase',
         rec,
         'revoke',
       );
