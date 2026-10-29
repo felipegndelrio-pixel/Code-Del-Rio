@@ -40,7 +40,7 @@ async function reset() {
 
 /** Sessão psql aberta: permite segurar um bloqueio de linha dentro de uma transação. */
 function psqlSession() {
-  const p = spawn('psql', [PG!, '-q', '-v', 'ON_ERROR_STOP=1'], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const p = spawn('psql', ['-q', '-v', 'ON_ERROR_STOP=1', PG!], { stdio: ['pipe', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
   p.stdout.on('data', (c) => (out += c));
@@ -70,22 +70,22 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     await reset();
     const s = store();
     const e = 'seq@it.test';
-    expect(await s.grant({ email: e, transaction: 'HP1', event: 'PURCHASE_APPROVED' })).toBe('active');
+    expect((await s.grant({ email: e, transaction: 'HP1', event: 'PURCHASE_APPROVED' })).result).toBe('active');
     expect(await row(e)).toEqual({ status: 'active', transaction: 'HP1', event: 'PURCHASE_APPROVED' });
     await s.revoke({ email: e, transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
-    expect(await s.grant({ email: e, transaction: 'HP1', event: 'PURCHASE_APPROVED' })).toBe('blocked');
+    expect((await s.grant({ email: e, transaction: 'HP1', event: 'PURCHASE_APPROVED' })).result).toBe('blocked');
     expect(await row(e)).toEqual({ status: 'revoked', transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
     await s.revoke({ email: e, transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
     await s.revoke({ email: e, transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
     expect((await row(e))?.status).toBe('revoked');
-    expect(await s.grant({ email: e, transaction: null })).toBe('blocked'); // sem transação não reativa
-    expect(await s.grant({ email: e, transaction: 'HP2', event: 'PURCHASE_APPROVED' })).toBe('active'); // compra nova
+    expect((await s.grant({ email: e, transaction: null })).result).toBe('blocked'); // sem transação não reativa
+    expect((await s.grant({ email: e, transaction: 'HP2', event: 'PURCHASE_APPROVED' })).result).toBe('active'); // compra nova
     expect(await row(e)).toEqual({ status: 'active', transaction: 'HP2', event: 'PURCHASE_APPROVED' });
-    expect(await s.grant({ email: e, transaction: null })).toBe('active'); // ativa continua ativa
+    expect((await s.grant({ email: e, transaction: null })).result).toBe('active'); // ativa continua ativa
     expect((await row(e))?.transaction).toBe('HP2'); // e não perde a transação
     // Reembolso sem transação: revoga e bloqueia qualquer aprovação automática.
     await s.revoke({ email: e, transaction: null });
-    expect(await s.grant({ email: e, transaction: 'HP3' })).toBe('blocked');
+    expect((await s.grant({ email: e, transaction: 'HP3' })).result).toBe('blocked');
     expect(await row(e)).toMatchObject({ status: 'revoked', transaction: null });
   });
 
@@ -93,7 +93,7 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     await reset();
     const s = store();
     await s.revoke({ email: 'ordem@it.test', transaction: 'HP1' });
-    expect(await s.grant({ email: 'ordem@it.test', transaction: 'HP1' })).toBe('blocked');
+    expect((await s.grant({ email: 'ordem@it.test', transaction: 'HP1' })).result).toBe('blocked');
     expect((await row('ordem@it.test'))?.status).toBe('revoked');
   });
 
@@ -106,7 +106,7 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     const pending = store().grant({ email: e, transaction: 'HP1', event: 'PURCHASE_APPROVED' });
     expect(await settled(pending, 700)).toBe(false); // esperando o bloqueio da linha
     await psql.run('commit;');
-    expect(await pending).toBe('blocked'); // o WHERE foi reavaliado sobre a versão revogada
+    expect((await pending).result).toBe('blocked'); // o WHERE foi reavaliado sobre a versão revogada
     psql.end();
     expect(await row(e)).toMatchObject({ status: 'revoked', event: 'PURCHASE_REFUNDED' });
   });
@@ -132,7 +132,7 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
       const e = `par${i}@it.test`;
       if (i % 2 === 0) await store().grant({ email: e, transaction: 'HP1' }); // metade com linha existente
       const [g] = await Promise.all([store().grant({ email: e, transaction: 'HP1' }), store().revoke({ email: e, transaction: 'HP1' })]);
-      outcomes[g === 'active' ? 'aprovouAntes' : 'bloqueada']++;
+      outcomes[g.result === 'active' ? 'aprovouAntes' : 'bloqueada']++;
       expect((await row(e))?.status).toBe('revoked');
     }
     console.info('ordens observadas', outcomes); // as duas ordens devem aparecer
@@ -141,17 +141,8 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
 
   it('concorrência real: 20 aprovações simultâneas de e-mail novo → uma linha ativa, sem erro', async () => {
     await reset();
-    // Conta os INSERT que voltaram vazios (conflito: outra requisição criou a linha antes),
-    // isto é, as vezes em que o passo 3 do grant() rodou de verdade no banco.
-    let conflicts = 0;
-    const counting = (async (url: string | URL | Request, init?: RequestInit) => {
-      const r = await viaGateway(url, init);
-      if (init?.method === 'POST' && (await r.clone().text()) === '[]') conflicts++;
-      return r;
-    }) as typeof fetch;
-    const results = await Promise.all(Array.from({ length: 20 }, () => supabaseStore(REST!, JWT!, counting).grant({ email: 'muitos@it.test', transaction: 'HP1' })));
-    console.info('INSERT em conflito (passo 3 exercitado):', conflicts);
-    expect(results.every((r) => r === 'active')).toBe(true);
+    const results = await Promise.all(Array.from({ length: 20 }, () => store().grant({ email: 'muitos@it.test', transaction: 'HP1' })));
+    expect(results.every((r) => r.result === 'active')).toBe(true);
     expect(await row('muitos@it.test')).toMatchObject({ status: 'active', transaction: 'HP1' });
   });
 

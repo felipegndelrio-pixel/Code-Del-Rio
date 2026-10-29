@@ -9,7 +9,6 @@ import { ThemeToggle } from '../components/AppShell';
 import { Button, Callout, Field, Input } from '../components/ui';
 import { activate, currentLicense, LICENSE } from '../license/config';
 import { endDemo, startDemo } from '../license/demo';
-import { openDemo } from '../state/actions';
 import { SupportLink } from '../components/SupportLink';
 
 /** Só volta para rotas internas do app (evita redirecionamento aberto). */
@@ -36,8 +35,7 @@ export default function Login() {
   const tryDemo = async () => {
     startDemo();
     try {
-      const w = await openDemo();
-      nav(`/app/p/${w.id}/visao-geral`);
+      nav('/app');
     } catch {
       nav('/app');
     }

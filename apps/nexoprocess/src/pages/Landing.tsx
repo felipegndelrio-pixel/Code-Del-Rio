@@ -24,8 +24,7 @@ export default function Landing() {
   const tryDemo = async () => {
     startDemo();
     try {
-      const w = await openDemo();
-      nav(`/app/p/${w.id}/visao-geral`);
+      nav('/app');
     } catch {
       toast('bad', 'Não conseguimos abrir a demonstração neste navegador. Tente recarregar a página.');
     }

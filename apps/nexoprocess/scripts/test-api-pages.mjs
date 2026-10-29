@@ -9,18 +9,120 @@ const HOTTOK = 'hottok-de-teste';
 const SERVICE_KEY = 'service-role-de-teste';
 const BUYER = 'comprador@ex.com';
 const rows = new Map(); // email → registro
+const refunded = new Map(); // email → conjunto append-only de transações reembolsadas
 const failures = [];
 const results = [];
 
-// Supabase falso: só o que a API usa — select por e-mail; UPDATE condicional (PATCH com
-// email=eq. e or=(status.eq.active,transaction.neq.T) ou status=eq.active); INSERT com
-// on_conflict=email (ignore-duplicates ou merge-duplicates). A atomicidade real no
-// PostgreSQL é provada em tests/integration/store.postgres.test.ts, não aqui.
+const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
+const normalizeTransaction = (transaction) => String(transaction ?? '').trim() || null;
+
+// Supabase falso: consulta por e-mail e as duas RPCs transacionais usadas por store.ts.
+// A atomicidade real no PostgreSQL é provada em tests/integration/store.postgres.test.ts.
 const fake = createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.headers.apikey !== SERVICE_KEY || req.headers.authorization !== `Bearer ${SERVICE_KEY}`) return res.writeHead(401).end();
+
+  if (url.pathname.startsWith('/rest/v1/rpc/')) {
+    const rpc = url.pathname.slice('/rest/v1/rpc/'.length);
+    if (req.method !== 'POST' || !['nexo_grant_license', 'nexo_revoke_license'].includes(rpc)) {
+      return res.writeHead(404).end();
+    }
+
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', () => {
+      const args = JSON.parse(body);
+      const email = normalizeEmail(args.p_email);
+      const transaction = normalizeTransaction(args.p_transaction);
+      const current = rows.get(email);
+      let result;
+      let status;
+
+      if (rpc === 'nexo_grant_license') {
+        const history = refunded.get(email);
+        if (transaction && history?.has(transaction)) {
+          result = 'blocked';
+          status = current?.status ?? 'revoked';
+        } else if (!current) {
+          rows.set(email, {
+            email,
+            status: 'active',
+            product_id: args.p_product_id ?? null,
+            transaction,
+            event: args.p_event ?? null,
+          });
+          result = 'active';
+          status = 'active';
+        } else if (
+          current.status === 'revoked' &&
+          (!transaction || !current.transaction || current.transaction === transaction)
+        ) {
+          result = 'blocked';
+          status = 'revoked';
+        } else {
+          rows.set(email, {
+            ...current,
+            status: 'active',
+            product_id: args.p_product_id ?? null,
+            transaction: transaction ?? current.transaction,
+            event: args.p_event ?? null,
+          });
+          result = 'active';
+          status = 'active';
+        }
+      } else {
+        if (transaction) {
+          const history = refunded.get(email) ?? new Set();
+          history.add(transaction);
+          refunded.set(email, history);
+        }
+
+        if (!current) {
+          rows.set(email, {
+            email,
+            status: 'revoked',
+            product_id: args.p_product_id ?? null,
+            transaction,
+            event: args.p_event ?? null,
+          });
+          result = 'revoked';
+          status = 'revoked';
+        } else if (
+          current.status === 'active' &&
+          transaction &&
+          current.transaction &&
+          current.transaction !== transaction
+        ) {
+          result = 'preserved';
+          status = 'active';
+        } else if (
+          current.status === 'revoked' &&
+          transaction &&
+          current.transaction &&
+          current.transaction !== transaction
+        ) {
+          result = 'preserved';
+          status = 'revoked';
+        } else {
+          rows.set(email, {
+            ...current,
+            status: 'revoked',
+            product_id: args.p_product_id ?? null,
+            transaction,
+            event: args.p_event ?? null,
+          });
+          result = 'revoked';
+          status = 'revoked';
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ result, status }));
+    });
+    return;
+  }
+
   if (url.pathname !== '/rest/v1/nexo_licenses') return res.writeHead(404).end();
-  const email = (url.searchParams.get('email') ?? '').replace(/^eq\./, '');
+  const email = normalizeEmail((url.searchParams.get('email') ?? '').replace(/^eq\./, ''));
   if (req.method === 'GET') {
     const r = rows.get(email);
     return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(r ? [{ status: r.status }] : []));
