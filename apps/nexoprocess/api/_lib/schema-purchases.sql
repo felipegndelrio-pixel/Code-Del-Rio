@@ -134,17 +134,19 @@ from public.nexo_licenses l
 where l.email = lower(btrim(l.email))
   and (l.transaction is null or l.transaction !~ '^[A-Za-z0-9_-]{1,64}$'
        or l.product_id is null or l.product_id !~ '^[A-Za-z0-9._:-]{1,128}$')
-on conflict do nothing;
-
-insert into public.nexo_reconciliation_blocks (email, platform, transaction_id, product_id, reason, event_type, created_at)
-select lower(btrim(r.email)), 'hotmart', r.transaction,
-       case when r.product_id ~ '^[A-Za-z0-9._:-]{1,128}$' then r.product_id else null end,
-       case when r.product_id is null or btrim(r.product_id) = ''
-            then 'legacy_refund_product_missing' else 'legacy_refund_product_invalid' end,
-       r.event, r.refunded_at
-from public.nexo_refunded_transactions r
-where r.email = lower(btrim(r.email))
-  and (r.product_id is null or r.product_id !~ '^[A-Za-z0-9._:-]{1,128}$')
+  and not exists (
+    select 1 from public.nexo_reconciliation_blocks b
+     where b.email = lower(btrim(l.email))
+       and b.platform = 'hotmart'
+       and b.transaction_id is not distinct from
+           case when l.transaction ~ '^[A-Za-z0-9_-]{1,64}$' then l.transaction else null end
+       and b.reason = case
+         when l.transaction is null or btrim(l.transaction) = '' then 'legacy_transaction_missing'
+         when l.transaction !~ '^[A-Za-z0-9_-]{1,64}$' then 'legacy_transaction_invalid'
+         when l.product_id is null or btrim(l.product_id) = '' then 'legacy_product_missing'
+         else 'legacy_product_invalid'
+       end
+  )
 on conflict do nothing;
 
 create or replace function public.nexo_refresh_license_access(p_email text)
@@ -558,6 +560,8 @@ revoke all on table public.nexo_purchase_events from public;
 revoke all on table public.nexo_reconciliation_blocks from public;
 revoke all on function public.nexo_refresh_license_access(text) from public;
 revoke all on function public.nexo_lookup_license(text) from public;
+revoke all on function public.nexo_grant_license(text, text, text, text) from public;
+revoke all on function public.nexo_revoke_license(text, text, text, text) from public;
 revoke all on function public.nexo_add_reconciliation_block(text, text, text, text, text, text, timestamptz) from public;
 revoke all on function public.nexo_apply_purchase_event(text, text, text, text, text, text, numeric, numeric, text, text, timestamptz) from public;
 revoke all on function public.nexo_grant_purchase(text, text, text, text, text, numeric, numeric, text, text, timestamptz) from public;
@@ -575,6 +579,8 @@ begin
       execute pg_catalog.format('revoke all on table public.nexo_reconciliation_blocks from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_refresh_license_access(text) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_lookup_license(text) from %I', r);
+      execute pg_catalog.format('revoke all on function public.nexo_grant_license(text, text, text, text) from %I', r);
+      execute pg_catalog.format('revoke all on function public.nexo_revoke_license(text, text, text, text) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_add_reconciliation_block(text, text, text, text, text, text, timestamptz) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_apply_purchase_event(text, text, text, text, text, text, numeric, numeric, text, text, timestamptz) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_grant_purchase(text, text, text, text, text, numeric, numeric, text, text, timestamptz) from %I', r);
