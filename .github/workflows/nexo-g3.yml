@@ -1,0 +1,128 @@
+name: NexoProcess G3 PostgreSQL
+
+on:
+  push:
+    branches:
+      - 'wip/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  g3-postgres:
+    # PRs are filtered by their source branch, not the base branch.
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/wip/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'wip/'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        # Official Docker image; tag availability reviewed 2026-10-29:
+        # https://hub.docker.com/_/postgres/tags (major 16, matching the local PG16 integration setup).
+        image: postgres:16
+        env:
+          POSTGRES_DB: nexo_it_g3_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: g3-ephemeral-local-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexo_it_g3_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      postgrest:
+        # Official PostgREST v12.2 image; release/tag reviewed 2026-10-29:
+        # https://hub.docker.com/r/postgrest/postgrest/tags and https://github.com/PostgREST/postgrest/blob/main/CHANGELOG.md
+        image: postgrest/postgrest:v12.2.12
+        env:
+          PGRST_DB_URI: postgres://authenticator:g3-ephemeral-local-only@postgres:5432/nexo_it_g3_test
+          PGRST_DB_SCHEMAS: public
+          PGRST_DB_ANON_ROLE: anon
+          PGRST_JWT_SECRET: g3-ephemeral-jwt-secret-only-never-production
+          PGRST_SERVER_PORT: 3000
+        ports:
+          - 3010:3000
+    steps:
+      # Official action docs/releases reviewed 2026-10-29:
+      # https://github.com/actions/checkout/releases and https://github.com/actions/setup-node/releases
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Wait for Postgres
+        run: |
+          for attempt in {1..30}; do
+            if pg_isready -h 127.0.0.1 -p 5432 -U postgres -d nexo_it_g3_test; then exit 0; fi
+            sleep 2
+          done
+          echo 'Postgres did not become ready' >&2
+          exit 1
+      - name: Create local-only roles and database identity marker before migrations
+        env:
+          PGPASSWORD: g3-ephemeral-local-only
+        run: |
+          psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE ROLE authenticator LOGIN NOINHERIT PASSWORD 'g3-ephemeral-local-only';
+          GRANT anon, authenticated, service_role TO authenticator;
+          CREATE TABLE public.nexo_it_g3_target (database_name text PRIMARY KEY);
+          INSERT INTO public.nexo_it_g3_target VALUES (current_database());
+          GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+          GRANT SELECT ON public.nexo_it_g3_target TO service_role;
+          NOTIFY pgrst, 'reload schema';
+          SQL
+      - name: Wait for PostgREST and confirm database target
+        env:
+          PGPASSWORD: g3-ephemeral-local-only
+          PGRST_JWT_SECRET: g3-ephemeral-jwt-secret-only-never-production
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3010/ >/dev/null; then break; fi
+            sleep 2
+          done
+          export NEXO_IT_PG_URL='postgresql://postgres:g3-ephemeral-local-only@127.0.0.1:5432/nexo_it_g3_test'
+          export NEXO_IT_POSTGREST_URL='http://127.0.0.1:3010'
+          export NEXO_IT_SERVICE_JWT="$(node --input-type=module -e '
+            import { createHmac } from "node:crypto";
+            const b64 = (x) => Buffer.from(JSON.stringify(x)).toString("base64url");
+            const header = b64({ alg: "HS256", typ: "JWT" });
+            const payload = b64({ role: "service_role", exp: Math.floor(Date.now() / 1000) + 600 });
+            const body = `${header}.${payload}`;
+            const signature = createHmac("sha256", process.env.PGRST_JWT_SECRET).update(body).digest("base64url");
+            process.stdout.write(`${body}.${signature}`);
+          ')"
+          node --input-type=module -e '
+            import { execFileSync } from "node:child_process";
+            const db = execFileSync("psql", [process.env.NEXO_IT_PG_URL, "-X", "-A", "-t", "-c", "SELECT current_database()"], { encoding: "utf8" }).trim();
+            if (db !== "nexo_it_g3_test") throw new Error("psql target mismatch");
+            const response = await fetch(`${process.env.NEXO_IT_POSTGREST_URL}/nexo_it_g3_target?select=database_name&limit=1`, { headers: { apikey: process.env.NEXO_IT_SERVICE_JWT, Authorization: `Bearer ${process.env.NEXO_IT_SERVICE_JWT}` } });
+            if (!response.ok) throw new Error("PostgREST marker read failed");
+            const rows = await response.json();
+            if (rows.length !== 1 || rows[0].database_name !== db) throw new Error("PostgREST/psql database mismatch");
+          '
+      - name: Apply the test schema
+        env:
+          PGPASSWORD: g3-ephemeral-local-only
+        run: |
+          psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema.sql
+          psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema-refund-history.sql
+      - name: Run PostgreSQL G3 integration suite
+        env:
+          NEXO_IT_PG_URL: postgresql://postgres:g3-ephemeral-local-only@127.0.0.1:5432/nexo_it_g3_test
+          NEXO_IT_POSTGREST_URL: http://127.0.0.1:3010
+          PGRST_JWT_SECRET: g3-ephemeral-jwt-secret-only-never-production
+        run: |
+          NEXO_IT_SERVICE_JWT="$(node --input-type=module -e '
+            import { createHmac } from "node:crypto";
+            const b64 = (x) => Buffer.from(JSON.stringify(x)).toString("base64url");
+            const body = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role: "service_role", exp: Math.floor(Date.now() / 1000) + 600 })}`;
+            process.stdout.write(`${body}.${createHmac("sha256", process.env.PGRST_JWT_SECRET).update(body).digest("base64url")}`);
+          ')" npm run nexo:test -- --testNamePattern 'PostgreSQL real via PostgREST|trava do alvo PostgreSQL G3'

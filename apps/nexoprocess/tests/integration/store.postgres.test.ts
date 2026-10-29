@@ -14,20 +14,17 @@ import { spawn } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import { handleWebhook } from '../../api/_lib/handlers';
 import { supabaseStore } from '../../api/_lib/store';
-import { assertSafeTestTargets } from './db-target';
+import { assertIntegrationConfig, assertPostgrestUsesTestDatabase, assertSafeTestTargets } from './db-target';
 
 const REST = process.env.NEXO_IT_POSTGREST_URL;
 const JWT = process.env.NEXO_IT_SERVICE_JWT;
 const PG = process.env.NEXO_IT_PG_URL;
 
-const integrationConfig = [REST, JWT, PG];
-const configuredCount = integrationConfig.filter((value) => value !== undefined).length;
-if (configuredCount !== 0 && configuredCount !== integrationConfig.length) {
-  throw new Error('Integração PostgreSQL exige NEXO_IT_POSTGREST_URL, NEXO_IT_SERVICE_JWT e NEXO_IT_PG_URL juntos.');
-}
+assertIntegrationConfig([REST, JWT, PG]);
 if (REST !== undefined && JWT !== undefined && PG !== undefined) {
   // Executado durante a descoberta do teste, antes de qualquer reset(), DELETE ou SQL.
   assertSafeTestTargets(PG, REST);
+  await assertPostgrestUsesTestDatabase(PG, REST, JWT);
 }
 
 vi.spyOn(console, 'log').mockImplementation(() => {});
