@@ -28,6 +28,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Run unit and API tests
+        run: npm run nexo:test -- src tests/api
       - name: Generate ephemeral credentials
         shell: bash
         run: |
@@ -118,11 +120,13 @@ jobs:
             const rows = await response.json();
             if (rows.length !== 1 || rows[0].database_name !== db) throw new Error("PostgREST/psql database mismatch");
           '
-      - name: Apply test schema and refund-history migration
+      - name: Apply schema and purchase migration twice
         shell: bash
         run: |
           PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema.sql
           PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema-refund-history.sql
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema-purchases.sql
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema-purchases.sql
       - name: Grant service role access to the disposable license table
         shell: bash
         run: |
@@ -158,7 +162,7 @@ jobs:
             import { readFileSync } from "node:fs";
             const report = JSON.parse(readFileSync(`${process.env.GITHUB_WORKSPACE}/g3-result.json`, "utf8"));
             const { numPassedTests: passed, numFailedTests: failed, numPendingTests: pending, numTodoTests: todo } = report;
-            if (![passed, failed, pending, todo].every(Number.isInteger) || passed < 17 || failed !== 0 || pending !== 0 || todo !== 0) {
+            if (![passed, failed, pending, todo].every(Number.isInteger) || passed < 23 || failed !== 0 || pending !== 0 || todo !== 0) {
               console.error(`G3 inválido: passed=${passed}, failed=${failed}, pending=${pending}, todo=${todo}`);
               process.exit(1);
             }

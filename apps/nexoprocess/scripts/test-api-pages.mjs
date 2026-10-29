@@ -16,7 +16,7 @@ const results = [];
 const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
 const normalizeTransaction = (transaction) => String(transaction ?? '').trim() || null;
 
-// Supabase falso: consulta por e-mail e as duas RPCs transacionais usadas por store.ts.
+// Supabase falso: RPCs transacionais de consulta, concessão e revogação usadas por store.ts.
 // A atomicidade real no PostgreSQL é provada em tests/integration/store.postgres.test.ts.
 const fake = createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -24,7 +24,7 @@ const fake = createServer((req, res) => {
 
   if (url.pathname.startsWith('/rest/v1/rpc/')) {
     const rpc = url.pathname.slice('/rest/v1/rpc/'.length);
-    if (req.method !== 'POST' || !['nexo_grant_license', 'nexo_revoke_license'].includes(rpc)) {
+    if (req.method !== 'POST' || !['nexo_lookup_license', 'nexo_grant_purchase', 'nexo_revoke_purchase'].includes(rpc)) {
       return res.writeHead(404).end();
     }
 
@@ -38,7 +38,12 @@ const fake = createServer((req, res) => {
       let result;
       let status;
 
-      if (rpc === 'nexo_grant_license') {
+      if (rpc === 'nexo_lookup_license') {
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(current ? { status: current.status } : null));
+        return;
+      }
+
+      if (rpc === 'nexo_grant_purchase') {
         const history = refunded.get(email);
         if (transaction && history?.has(transaction)) {
           result = 'blocked';
@@ -123,10 +128,7 @@ const fake = createServer((req, res) => {
 
   if (url.pathname !== '/rest/v1/nexo_licenses') return res.writeHead(404).end();
   const email = normalizeEmail((url.searchParams.get('email') ?? '').replace(/^eq\./, ''));
-  if (req.method === 'GET') {
-    const r = rows.get(email);
-    return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(r ? [{ status: r.status }] : []));
-  }
+  if (req.method === 'GET') return res.writeHead(404).end();
   let body = '';
   req.on('data', (c) => (body += c));
   req.on('end', () => {

@@ -236,12 +236,12 @@ describe('ativação /api/license', () => {
 });
 
 describe('armazenamento', () => {
-  it('Supabase: consulta pela tabela; concessão e revogação por funções RPC transacionais, com a chave de serviço', async () => {
+  it('Supabase: consulta de acesso e gravação de compras por RPC, com a chave de serviço', async () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     const fake = (async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
-      if (!init?.method) return new Response(JSON.stringify([{ status: 'active' }]), { status: 200 });
-      if (url.endsWith('/rpc/nexo_grant_license')) return new Response(JSON.stringify({ result: 'active', status: 'active' }), { status: 200 });
+      if (url.endsWith('/rpc/nexo_lookup_license')) return new Response(JSON.stringify({ status: 'active' }), { status: 200 });
+      if (url.endsWith('/rpc/nexo_grant_purchase')) return new Response(JSON.stringify({ result: 'active', status: 'active' }), { status: 200 });
       return new Response(JSON.stringify({ result: 'revoked', status: 'revoked' }), { status: 200 });
     }) as typeof fetch;
     const s = supabaseStore('https://abc.supabase.co/', 'srv', fake);
@@ -249,12 +249,13 @@ describe('armazenamento', () => {
     expect(await s.grant({ email: 'a@ex.com', transaction: 'HP1', product_id: '123', event: 'PURCHASE_APPROVED' })).toEqual({ result: 'active', status: 'active' });
     await s.revoke({ email: 'a@ex.com', transaction: 'HP1' });
     expect(calls).toHaveLength(3); // uma requisição (uma transação no banco) por operação
-    expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?email=eq.a%2Bb%40ex.com&select=status');
+    expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/rpc/nexo_lookup_license');
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ p_email: 'a+b@ex.com' });
     expect(calls[1].init?.method).toBe('POST');
-    expect(calls[1].url).toBe('https://abc.supabase.co/rest/v1/rpc/nexo_grant_license');
-    expect(JSON.parse(String(calls[1].init?.body))).toEqual({ p_email: 'a@ex.com', p_transaction: 'HP1', p_product_id: '123', p_event: 'PURCHASE_APPROVED' });
-    expect(calls[2].url).toBe('https://abc.supabase.co/rest/v1/rpc/nexo_revoke_license');
-    expect(JSON.parse(String(calls[2].init?.body))).toEqual({ p_email: 'a@ex.com', p_transaction: 'HP1', p_product_id: null, p_event: null });
+    expect(calls[1].url).toBe('https://abc.supabase.co/rest/v1/rpc/nexo_grant_purchase');
+    expect(JSON.parse(String(calls[1].init?.body))).toEqual({ p_platform: 'hotmart', p_transaction: 'HP1', p_email: 'a@ex.com', p_product_id: '123', p_event: 'PURCHASE_APPROVED', p_amount: null, p_refund_amount: null, p_currency: null, p_provider_event_id: null, p_occurred_at: null });
+    expect(calls[2].url).toBe('https://abc.supabase.co/rest/v1/rpc/nexo_revoke_purchase');
+    expect(JSON.parse(String(calls[2].init?.body))).toEqual({ p_platform: 'hotmart', p_transaction: 'HP1', p_email: 'a@ex.com', p_product_id: null, p_event: null, p_amount: null, p_refund_amount: null, p_currency: null, p_provider_event_id: null, p_occurred_at: null });
     expect((calls[2].init?.headers as Record<string, string>).Authorization).toBe('Bearer srv');
   });
 
@@ -269,12 +270,11 @@ describe('armazenamento', () => {
 
   it('Supabase com e-mail duplicado na tabela: qualquer linha revoked nega o acesso (falha fechada)', async () => {
     const answer = (rows: { status: string }[]) => (async () => new Response(JSON.stringify(rows), { status: 200 })) as typeof fetch;
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'revoked' }])).lookup('a@ex.com')).toBe('revoked');
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'revoked' }, { status: 'active' }])).lookup('a@ex.com')).toBe('revoked');
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'active' }])).lookup('a@ex.com')).toBe('active');
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([])).lookup('a@ex.com')).toBeNull();
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer({ status: 'revoked' })).lookup('a@ex.com')).toBe('revoked');
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer({ status: 'active' })).lookup('a@ex.com')).toBe('active');
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer(null)).lookup('a@ex.com')).toBeNull();
     // De ponta a ponta: a ativação devolve 404 (sem acesso) com a linha duplicada.
-    const deps = { store: supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'revoked' }])), privateJwk: priv };
+    const deps = { store: supabaseStore('https://abc.supabase.co', 'srv', answer({ status: 'revoked' })), privateJwk: priv };
     expect((await handleLicense(post('/api/license', { email: 'a@ex.com' }), deps)).status).toBe(404);
   });
 
@@ -503,7 +503,7 @@ describe('webhook da Hotmart — reembolso definitivo por transação (unitário
     // Aprovação atrasada de transação reembolsada com outra compra ativa: o webhook responde ativa.
     const r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), { store: s({ result: 'blocked', status: 'active' }), hottok: 'segredo' });
     expect(await r.json()).toEqual({ ignored: 'transacao_reembolsada', status: 'active' });
-    expect(urls).toEqual(['https://abc.supabase.co/rest/v1/rpc/nexo_grant_license', 'https://abc.supabase.co/rest/v1/rpc/nexo_grant_license']);
+    expect(urls).toEqual(['https://abc.supabase.co/rest/v1/rpc/nexo_grant_purchase', 'https://abc.supabase.co/rest/v1/rpc/nexo_grant_purchase']);
   });
 
   it('7) transação ausente ou inválida: concede só a e-mail novo ou ativo; nunca reativa; reembolso sem transação revoga e bloqueia', async () => {
@@ -530,7 +530,7 @@ describe('webhook da Hotmart — reembolso definitivo por transação (unitário
     }) as typeof fetch;
     const r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1),status.eq.revoked'), { store: supabaseStore('https://abc.supabase.co', 'srv', f), hottok: 'segredo' });
     expect(r.status).toBe(200);
-    expect(bodies).toEqual([{ p_email: 'ana@ex.com', p_transaction: null, p_product_id: '123', p_event: 'PURCHASE_APPROVED' }]);
+    expect(bodies).toEqual([{ p_platform: 'hotmart', p_transaction: null, p_email: 'ana@ex.com', p_product_id: '123', p_event: 'PURCHASE_APPROVED', p_amount: null, p_refund_amount: null, p_currency: null, p_provider_event_id: null, p_occurred_at: null }]);
   });
 
   const failing = (fail: (url: string, init?: RequestInit) => Response | null) =>
@@ -538,7 +538,7 @@ describe('webhook da Hotmart — reembolso definitivo por transação (unitário
 
   it('8) erro de leitura no Supabase: 500 para a Hotmart reenviar, nada concedido; login devolve 502', async () => {
     for (const bad of [new Response('erro', { status: 500 }), new Response('<html>', { status: 200 }), new Response('{"a":1}', { status: 200 })]) {
-      const f = failing((u) => (u.endsWith('/rpc/nexo_grant_license') ? bad.clone() : null));
+      const f = failing((u) => (u.endsWith('/rpc/nexo_grant_purchase') ? bad.clone() : null));
       const r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), { store: supabaseStore('https://abc.supabase.co', 'srv', f), hottok: 'segredo' });
       expect(r.status).toBe(500);
       expect(await r.json()).toEqual({ error: 'falha_armazenamento' });

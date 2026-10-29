@@ -560,8 +560,6 @@ revoke all on table public.nexo_purchase_events from public;
 revoke all on table public.nexo_reconciliation_blocks from public;
 revoke all on function public.nexo_refresh_license_access(text) from public;
 revoke all on function public.nexo_lookup_license(text) from public;
-revoke all on function public.nexo_grant_license(text, text, text, text) from public;
-revoke all on function public.nexo_revoke_license(text, text, text, text) from public;
 revoke all on function public.nexo_add_reconciliation_block(text, text, text, text, text, text, timestamptz) from public;
 revoke all on function public.nexo_apply_purchase_event(text, text, text, text, text, text, numeric, numeric, text, text, timestamptz) from public;
 revoke all on function public.nexo_grant_purchase(text, text, text, text, text, numeric, numeric, text, text, timestamptz) from public;
@@ -572,6 +570,12 @@ do $$
 declare
   r text;
 begin
+  if pg_catalog.to_regprocedure('public.nexo_grant_license(text,text,text,text)') is not null then
+    execute 'revoke all on function public.nexo_grant_license(text, text, text, text) from public';
+  end if;
+  if pg_catalog.to_regprocedure('public.nexo_revoke_license(text,text,text,text)') is not null then
+    execute 'revoke all on function public.nexo_revoke_license(text, text, text, text) from public';
+  end if;
   foreach r in array array['anon', 'authenticated', 'service_role', 'authenticator'] loop
     if exists (select 1 from pg_catalog.pg_roles where rolname = r) then
       execute pg_catalog.format('revoke all on table public.nexo_purchases from %I', r);
@@ -579,8 +583,12 @@ begin
       execute pg_catalog.format('revoke all on table public.nexo_reconciliation_blocks from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_refresh_license_access(text) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_lookup_license(text) from %I', r);
-      execute pg_catalog.format('revoke all on function public.nexo_grant_license(text, text, text, text) from %I', r);
-      execute pg_catalog.format('revoke all on function public.nexo_revoke_license(text, text, text, text) from %I', r);
+      if pg_catalog.to_regprocedure('public.nexo_grant_license(text,text,text,text)') is not null then
+        execute pg_catalog.format('revoke all on function public.nexo_grant_license(text, text, text, text) from %I', r);
+      end if;
+      if pg_catalog.to_regprocedure('public.nexo_revoke_license(text,text,text,text)') is not null then
+        execute pg_catalog.format('revoke all on function public.nexo_revoke_license(text, text, text, text) from %I', r);
+      end if;
       execute pg_catalog.format('revoke all on function public.nexo_add_reconciliation_block(text, text, text, text, text, text, timestamptz) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_apply_purchase_event(text, text, text, text, text, text, numeric, numeric, text, text, timestamptz) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_grant_purchase(text, text, text, text, text, numeric, numeric, text, text, timestamptz) from %I', r);
