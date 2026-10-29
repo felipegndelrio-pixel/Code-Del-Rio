@@ -31,8 +31,12 @@ jobs:
       - name: Generate ephemeral credentials
         shell: bash
         run: |
-          echo "PG_TEST_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
-          echo "PGRST_JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          PG_TEST_PASSWORD="$(openssl rand -hex 32)"
+          PGRST_JWT_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$PG_TEST_PASSWORD"
+          echo "::add-mask::$PGRST_JWT_SECRET"
+          echo "PG_TEST_PASSWORD=$PG_TEST_PASSWORD" >> "$GITHUB_ENV"
+          echo "PGRST_JWT_SECRET=$PGRST_JWT_SECRET" >> "$GITHUB_ENV"
       - name: Start disposable PostgreSQL
         shell: bash
         run: |
@@ -94,14 +98,15 @@ jobs:
             const body = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role: "service_role", exp: Math.floor(Date.now() / 1000) + 1800 })}`;
             process.stdout.write(`${body}.${createHmac("sha256", process.env.PGRST_JWT_SECRET).update(body).digest("base64url")}`);
           ')"
+          echo "::add-mask::$TOKEN"
           echo "NEXO_IT_SERVICE_JWT=$TOKEN" >> "$GITHUB_ENV"
       - name: Confirm psql and PostgREST target the same test database
         shell: bash
         env:
           NEXO_IT_POSTGREST_URL: http://127.0.0.1:3010
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes postgresql-client
+          # ubuntu-latest currently provides PostgreSQL 16 and psql; verified 2026-10-29:
+          # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
           export NEXO_IT_PG_URL="postgresql://postgres:$PG_TEST_PASSWORD@127.0.0.1:5432/nexo_it_g3_test"
           node --input-type=module -e '
             import { execFileSync } from "node:child_process";
@@ -123,6 +128,21 @@ jobs:
         run: |
           PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 \
             -c 'GRANT SELECT, INSERT, UPDATE, DELETE ON public.nexo_licenses TO service_role;'
+      - name: Reload PostgREST schema cache and wait for license endpoint
+        shell: bash
+        run: |
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 \
+            -c "NOTIFY pgrst, 'reload schema';"
+          for attempt in {1..30}; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --header "apikey: $NEXO_IT_SERVICE_JWT" \
+              --header "Authorization: Bearer $NEXO_IT_SERVICE_JWT" \
+              'http://127.0.0.1:3010/nexo_licenses?limit=0')"
+            if [ "$status" = '200' ]; then exit 0; fi
+            sleep 2
+          done
+          echo 'PostgREST license endpoint did not become ready after schema reload' >&2
+          exit 1
       - name: Run PostgreSQL G3 integration suite
         shell: bash
         run: |
@@ -131,3 +151,12 @@ jobs:
           export PGRST_JWT_SECRET
           export NEXO_IT_SERVICE_JWT
           npm run nexo:test -- --testNamePattern 'PostgreSQL real via PostgREST|trava do alvo PostgreSQL G3'
+      - name: Show last 30 lines of container logs after failure
+        if: failure()
+        shell: bash
+        run: |
+          for container in g3-postgrest g3-postgres; do
+            echo "::group::Last 30 lines: $container"
+            docker logs "$container" 2>&1 | tail -n 30 || true
+            echo '::endgroup::'
+          done
