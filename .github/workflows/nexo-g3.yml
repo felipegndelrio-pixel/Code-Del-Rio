@@ -150,7 +150,20 @@ jobs:
           export NEXO_IT_POSTGREST_URL=http://127.0.0.1:3010
           export PGRST_JWT_SECRET
           export NEXO_IT_SERVICE_JWT
-          npm run nexo:test -- --testNamePattern 'PostgreSQL real via PostgREST|trava do alvo PostgreSQL G3'
+          npm run nexo:test -- tests/integration --reporter=default --reporter=json --outputFile="$GITHUB_WORKSPACE/g3-result.json"
+      - name: Reject skipped or missing G3 tests
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const report = JSON.parse(readFileSync(`${process.env.GITHUB_WORKSPACE}/g3-result.json`, "utf8"));
+            const { numPassedTests: passed, numFailedTests: failed, numPendingTests: pending, numTodoTests: todo } = report;
+            if (![passed, failed, pending, todo].every(Number.isInteger) || passed < 17 || failed !== 0 || pending !== 0 || todo !== 0) {
+              console.error(`G3 inválido: passed=${passed}, failed=${failed}, pending=${pending}, todo=${todo}`);
+              process.exit(1);
+            }
+            console.log(`G3 válido: passed=${passed}, failed=${failed}, pending=${pending}, todo=${todo}`);
+          '
       - name: Show last 30 lines of container logs after failure
         if: failure()
         shell: bash
