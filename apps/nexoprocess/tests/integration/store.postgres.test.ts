@@ -100,15 +100,16 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     await s.revoke({ email: e, transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
     await s.revoke({ email: e, transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
     expect((await row(e))?.status).toBe('revoked');
-    expect((await s.grant({ email: e, transaction: null })).result).toBe('blocked'); // sem transação não reativa
+    const missingTx = await fetch(`${REST}/rpc/nexo_grant_purchase`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_platform: 'hotmart', p_transaction: null, p_email: e, p_product_id: '123', p_event: 'PURCHASE_APPROVED' }) });
+    expect(await missingTx.json()).toMatchObject({ result: 'blocked', status: 'revoked', ignored: 'transaction_missing' });
     expect((await s.grant({ email: e, transaction: 'HP2', event: 'PURCHASE_APPROVED' })).result).toBe('active'); // compra nova
     expect(await row(e)).toEqual({ status: 'active', transaction: 'HP2', event: 'PURCHASE_APPROVED' });
-    expect((await s.grant({ email: e, transaction: null })).result).toBe('blocked'); // transação ausente gera reconciliação
-    expect((await row(e))?.status).toBe('revoked');
+    expect(await s.grant({ email: e, transaction: null })).toMatchObject({ result: 'blocked', status: 'active' }); // aprovação sem tx não altera acesso
+    expect((await row(e))?.transaction).toBe('HP2');
     // Reembolso sem transação: revoga e bloqueia qualquer aprovação automática.
     await s.revoke({ email: e, transaction: null });
     expect((await s.grant({ email: e, transaction: 'HP3' })).result).toBe('blocked');
-    expect(await row(e)).toMatchObject({ status: 'revoked', transaction: null });
+    expect(await row(e)).toMatchObject({ status: 'revoked', transaction: 'HP2' });
   });
 
   it('fora de ordem: reembolso que chega antes da aprovação cria a linha revogada e bloqueia a aprovação', async () => {
@@ -228,20 +229,29 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     expect(await s.lookup(e)).toBe('active');
   });
 
-  it('transação ou produto ausente bloqueia; evento mais antigo não desfaz reembolso', async () => {
+  it('transação ausente é ignorada; produto ausente bloqueia; evento antigo e webhook sem product.id são tratados', async () => {
     await reset(); const s = store(); const e = 'reconcile@it.test';
     await s.grant({ email: e, transaction: 'H1', product_id: '123', event: 'PURCHASE_APPROVED', occurred_at: '2026-01-02T00:00:00Z' });
     await s.revoke({ email: e, transaction: 'H1', product_id: '123', event: 'REFUND', occurred_at: '2026-01-03T00:00:00Z' });
     await s.grant({ email: e, transaction: 'H1', product_id: '123', event: 'PURCHASE_APPROVED', occurred_at: '2026-01-01T00:00:00Z' });
     expect(await s.lookup(e)).toBe('revoked');
-    expect((await s.grant({ email: e, transaction: 'H2', product_id: null, event: 'PURCHASE_APPROVED' })).result).toBe('blocked');
+    const raw = supabaseStore(REST!, JWT!, viaGateway);
+    expect(await raw.grant({ email: 'missing-product@it.test', transaction: 'H2', product_id: null, event: 'PURCHASE_APPROVED' })).toMatchObject({ result: 'blocked', status: 'revoked' });
     expect(await s.lookup(e)).toBe('revoked');
+    const response = await handleWebhook(new Request('https://x.test/api/hotmart-webhook', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-HOTMART-HOTTOK': 'segredo' },
+      body: JSON.stringify({ event: 'PURCHASE_APPROVED', data: { buyer: { email: 'no-product-id@it.test' }, purchase: { transaction: 'H3' } } }),
+    }), { store: raw, hottok: 'segredo' });
+    expect(response.status).toBe(200);
+    expect(await row('no-product-id@it.test')).toMatchObject({ status: 'revoked', transaction: 'H3' });
   });
 
   it('service_role não pode executar as RPCs antigas de licença', async () => {
     for (const fn of ['nexo_grant_license', 'nexo_revoke_license']) {
       const r = await fetch(`${REST}/rpc/${fn}`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_email: 'legacy@it.test', p_transaction: 'H1', p_product_id: '123', p_event: 'PURCHASE_APPROVED' }) });
-      expect(r.ok).toBe(false);
+      expect([401, 403]).toContain(r.status);
+      const body = await r.json() as { code?: string };
+      expect(body.code).toBe('42501');
     }
   });
 
@@ -250,13 +260,15 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     const email = 'migration@it.test';
     const insert = await fetch(`${REST}/nexo_licenses`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ email, status: 'active', transaction: 'H1', product_id: null, event: 'PURCHASE_APPROVED' }) });
     expect(insert.ok).toBe(true);
+    const { execFileSync } = await import('node:child_process');
+    const migrate = () => execFileSync('psql', [PG!, '-X', '-v', 'ON_ERROR_STOP=1', '-f', 'apps/nexoprocess/api/_lib/schema-purchases.sql'], { stdio: 'ignore' });
+    migrate();
     const blocksResponse = await fetch(`${REST}/nexo_reconciliation_blocks?email=eq.${encodeURIComponent(email)}&resolved_at=is.null&select=id`, { headers: auth() });
     const blocks = await blocksResponse.json() as { id: number }[];
     expect(blocks).toHaveLength(1);
     const resolved = await fetch(`${REST}/rpc/nexo_resolve_reconciliation_block`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_id: blocks[0].id, p_resolution: 'reconciled in test' }) });
     expect(resolved.ok).toBe(true);
-    const { execFileSync } = await import('node:child_process');
-    execFileSync('psql', [PG!, '-X', '-v', 'ON_ERROR_STOP=1', '-f', 'apps/nexoprocess/api/_lib/schema-purchases.sql'], { stdio: 'ignore' });
+    migrate();
     const after = await fetch(`${REST}/nexo_reconciliation_blocks?email=eq.${encodeURIComponent(email)}&resolved_at=is.null&select=id`, { headers: auth() });
     expect(await after.json()).toEqual([]);
     await reset();

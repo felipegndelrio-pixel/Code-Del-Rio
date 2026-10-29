@@ -263,6 +263,15 @@ begin
     return jsonb_build_object('result', 'blocked', 'status', 'revoked');
   end if;
 
+  if p_operation = 'grant' and v_transaction is null then
+    perform public.nexo_refresh_license_access(v_email);
+    select l.status into v_status from public.nexo_licenses l where l.email = v_email;
+    return jsonb_build_object(
+      'result', 'blocked', 'status', coalesce(v_status, 'revoked'),
+      'ignored', 'transaction_missing'
+    );
+  end if;
+
   if p_provider_event_id is not null then
     if length(p_provider_event_id) not between 1 and 160 then
       perform public.nexo_add_reconciliation_block(v_email, v_platform, null, null, 'provider_event_id_invalid', v_event, v_time);
