@@ -155,20 +155,26 @@ export async function handleWebhook(req: Request, deps: WebhookDeps): Promise<Re
   }
   if (!deps.store) return notConfigured('/api/hotmart-webhook', deps.missing); // Hotmart reenvia depois
   if (ev.transactionInvalid) log('transação fora do formato: tratada como ausente');
-  // Regra em LicenseStore.grant(): reembolso é definitivo para a mesma transação; só uma
-  // compra com outra transação reativa. Revogação sempre grava (falha fechada).
+  // Regra em LicenseStore.grant(): transação reembolsada nunca concede de novo (histórico por
+  // transação); só uma compra com outra transação reativa. Revogação sempre grava (falha fechada).
   const rec = { email, product_id: ev.productId, transaction: ev.transaction, event: ev.event };
   let status: 'active' | 'revoked';
   try {
     if (ev.action === 'grant') {
-      if ((await deps.store.grant(rec)) === 'blocked') {
+      const g = await deps.store.grant(rec);
+      if (g.result === 'blocked') {
+        // 200: reenviar não muda nada. status é o estado efetivo: uma aprovação atrasada de
+        // transação reembolsada não mexe numa licença ativa por outra compra.
+        if (g.status === 'active') {
+          log('ignorado: transação já reembolsada; a licença segue ativa por outra compra');
+          return json(200, { ignored: 'transacao_reembolsada', status: 'active' });
+        }
         log('ignorado: licença revogada; aprovação sem transação nova não reativa');
-        return json(200, { ignored: 'licenca_revogada', status: 'revoked' }); // 200: reenviar não muda nada
+        return json(200, { ignored: 'licenca_revogada', status: 'revoked' });
       }
       status = 'active';
     } else {
-      await deps.store.revoke(rec);
-      status = 'revoked';
+      status = await deps.store.revoke(rec);
     }
   } catch (e) {
     // Erro de leitura ou gravação: 500 para a Hotmart reenviar; nada é concedido.

@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { handleLicense, handleWebhook, licenseDepsFromEnv, maskEmail, safeEqual, WEBHOOK_MAX_BYTES, webhookDepsFromEnv } from '../../api/_lib/handlers';
 import { classify } from '../../api/_lib/hotmart';
-import { allowlistStore, memoryStore, storeFromEnv, supabaseStore } from '../../api/_lib/store';
+import { allowlistStore, grantRule, memoryStore, storeFromEnv, supabaseStore } from '../../api/_lib/store';
 import { normalizeEmail, readToken, verifyToken } from '../../src/license/token';
 
 let priv: JsonWebKey;
@@ -236,39 +236,45 @@ describe('ativação /api/license', () => {
 });
 
 describe('armazenamento', () => {
-  it('Supabase: consulta, concessão condicional e revogação pela API REST (PostgREST) com a chave de serviço', async () => {
+  it('Supabase: consulta de acesso e gravação de compras por RPC, com a chave de serviço', async () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     const fake = (async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
-      if (!init?.method) return new Response(JSON.stringify([{ status: 'active' }]), { status: 200 });
-      if (init.method === 'PATCH') return new Response(JSON.stringify([{ email: 'a@ex.com' }]), { status: 200 });
-      // revogação com return=representation: o PostgREST devolve a linha gravada
-      return new Response(JSON.stringify([{ email: 'a@ex.com', status: 'revoked' }]), { status: 201 });
+      if (url.endsWith('/rpc/nexo_lookup_license')) return new Response(JSON.stringify({ status: 'active' }), { status: 200 });
+      if (url.endsWith('/rpc/nexo_grant_purchase')) return new Response(JSON.stringify({ result: 'active', status: 'active' }), { status: 200 });
+      return new Response(JSON.stringify({ result: 'revoked', status: 'revoked' }), { status: 200 });
     }) as typeof fetch;
     const s = supabaseStore('https://abc.supabase.co/', 'srv', fake);
     expect(await s.lookup('a+b@ex.com')).toBe('active');
-    expect(await s.grant({ email: 'a@ex.com', transaction: 'HP1' })).toBe('active');
+    expect(await s.grant({ email: 'a@ex.com', transaction: 'HP1', product_id: '123', event: 'PURCHASE_APPROVED' })).toEqual({ result: 'active', status: 'active' });
     await s.revoke({ email: 'a@ex.com', transaction: 'HP1' });
-    expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?email=eq.a%2Bb%40ex.com&select=status');
-    // Concessão: UM UPDATE com a regra no filtro (não é leitura seguida de gravação).
-    expect(calls[1].init?.method).toBe('PATCH');
-    expect(calls[1].url).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?email=eq.a%40ex.com&or=(status.eq.active,transaction.neq.HP1)&select=email,status,transaction');
-    expect(JSON.parse(String(calls[1].init?.body))).toMatchObject({ status: 'active', transaction: 'HP1' });
-    expect(calls[2].url).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?on_conflict=email&select=email,status');
-    expect((calls[2].init?.headers as Record<string, string>).Prefer).toContain('resolution=merge-duplicates');
-    expect((calls[2].init?.headers as Record<string, string>).Prefer).toContain('return=representation');
-    expect(JSON.parse(String(calls[2].init?.body))).toMatchObject({ email: 'a@ex.com', status: 'revoked', transaction: 'HP1' });
+    expect(calls).toHaveLength(3); // uma requisição (uma transação no banco) por operação
+    expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/rpc/nexo_lookup_license');
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ p_email: 'a+b@ex.com' });
+    expect(calls[1].init?.method).toBe('POST');
+    expect(calls[1].url).toBe('https://abc.supabase.co/rest/v1/rpc/nexo_grant_purchase');
+    expect(JSON.parse(String(calls[1].init?.body))).toEqual({ p_platform: 'hotmart', p_transaction: 'HP1', p_email: 'a@ex.com', p_product_id: '123', p_event: 'PURCHASE_APPROVED', p_amount: null, p_refund_amount: null, p_currency: null, p_provider_event_id: null, p_occurred_at: null });
+    expect(calls[2].url).toBe('https://abc.supabase.co/rest/v1/rpc/nexo_revoke_purchase');
+    expect(JSON.parse(String(calls[2].init?.body))).toEqual({ p_platform: 'hotmart', p_transaction: 'HP1', p_email: 'a@ex.com', p_product_id: null, p_event: null, p_amount: null, p_refund_amount: null, p_currency: null, p_provider_event_id: null, p_occurred_at: null });
     expect((calls[2].init?.headers as Record<string, string>).Authorization).toBe('Bearer srv');
   });
 
+  it('Supabase: resposta da RPC fora do contrato lança (nunca concede por suposição)', async () => {
+    const answer = (body: string) => (async () => new Response(body, { status: 200 })) as unknown as typeof fetch;
+    const grant = (body: string) => supabaseStore('https://abc.supabase.co', 'srv', answer(body)).grant({ email: 'a@ex.com', transaction: 'HP1' });
+    expect(await grant('{"result":"blocked","status":"active"}')).toEqual({ result: 'blocked', status: 'active' });
+    for (const bad of ['[]', 'null', '{"result":"active"}', '{"result":"active","status":"revoked"}', '{"result":"ok","status":"active"}', '<html>']) {
+      await expect(grant(bad), bad).rejects.toThrow('Supabase grant: resposta inesperada');
+    }
+  });
+
   it('Supabase com e-mail duplicado na tabela: qualquer linha revoked nega o acesso (falha fechada)', async () => {
-    const answer = (rows: { status: string }[]) => (async () => new Response(JSON.stringify(rows), { status: 200 })) as typeof fetch;
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'revoked' }])).lookup('a@ex.com')).toBe('revoked');
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'revoked' }, { status: 'active' }])).lookup('a@ex.com')).toBe('revoked');
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'active' }])).lookup('a@ex.com')).toBe('active');
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer([])).lookup('a@ex.com')).toBeNull();
+    const answer = (body: unknown) => (async () => new Response(JSON.stringify(body), { status: 200 })) as typeof fetch;
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer({ status: 'revoked' })).lookup('a@ex.com')).toBe('revoked');
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer({ status: 'active' })).lookup('a@ex.com')).toBe('active');
+    expect(await supabaseStore('https://abc.supabase.co', 'srv', answer(null)).lookup('a@ex.com')).toBeNull();
     // De ponta a ponta: a ativação devolve 404 (sem acesso) com a linha duplicada.
-    const deps = { store: supabaseStore('https://abc.supabase.co', 'srv', answer([{ status: 'active' }, { status: 'revoked' }])), privateJwk: priv };
+    const deps = { store: supabaseStore('https://abc.supabase.co', 'srv', answer({ status: 'revoked' })), privateJwk: priv };
     expect((await handleLicense(post('/api/license', { email: 'a@ex.com' }), deps)).status).toBe(404);
   });
 
@@ -368,28 +374,83 @@ describe('webhook da Hotmart — reembolso definitivo por transação (unitário
     expect((await handleLicense(post('/api/license', { email: 'ana@ex.com' }), { store: d.store, privateJwk: priv })).status).toBe(200);
   });
 
-  it('5) fora de ordem: reembolso antes da aprovação bloqueia a aprovação; reembolso atrasado de compra antiga revoga (falha fechada)', async () => {
+  it('5) fora de ordem: reembolso antes da aprovação bloqueia a aprovação; reembolso atrasado de compra antiga preserva a compra nova', async () => {
     const d = deps();
     await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d); // e-mail nunca visto: grava revoked
     expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP1' });
     await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d);
     expect(state(d)?.status).toBe('revoked');
-    // LIMITAÇÃO (um registro por e-mail, sem histórico por transação): compra nova HP2 e,
-    // depois, reembolso atrasado de HP1 → revoga, mesmo com HP2 válida. Erra para o lado seguro.
+    // O reembolso atrasado de HP1 deve entrar no histórico, sem revogar a compra atual HP2.
     await handleWebhook(ev('PURCHASE_APPROVED', 'HP2'), d);
     expect(state(d)?.status).toBe('active');
     await handleWebhook(ev('PURCHASE_REFUNDED', 'HP1'), d);
-    expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP1' });
+    expect(state(d)).toMatchObject({ status: 'active', transaction: 'HP2' });
+    expect(d.store.refunded.get('ana@ex.com')?.has('HP1')).toBe(true);
   });
 
-  it('5b) LIMITAÇÃO: só a última transação reembolsada é lembrada', async () => {
-    // HP1 reembolsada, HP2 comprada e reembolsada; um reenvio tardio da aprovação de HP1
-    // reativa, porque a linha só guarda HP2. Fechar isso exige histórico por transação (schema).
+  it('5b) histórico por transação: toda transação reembolsada é lembrada, não só a última', async () => {
+    // HP1 reembolsada, HP2 comprada e reembolsada; a linha só guarda HP2, mas o histórico
+    // guarda as duas: um reenvio tardio da aprovação de HP1 não reativa.
     const d = deps();
     for (const [name, t] of [['PURCHASE_APPROVED', 'HP1'], ['PURCHASE_REFUNDED', 'HP1'], ['PURCHASE_APPROVED', 'HP2'], ['PURCHASE_REFUNDED', 'HP2']] as const) await handleWebhook(ev(name, t), d);
     expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP2' });
     await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d);
-    expect(state(d)?.status).toBe('active'); // comportamento atual documentado, não desejado
+    expect(state(d)?.status).toBe('revoked'); // regressão: aprovação atrasada não pode reativar transação reembolsada
+  });
+
+  const run = async (d: ReturnType<typeof deps>, steps: (readonly [string, string])[]) => {
+    for (const [name, t] of steps) expect((await handleWebhook(ev(name, t), d)).status, `${name} ${t}`).toBe(200);
+  };
+  const HP1_HP2_REEMBOLSADAS_HP3_ATIVA = [['PURCHASE_APPROVED', 'HP1'], ['PURCHASE_REFUNDED', 'HP1'], ['PURCHASE_APPROVED', 'HP2'], ['PURCHASE_REFUNDED', 'HP2'], ['PURCHASE_APPROVED', 'HP3']] as const;
+
+  it('5c) HP1 e HP2 reembolsadas, HP3 ativa: aprovações atrasadas de HP1 e HP2 respondem o estado efetivo (ativa) e não mexem na licença', async () => {
+    const d = deps();
+    await run(d, [...HP1_HP2_REEMBOLSADAS_HP3_ATIVA]);
+    expect(state(d)).toMatchObject({ status: 'active', transaction: 'HP3' });
+    expect([...d.store.refunded.get('ana@ex.com')!]).toEqual(['HP1', 'HP2']);
+    for (const t of ['HP1', 'HP2', 'HP1']) {
+      for (const name of ['PURCHASE_APPROVED', 'PURCHASE_COMPLETE']) {
+        const r = await handleWebhook(ev(name, t), d);
+        expect(r.status).toBe(200);
+        expect(await r.json()).toEqual({ ignored: 'transacao_reembolsada', status: 'active' });
+      }
+    }
+    expect(state(d)).toMatchObject({ status: 'active', transaction: 'HP3', event: 'PURCHASE_APPROVED' });
+    // Reenvio da aprovação válida: idempotente.
+    expect(await (await handleWebhook(ev('PURCHASE_APPROVED', 'HP3'), d)).json()).toEqual({ ok: true, status: 'active' });
+    expect((await handleLicense(post('/api/license', { email: 'ana@ex.com' }), { store: d.store, privateJwk: priv })).status).toBe(200);
+  });
+
+  it('5d) reembolsos fora de ordem e repetidos: o histórico só cresce e nenhuma transação reembolsada volta a conceder', async () => {
+    const d = deps();
+    // Reembolsos chegam antes das aprovações, fora de ordem e repetidos.
+    await run(d, [['PURCHASE_REFUNDED', 'HP2'], ['PURCHASE_REFUNDED', 'HP1'], ['PURCHASE_REFUNDED', 'HP2'], ['PURCHASE_APPROVED', 'HP1'], ['PURCHASE_APPROVED', 'HP2']]);
+    expect(state(d)).toMatchObject({ status: 'revoked', transaction: 'HP2' });
+    expect([...d.store.refunded.get('ana@ex.com')!].sort()).toEqual(['HP1', 'HP2']);
+    // Compra nova ativa; reembolso atrasado de HP1 é registrado sem revogar HP3.
+    await run(d, [['PURCHASE_APPROVED', 'HP3']]);
+    expect(state(d)).toMatchObject({ status: 'active', transaction: 'HP3' });
+    await run(d, [['PURCHASE_REFUNDED', 'HP1']]);
+    expect(state(d)).toMatchObject({ status: 'active', transaction: 'HP3' });
+    expect([...d.store.refunded.get('ana@ex.com')!].sort()).toEqual(['HP1', 'HP2']);
+    expect(await (await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d)).json()).toEqual({ ignored: 'transacao_reembolsada', status: 'active' });
+    expect(await (await handleWebhook(ev('PURCHASE_APPROVED', 'HP2'), d)).json()).toEqual({ ignored: 'transacao_reembolsada', status: 'active' });
+    // HP3 nunca foi reembolsada: o reenvio dela permanece ativo.
+    expect(await (await handleWebhook(ev('PURCHASE_APPROVED', 'HP3'), d)).json()).toEqual({ ok: true, status: 'active' });
+    // Reembolso de HP3 depois: revoga e HP3 entra no histórico.
+    await run(d, [['PURCHASE_REFUNDED', 'HP3'], ['PURCHASE_APPROVED', 'HP3']]);
+    expect(state(d)?.status).toBe('revoked');
+    expect(d.store.refunded.get('ana@ex.com')?.has('HP3')).toBe(true);
+    expect(d.store.data.size).toBe(1);
+  });
+
+  it('5e) regra pura (grantRule): histórico tem precedência sobre a linha', () => {
+    const refunded = new Set(['HP1']);
+    expect(grantRule(undefined, 'HP1', refunded)).toBe(false); // e-mail sem linha, mas transação reembolsada
+    expect(grantRule({ email: 'a@ex.com', status: 'active', transaction: 'HP3' }, 'HP1', refunded)).toBe(false);
+    expect(grantRule({ email: 'a@ex.com', status: 'active', transaction: 'HP3' }, null, refunded)).toBe(true);
+    expect(grantRule({ email: 'a@ex.com', status: 'revoked', transaction: 'HP2' }, 'HP3', refunded)).toBe(true);
+    expect(grantRule({ email: 'a@ex.com', status: 'revoked', transaction: 'HP2' }, 'HP2')).toBe(false);
   });
 
   it('6) concorrência na memória: aprovação e reembolso simultâneos terminam revogados em qualquer ordem', async () => {
@@ -402,24 +463,47 @@ describe('webhook da Hotmart — reembolso definitivo por transação (unitário
     }
   });
 
-  it('6b) PostgREST simulado: linha criada por outra requisição entre o UPDATE e o INSERT segue a mesma regra', async () => {
-    // Sequência de respostas: UPDATE sem linha → INSERT em conflito (linha criada por outra
-    // requisição) → UPDATE de novo. O resultado depende só do terceiro passo.
-    const seq = (third: unknown[]) => {
-      const answers = [[], [], third];
-      const urls: string[] = [];
-      const f = (async (url: string) => {
+  it('6c) concorrência na memória com histórico: aprovação atrasada de HP1, aprovação de HP3 e reenvio do reembolso de HP2, em qualquer ordem', async () => {
+    const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    for (const order of orders) {
+      const d = deps();
+      await run(d, [...HP1_HP2_REEMBOLSADAS_HP3_ATIVA].slice(0, 4)); // HP1 e HP2 reembolsadas
+      const ops = [() => handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), d), () => handleWebhook(ev('PURCHASE_APPROVED', 'HP3'), d), () => handleWebhook(ev('PURCHASE_REFUNDED', 'HP2'), d)];
+      const res = await Promise.all(order.map((i) => ops[i]()));
+      expect(res.every((r) => r.status === 200), String(order)).toBe(true);
+      // HP1 e HP2 estão reembolsadas; o reembolso antigo de HP2 não revoga a compra atual HP3.
+      expect(state(d)?.transaction, String(order)).toBe('HP3');
+      expect(state(d)?.status, String(order)).toBe('active');
+      expect([...d.store.refunded.get('ana@ex.com')!].sort()).toEqual(['HP1', 'HP2']);
+    }
+  });
+
+  it('6d) concorrência na memória: reenvios simultâneos de aprovação e reembolso da mesma transação sempre terminam revogados e no histórico', async () => {
+    for (let i = 0; i < 20; i++) {
+      const d = deps();
+      const burst = [
+        ...Array.from({ length: 3 }, () => handleWebhook(ev('PURCHASE_APPROVED', 'HP7'), d)),
+        ...Array.from({ length: 3 }, () => handleWebhook(ev('PURCHASE_REFUNDED', 'HP7'), d)),
+      ];
+      await Promise.all(i % 2 ? burst : burst.reverse());
+      expect(state(d)?.status).toBe('revoked');
+      expect(await (await handleWebhook(ev('PURCHASE_APPROVED', 'HP7'), d)).json()).toEqual({ ignored: 'licenca_revogada', status: 'revoked' });
+    }
+  });
+
+  it('6b) PostgREST simulado: a concessão é UMA chamada RPC e devolve o estado efetivo calculado no banco', async () => {
+    const urls: string[] = [];
+    const answer = (body: unknown) =>
+      (async (url: string) => {
         urls.push(url);
-        return new Response(JSON.stringify(answers.shift()), { status: 200 });
+        return new Response(JSON.stringify(body), { status: 200 });
       }) as typeof fetch;
-      return { f, urls };
-    };
-    const a = seq([{ email: 'a@ex.com' }]); // a outra era uma aprovação: ativa
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', a.f).grant({ email: 'a@ex.com', transaction: 'HP1' })).toBe('active');
-    const b = seq([]); // a outra era o reembolso da mesma transação: bloqueada
-    expect(await supabaseStore('https://abc.supabase.co', 'srv', b.f).grant({ email: 'a@ex.com', transaction: 'HP1' })).toBe('blocked');
-    expect(b.urls).toHaveLength(3);
-    expect(b.urls[1]).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?on_conflict=email&select=email');
+    const s = (body: unknown) => supabaseStore('https://abc.supabase.co', 'srv', answer(body));
+    expect(await s({ result: 'blocked', status: 'revoked' }).grant({ email: 'a@ex.com', transaction: 'HP1' })).toEqual({ result: 'blocked', status: 'revoked' });
+    // Aprovação atrasada de transação reembolsada com outra compra ativa: o webhook responde ativa.
+    const r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), { store: s({ result: 'blocked', status: 'active' }), hottok: 'segredo' });
+    expect(await r.json()).toEqual({ ignored: 'transacao_reembolsada', status: 'active' });
+    expect(urls).toEqual(['https://abc.supabase.co/rest/v1/rpc/nexo_grant_purchase', 'https://abc.supabase.co/rest/v1/rpc/nexo_grant_purchase']);
   });
 
   it('7) transação ausente ou inválida: concede só a e-mail novo ou ativo; nunca reativa; reembolso sem transação revoga e bloqueia', async () => {
@@ -438,15 +522,15 @@ describe('webhook da Hotmart — reembolso definitivo por transação (unitário
     expect(state(d2)).toMatchObject({ status: 'active', transaction: '777' });
   });
 
-  it('7b) transação inválida nunca entra no filtro do PostgREST', async () => {
-    const urls: string[] = [];
-    const f = (async (url: string) => {
-      urls.push(url);
-      return new Response(JSON.stringify([{ email: 'ana@ex.com' }]), { status: 200 });
+  it('7b) transação inválida nunca chega ao banco (vai como ausente na RPC)', async () => {
+    const bodies: unknown[] = [];
+    const f = (async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ result: 'active', status: 'active' }), { status: 200 });
     }) as typeof fetch;
     const r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1),status.eq.revoked'), { store: supabaseStore('https://abc.supabase.co', 'srv', f), hottok: 'segredo' });
     expect(r.status).toBe(200);
-    expect(urls[0]).toBe('https://abc.supabase.co/rest/v1/nexo_licenses?email=eq.ana%40ex.com&status=eq.active&select=email,status,transaction');
+    expect(bodies).toEqual([{ p_platform: 'hotmart', p_transaction: null, p_email: 'ana@ex.com', p_product_id: '123', p_event: 'PURCHASE_APPROVED', p_amount: null, p_refund_amount: null, p_currency: null, p_provider_event_id: null, p_occurred_at: null }]);
   });
 
   const failing = (fail: (url: string, init?: RequestInit) => Response | null) =>
@@ -454,7 +538,7 @@ describe('webhook da Hotmart — reembolso definitivo por transação (unitário
 
   it('8) erro de leitura no Supabase: 500 para a Hotmart reenviar, nada concedido; login devolve 502', async () => {
     for (const bad of [new Response('erro', { status: 500 }), new Response('<html>', { status: 200 }), new Response('{"a":1}', { status: 200 })]) {
-      const f = failing((_u, init) => (init?.method === 'PATCH' ? bad.clone() : null));
+      const f = failing((u) => (u.endsWith('/rpc/nexo_grant_purchase') ? bad.clone() : null));
       const r = await handleWebhook(ev('PURCHASE_APPROVED', 'HP1'), { store: supabaseStore('https://abc.supabase.co', 'srv', f), hottok: 'segredo' });
       expect(r.status).toBe(500);
       expect(await r.json()).toEqual({ error: 'falha_armazenamento' });
@@ -551,7 +635,7 @@ describe('v2.4.5 — revogação só responde 200 com a gravação confirmada pe
     const r = await handleWebhook(ev(), { store: supabaseStore('https://abc.supabase.co', 'srv', reply(201, '[]')), hottok: 'segredo' });
     expect(r.status).toBe(500);
     const err = vi.mocked(console.error).mock.calls.map((c) => c.join(' ')).join('\n');
-    expect(err).toContain('PURCHASE_REFUNDED: ERRO ao gravar no Supabase (revogar) tx=HP1 (a***@ex.com) — Supabase revoke: gravação não confirmada (0 linha(s) devolvida(s))');
+    expect(err).toContain('PURCHASE_REFUNDED: ERRO ao gravar no Supabase (revogar) tx=HP1 (a***@ex.com) — Supabase revoke: gravação não confirmada (status null)');
   });
 
   it('erro do Supabase (ex.: 401 chave errada, 42P10 sem chave única): 500 e o erro exato no log, sem a chave', async () => {

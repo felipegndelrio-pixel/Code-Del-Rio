@@ -57,6 +57,12 @@ export default defineConfig(({ mode }) => {
   const env = { ...process.env, ...loadEnv(mode, import.meta.dirname, '') };
   const single = env.SINGLEFILE === 'true';
   const themeInit = readFileSync(import.meta.dirname + '/public/theme-init.js', 'utf8');
+  const buildId = (env.VITE_BUILD_ID || 'unversioned').replace(/[&<>\"]/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+  })[char]!);
   return {
     root: import.meta.dirname,
     base: env.VITE_BASE || '/',
@@ -64,6 +70,10 @@ export default defineConfig(({ mode }) => {
     css: { postcss: { plugins: [tailwind({ config: import.meta.dirname + '/tailwind.config.js' }), autoprefixer()] } },
     plugins: [
       react(),
+      {
+        name: 'nexo-build-id',
+        transformIndexHtml: (html) => html.replace('%NEXO_BUILD_ID%', buildId),
+      },
       VitePWA({
         disable: single,
         registerType: 'prompt',

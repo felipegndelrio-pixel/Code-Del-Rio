@@ -87,13 +87,15 @@ Trocar o par depois desconecta todos os compradores (cada um entra de novo com o
 
 As variáveis do painel **não** valem para `wrangler pages deploy`: o build é feito no seu computador. Use o build de venda, que se recusa a rodar sem as chaves (sem elas o app sairia aberto, sem `/entrar` nem modo demo):
 
-```bash
-export VITE_LICENSE_PUBLIC_JWK='<linha pública do passo 2>'
-export VITE_HOTMART_CHECKOUT_URL='https://pay.hotmart.com/SEU-PRODUTO'
-export VITE_SUPPORT_EMAIL='suporte@seudominio.com.br'
-npm ci && npm run nexo:build:venda
-cd apps/nexoprocess && npx wrangler pages deploy dist --project-name SEU-PROJETO --branch main
+No Windows (PowerShell ou cmd), configure `VITE_LICENSE_PUBLIC_JWK`, `VITE_HOTMART_CHECKOUT_URL` e `VITE_SUPPORT_EMAIL` no ambiente da sessão e execute `npm ci` e `npm run nexo:build:venda` na raiz do repositório. O script valida as variáveis, exige que não haja alterações rastreadas e injeta o SHA completo do commit em `<meta name="nexo-build-id">`; funciona também em Git Bash. O deploy usa a pasta `apps/nexoprocess/dist`:
+
+```powershell
+$GIT_COMMIT = git rev-parse HEAD
+Set-Location apps/nexoprocess
+npx wrangler pages deploy dist --project-name nexoprocess --branch main --commit-hash $GIT_COMMIT --commit-dirty=false
 ```
+
+O deployment deve ser feito a partir do mesmo commit limpo usado no build.
 
 As variáveis do servidor (`LICENSE_PRIVATE_JWK`, `SUPABASE_*`, `HOTMART_*`) continuam no painel: as functions as leem a cada requisição.
 
@@ -141,15 +143,105 @@ Se o log mostrar `ignorado: sem e-mail` ou `401`, copie o corpo do **Histórico*
 
 ## Operação
 
-- **Liberar manualmente:**
+### Troca inicial e retomada após rollback
+
+Execute esta sequência em janela de baixo movimento. Na primeira troca e após rollback, exporte `nexo_licenses` e registre sua impressão digital **antes de qualquer SQL**. Na primeira troca, aplique então `schema-refund-history.sql` e `schema-purchases.sql`, nessa ordem; depois siga os passos 2–6. Após rollback, siga os mesmos passos desde a exportação. Não publique a versão nova até todos os critérios passarem.
+
+1. Exporte `nexo_licenses` em CSV e guarde-o fora do repositório e de conversas. Calcule e registre a impressão digital abaixo; guarde apenas a contagem e o hash no registro da mudança. Faça isso antes de aplicar qualquer SQL.
+
+   ```sql
+   select count(*) as linhas,
+          md5(coalesce(string_agg(email || '|' || status || '|' || coalesce(transaction, '') || '|' || coalesce(product_id, ''), ',' order by email), '')) as impressao
+     from public.nexo_licenses;
+   ```
+
+2. Antes de reaplicar `schema-purchases.sql`, consulte a divergência:
+
+   ```sql
+   select count(*) as licencas_divergentes
+     from public.nexo_licenses l
+    where (l.status = 'active') is distinct from
+          ((public.nexo_lookup_license(l.email)->>'status') = 'active');
+   ```
+
+   Esta consulta só cobre e-mails que ainda têm linha em `nexo_licenses`; não detecta compras que não estejam representadas nessa tabela.
+
+3. Para cada licença `revoked` cujo `nexo_lookup_license(email)` ainda retorne `active`, confira a transação, produto, comprador e evento de reembolso/chargeback no histórico da Hotmart. Este bloco é **somente para reembolso total ou chargeback confirmado**. Só registre o evento se plataforma e transação coincidirem exatamente com a identidade da compra existente. O SQL abaixo é um modelo: substitua os valores uma única vez no topo por dados confirmados antes de executar.
+
+   ```sql
+   do $$
+   declare
+     v_tx text := '<transação>';
+     v_email text := lower(btrim('<e-mail>'));
+     v_prod text := '<produto>';
+     v_event text := '<evento>';
+     v_when text := '<timestamp>';
+     v_before integer;
+     v_after integer;
+     v_active boolean;
+     v_result jsonb;
+   begin
+     if v_tx like '<%' or v_email like '<%' or v_prod like '<%'
+        or v_event like '<%' or v_when like '<%' then
+       raise exception 'Substitua todos os valores-modelo por dados verificados';
+     end if;
+
+     if not exists (
+       select 1 from public.nexo_purchases
+        where platform = 'hotmart' and transaction_id = v_tx and email = v_email
+     ) then
+       raise exception 'Compra Hotmart correspondente não existe; parar para reconciliação';
+     end if;
+
+     select count(*) into v_before from public.nexo_reconciliation_blocks
+      where email = v_email and resolved_at is null;
+     v_result := public.nexo_revoke_purchase(
+       p_platform => 'hotmart', p_transaction => v_tx, p_email => v_email,
+       p_product_id => v_prod, p_event => v_event, p_occurred_at => v_when::timestamptz
+     );
+     select count(*) into v_after from public.nexo_reconciliation_blocks
+      where email = v_email and resolved_at is null;
+     select access_active into v_active from public.nexo_purchases
+      where platform = 'hotmart' and transaction_id = v_tx;
+     if v_result ? 'ignored' or v_after <> v_before or coalesce(v_active, true) then
+       raise exception 'Evento ignorado ou não aplicado como esperado; nada foi gravado: %', v_result;
+     end if;
+     raise notice 'Revogação registrada: %', v_result;
+   end $$;
+   ```
+
+   Marcador não substituído, compra ausente, `ignored`, bloqueio novo ou compra ainda ativa causa erro e reverte o bloco inteiro. Um `result = 'blocked'` pode ser o resultado correto quando a única compra foi revogada; o critério é o estado da compra e a ausência de bloqueio novo.
+
+   Para a divergência inversa (`nexo_licenses.status = 'active'` e lookup não ativo), confira a transação na Hotmart. Uma transação válida, distinta e aprovada durante o rollback será inserida pela reaplicação, se ainda não existir no registro. Se a transação já existir — sobretudo em estado reembolsado, chargeback, cancelado, expirado ou falha — **pare para análise manual**. Não use `nexo_grant_purchase` para reativá-la: a função ignora aprovações para compras em estado terminal, e a projeção pode voltar a revogar a licença.
+
+4. Reaplique `schema-purchases.sql` da mesma tag/commit que será publicado. A reaplicação projeta novamente os acessos e pode alterar `nexo_licenses`.
+5. Rode novamente a consulta de divergência. O resultado deve ser **zero**. Confirme também que as linhas, o hash da impressão digital e os bloqueios abertos foram revisados; qualquer diferença inesperada interrompe a troca.
+6. Só então publique o build testado e identificado pelo SHA. Depois, execute V3–V6 abaixo.
+7. Com o backend novo publicado e recebendo webhooks, repita uma vez os passos 2–5: consulte a divergência, reconcilie os eventos confirmados, reaplique `schema-purchases.sql` e confirme divergência zero. Isso captura compras processadas pelo backend antigo entre a consulta final e a publicação, que podem existir apenas em `nexo_licenses` e não serem vistas pelo lookup baseado em compras. Se restar qualquer divergência, pare e analise antes de encerrar a troca.
+
+### Verificações de liberação V3–V6
+
+- **V3 — rota da API:** `GET https://nexoprocess.pages.dev/api/license` deve responder HTTP `405` com JSON `{"error":"metodo"}`; nunca deve retornar o HTML da aplicação.
+- **V4 — sem compra:** em janela anônima, `/entrar` com um e-mail sem compra ativa deve recusar o acesso.
+- **V5 — licença ativa:** em sessão privada do fundador, `/entrar` com o e-mail da licença ativa deve liberar o acesso. Não registre nem compartilhe esse e-mail nos logs de revisão.
+- **V6 — webhook:** um evento de teste suportado pela Hotmart deve criar/atualizar a licença e aparecer nos logs. Para comprovar também revogação ponta a ponta, use uma compra de teste que possa ser reembolsada; compra real só com aprovação explícita do custo. Verifique a linha/projeção após aprovação e revogação.
+
+Falha em qualquer V3–V6 ou erro 5xx em `/api/*` dispara o rollback do app descrito abaixo. Após rollback, preserve o banco e repita a sequência de retomada antes de publicar novamente.
+
+- **Operações manuais por versão:** na **v2.4.5**, a projeção ainda é `nexo_licenses`; o procedimento direto abaixo só vale nessa versão. Na versão nova, o acesso deriva de `nexo_purchases`/`nexo_lookup_license`: libere apenas registrando uma compra verificada ou usando `LICENSE_ALLOWLIST` como contingência operacional. Uma linha manual sem transação em `nexo_licenses` vira bloqueio de reconciliação na reaplicação; não a use para liberar acesso.
+
+  **Somente v2.4.5 — liberar diretamente:**
 
   ```sql
   insert into nexo_licenses (email, status, event) values ('pessoa@ex.com', 'active', 'MANUAL')
   on conflict (email) do update set status = 'active', event = 'MANUAL', updated_at = now();
   ```
 
-- **Revogar:** `update nexo_licenses set status = 'revoked', updated_at = now() where email = 'pessoa@ex.com';`
-- **Reverter um deploy ruim:** Deployments → deploy anterior → **Rollback to this deployment**.
+- **Somente v2.4.5 — revogar diretamente:** `update nexo_licenses set status = 'revoked', updated_at = now() where email = 'pessoa@ex.com';`.
+- **Versão nova — revogar:** após confirmar plataforma e transação na Hotmart, use `nexo_revoke_purchase` pelo procedimento validado no passo 3. Sem identidade confiável da compra, crie/trate bloqueio de reconciliação; não altere diretamente a projeção `nexo_licenses`.
+- **Criar bloqueio na versão nova:** faça isso somente no SQL Editor com uma sessão administrativa; a função não está disponível às roles da API. Antes de chamar qualquer função, valide os dados e normalize o e-mail exatamente como o banco (`lower(btrim(email))`); rejeite qualquer marcador ainda não substituído. Na mesma transação, chame `public.nexo_add_reconciliation_block(email_normalizado, plataforma, transação_ou_null, produto_ou_null, motivo, evento, timestamp_confirmado)` e depois `public.nexo_refresh_license_access(email_normalizado)`. Confirme que há um bloqueio aberto para o e-mail e que a projeção em `nexo_licenses` reflete o bloqueio; sem esses dois resultados, pare e investigue.
+- **Reverter um deploy ruim:** se qualquer verificação V3–V6 falhar ou houver erro 5xx em `/api/*`, Pages → `nexoprocess` → Deployments → deployment `782574b2` (`782574b2.nexoprocess.pages.dev`) → **Rollback to this deployment**. Confirme que o deployment voltou e que `/api/license` e `/api/hotmart-webhook` aparecem em Functions. Esse rollback troca o app/API; não reverte o banco.
+- **Banco após rollback do app:** não remova as tabelas de compras nem o histórico de reembolsos. Siga a seção **Troca inicial e retomada após rollback** antes de voltar à versão nova. Não faça reversão destrutiva do esquema sem backup restaurável e revisão explícita.
 - **Emergência sem banco:** `LICENSE_ALLOWLIST` com os e-mails que precisam entrar.
 
 ## Limites conhecidos (decisões conscientes)

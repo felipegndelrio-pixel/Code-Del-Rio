@@ -2,6 +2,8 @@
 interface ImportMetaEnv {
   readonly VITE_ROUTER?: string;
   readonly VITE_BASE?: string;
+  /** Git commit SHA injected by the sale build script and exposed in index.html. */
+  readonly VITE_BUILD_ID?: string;
   /** "true" exige o e-mail da compra para usar /app (build de venda). */
   readonly VITE_LICENSE_REQUIRED?: string;
   /** Chave pública (JWK) que verifica o token de licença. */

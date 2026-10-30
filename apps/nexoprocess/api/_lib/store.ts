@@ -7,158 +7,306 @@ export type LicenseStatus = 'active' | 'revoked';
 export interface LicenseRecord {
   email: string;
   status: LicenseStatus;
+  platform?: string | null;
   product_id?: string | null;
   transaction?: string | null;
   event?: string | null;
+  amount?: number | null;
+  refund_amount?: number | null;
+  currency?: string | null;
+  provider_event_id?: string | null;
+  occurred_at?: string | null;
 }
 
-/** 'blocked': a licença do e-mail está revogada e esta aprovação não pode reativá-la. */
-export type GrantResult = 'active' | 'blocked';
+export interface GrantResult {
+  result: 'active' | 'blocked';
+  status: LicenseStatus;
+}
 
-/**
- * Regra de concessão (a mesma em todos os armazenamentos, atômica no banco):
- * - sem linha para o e-mail → cria 'active';
- * - linha 'active' → continua 'active' (atualiza produto, transação e evento);
- * - linha 'revoked' → só reativa se as DUAS transações são conhecidas e diferentes
- *   (compra nova). Mesma transação (reenvio da aprovação já reembolsada) ou
- *   transação ausente de qualquer lado → 'blocked' (falha fechada).
- * Revogação: sempre grava 'revoked' com a transação do evento (falha fechada).
- */
 export interface LicenseStore {
   kind: 'supabase' | 'allowlist' | 'memory';
-  /** Situação da licença do e-mail, ou null se não existe. */
   lookup(email: string): Promise<LicenseStatus | null>;
-  /** Concede pela regra acima. Erro de leitura/gravação lança (nunca concede por padrão). */
   grant(rec: Omit<LicenseRecord, 'status'>): Promise<GrantResult>;
-  /** Revoga sempre. Lista fixa não grava (lança erro). */
-  revoke(rec: Omit<LicenseRecord, 'status'>): Promise<void>;
+  revoke(rec: Omit<LicenseRecord, 'status'>): Promise<LicenseStatus>;
 }
 
 export type Env = Record<string, string | undefined>;
-const TABLE = 'nexo_licenses';
+const isStatus = (s: unknown): s is LicenseStatus =>
+  s === 'active' || s === 'revoked';
 
-export function supabaseStore(url: string, serviceKey: string, fetchImpl: typeof fetch = fetch): LicenseStore {
-  const base = `${url.replace(/\/$/, '')}/rest/v1/${TABLE}`;
-  const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' };
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const normalizeTransaction = (transaction?: string | null) =>
+  transaction?.trim() || null;
+
+export function supabaseStore(
+  url: string,
+  serviceKey: string,
+  fetchImpl: typeof fetch = fetch,
+): LicenseStore {
+  const root = `${url.replace(/\/$/, '')}/rest/v1`;
+  const headers = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    'Content-Type': 'application/json',
+  };
+
+  const rpc = async (
+    fn: string,
+    rec: Omit<LicenseRecord, 'status'>,
+    step: string,
+  ): Promise<Record<string, unknown>> => {
+    const r = await fetchImpl(`${root}/rpc/${fn}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        p_platform: rec.platform?.trim().toLowerCase() || 'hotmart',
+        p_transaction: normalizeTransaction(rec.transaction),
+        p_email: normalizeEmail(rec.email),
+        p_product_id: rec.product_id ?? null,
+        p_event: rec.event ?? null,
+        p_amount: rec.amount ?? null,
+        p_refund_amount: rec.refund_amount ?? null,
+        p_currency: rec.currency?.trim().toUpperCase() ?? null,
+        p_provider_event_id: rec.provider_event_id ?? null,
+        p_occurred_at: rec.occurred_at ?? null,
+      }),
+    });
+
+    if (!r.ok) {
+      throw new Error(`Supabase ${step}: HTTP ${r.status} ${await r.text()}`);
+    }
+
+    const body: unknown = await r.json().catch(() => null);
+    return body && typeof body === 'object' && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : {};
+  };
+
   return {
     kind: 'supabase',
+
     async lookup(email) {
-      const r = await fetchImpl(`${base}?email=eq.${encodeURIComponent(email)}&select=status`, { headers });
-      if (!r.ok) throw new Error(`Supabase lookup: HTTP ${r.status}`);
-      const rows = (await r.json()) as { status: LicenseStatus }[];
-      // Uma linha por e-mail é garantida pelo schema.sql; se a tabela tiver duplicidade
-      // (criada sem a chave única), qualquer linha 'revoked' prevalece: falha fechada.
-      if (rows.length > 1) console.error(`Supabase: ${rows.length} linhas para o mesmo e-mail — rode o schema.sql`);
-      if (rows.some((x) => x.status === 'revoked')) return 'revoked';
-      return rows[0]?.status ?? null;
+      const normalizedEmail = normalizeEmail(email);
+      const r = await fetchImpl(`${root}/rpc/nexo_lookup_license`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ p_email: normalizedEmail }),
+      });
+
+      if (!r.ok) {
+        throw new Error(`Supabase lookup: HTTP ${r.status}`);
+      }
+
+      const body: unknown = await r.json().catch(() => null);
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+      const status = (body as Record<string, unknown>).status;
+      return isStatus(status) ? status : null;
     },
-    // Cada passo é UM comando SQL (PostgREST: uma transação por requisição). Não há
-    // leitura seguida de gravação: a condição da regra fica no WHERE do UPDATE, que o
-    // PostgreSQL reavalia sobre a versão mais nova da linha depois de esperar o bloqueio
-    // de uma gravação concorrente (READ COMMITTED).
+
     async grant(rec) {
-      const now = new Date().toISOString();
-      // 1) UPDATE condicional. Com transação: 'active' OU transação gravada diferente
-      //    (transaction <> T é NULL para transação gravada nula → não atualiza).
-      //    Sem transação: só linha 'active'. T já vem validada ([A-Za-z0-9_-]).
-      const cond = rec.transaction ? `or=(status.eq.active,transaction.neq.${encodeURIComponent(rec.transaction)})` : 'status=eq.active';
-      const patch = { status: 'active', product_id: rec.product_id ?? null, event: rec.event ?? null, updated_at: now, ...(rec.transaction ? { transaction: rec.transaction } : {}) };
-      const update = async () => {
-        // O select precisa citar as colunas do filtro: no PostgREST 12, or=(...) com um select
-        // que as omite falha (42703). O filtro continua no WHERE do UPDATE (conferido no log SQL).
-        const r = await fetchImpl(`${base}?email=eq.${encodeURIComponent(rec.email)}&${cond}&select=email,status,transaction`, {
-          method: 'PATCH',
-          headers: { ...headers, Prefer: 'return=representation' },
-          body: JSON.stringify(patch),
-        });
-        return rowsOf(r, 'grant/update');
-      };
-      if ((await update()).length > 0) return 'active';
-      // 2) Nenhuma linha atualizada: ou o e-mail não existe, ou está bloqueado. INSERT ...
-      //    ON CONFLICT (email) DO NOTHING: cria só se não existir (exige a chave única do schema.sql).
-      const ins = await fetchImpl(`${base}?on_conflict=email&select=email`, {
-        method: 'POST',
-        headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=representation' },
-        body: JSON.stringify({ email: rec.email, status: 'active', product_id: rec.product_id ?? null, transaction: rec.transaction ?? null, event: rec.event ?? null, updated_at: now }),
-      });
-      if ((await rowsOf(ins, 'grant/insert')).length > 0) return 'active';
-      // 3) A linha passou a existir entre 1 e 2 (gravação concorrente): aplica a mesma
-      //    regra sobre ela. Ainda sem linha atualizada → bloqueada.
-      return (await update()).length > 0 ? 'active' : 'blocked';
+      const { result, status } = await rpc(
+        'nexo_grant_purchase',
+        rec,
+        'grant',
+      );
+
+      if (
+        (result !== 'active' && result !== 'blocked') ||
+        !isStatus(status) ||
+        (result === 'active' && status !== 'active')
+      ) {
+        throw new Error('Supabase grant: resposta inesperada');
+      }
+
+      return { result, status };
     },
+
     async revoke(rec) {
-      // INSERT ... ON CONFLICT (email) DO UPDATE: um comando, atômico. O banco devolve a
-      // linha gravada: sem ela com status 'revoked', lança (o webhook responde 500 e a
-      // Hotmart reenvia) — nunca um 200 sem a revogação confirmada.
-      const r = await fetchImpl(`${base}?on_conflict=email&select=email,status`, {
-        method: 'POST',
-        headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify({ email: rec.email, status: 'revoked', product_id: rec.product_id ?? null, transaction: rec.transaction ?? null, event: rec.event ?? null, updated_at: new Date().toISOString() }),
-      });
-      const rows = (await rowsOf(r, 'revoke')) as { email?: string; status?: string }[];
-      if (!rows.some((x) => x.email === rec.email && x.status === 'revoked')) throw new Error(`Supabase revoke: gravação não confirmada (${rows.length} linha(s) devolvida(s))`);
+      const { status } = await rpc(
+        'nexo_revoke_purchase',
+        rec,
+        'revoke',
+      );
+
+      if (!isStatus(status)) {
+        throw new Error(
+          `Supabase revoke: gravação não confirmada (status ${JSON.stringify(status ?? null)})`,
+        );
+      }
+
+      return status;
     },
   };
-}
-
-/** Linhas devolvidas pelo PostgREST (return=representation). Qualquer erro lança. */
-async function rowsOf(r: Response, step: string): Promise<unknown[]> {
-  if (!r.ok) throw new Error(`Supabase ${step}: HTTP ${r.status} ${await r.text()}`);
-  const rows: unknown = await r.json().catch(() => null);
-  if (!Array.isArray(rows)) throw new Error(`Supabase ${step}: resposta inesperada`);
-  return rows;
 }
 
 export function allowlistStore(list: string): LicenseStore {
-  const emails = new Set(list.split(/[,\s;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean));
+  const emails = new Set(
+    list
+      .split(/[,\s;]+/)
+      .map((e) => normalizeEmail(e))
+      .filter(Boolean),
+  );
+
   return {
     kind: 'allowlist',
+
     async lookup(email) {
-      return emails.has(email) ? 'active' : null;
+      return emails.has(normalizeEmail(email)) ? 'active' : null;
     },
+
     async grant() {
-      throw new Error('LICENSE_ALLOWLIST é só leitura: configure o Supabase para receber o webhook.');
+      throw new Error(
+        'LICENSE_ALLOWLIST é só leitura: configure o Supabase para receber o webhook.',
+      );
     },
+
     async revoke() {
-      throw new Error('LICENSE_ALLOWLIST é só leitura: configure o Supabase para receber o webhook.');
+      throw new Error(
+        'LICENSE_ALLOWLIST é só leitura: configure o Supabase para receber o webhook.',
+      );
     },
   };
 }
 
-/** Mesma regra de grant() do Supabase, sobre um registro em memória (função pura). */
-export function grantRule(cur: LicenseRecord | undefined, transaction: string | null | undefined): boolean {
+export function grantRule(
+  cur: LicenseRecord | undefined,
+  transaction: string | null | undefined,
+  refunded: ReadonlySet<string> = new Set(),
+): boolean {
+  const tx = normalizeTransaction(transaction);
+  const history = new Set(
+    [...refunded].map((item) => item.trim()).filter(Boolean),
+  );
+
+  if (tx && history.has(tx)) return false;
   if (!cur || cur.status === 'active') return true;
-  return !!transaction && !!cur.transaction && cur.transaction !== transaction;
+
+  const currentTx = normalizeTransaction(cur.transaction);
+  return !!tx && !!currentTx && currentTx !== tx;
 }
 
-/** Só para testes. Sem await entre ler e gravar: atômico no laço de eventos do JS (não prova o PostgreSQL). */
-export function memoryStore(initial: Record<string, LicenseStatus> = {}): LicenseStore & { data: Map<string, LicenseRecord> } {
-  const data = new Map<string, LicenseRecord>(Object.entries(initial).map(([email, status]) => [email, { email, status }]));
+export function memoryStore(
+  initial: Record<string, LicenseStatus> = {},
+): LicenseStore & {
+  data: Map<string, LicenseRecord>;
+  refunded: Map<string, Set<string>>;
+} {
+  const data = new Map<string, LicenseRecord>();
+  const refunded = new Map<string, Set<string>>();
+
+  for (const [email, status] of Object.entries(initial)) {
+    const normalizedEmail = normalizeEmail(email);
+    data.set(normalizedEmail, {
+      email: normalizedEmail,
+      status,
+      transaction: null,
+    });
+  }
+
   return {
     kind: 'memory',
     data,
+    refunded,
+
     async lookup(email) {
-      return data.get(email)?.status ?? null;
+      return data.get(normalizeEmail(email))?.status ?? null;
     },
+
     async grant(rec) {
-      const cur = data.get(rec.email);
-      if (!grantRule(cur, rec.transaction)) return 'blocked';
-      data.set(rec.email, { ...cur, ...rec, transaction: rec.transaction ?? cur?.transaction ?? null, status: 'active' });
-      return 'active';
+      const email = normalizeEmail(rec.email);
+      const tx = normalizeTransaction(rec.transaction);
+      const cur = data.get(email);
+
+      if (!grantRule(cur, tx, refunded.get(email))) {
+        return {
+          result: 'blocked',
+          status: cur?.status ?? 'revoked',
+        };
+      }
+
+      data.set(email, {
+        ...cur,
+        ...rec,
+        email,
+        transaction: tx ?? cur?.transaction ?? null,
+        status: 'active',
+      });
+
+      return { result: 'active', status: 'active' };
     },
+
     async revoke(rec) {
-      data.set(rec.email, { ...data.get(rec.email), ...rec, transaction: rec.transaction ?? null, status: 'revoked' });
+      const email = normalizeEmail(rec.email);
+      const tx = normalizeTransaction(rec.transaction);
+      const cur = data.get(email);
+
+      if (tx) {
+        const history = refunded.get(email) ?? new Set<string>();
+        history.add(tx);
+        refunded.set(email, history);
+      }
+
+      // Sem transação identificável: falha fechada.
+      if (!tx) {
+        data.set(email, {
+          ...cur,
+          ...rec,
+          email,
+          transaction: null,
+          status: 'revoked',
+        });
+        return 'revoked';
+      }
+
+      // Sem registro: cria uma licença revogada para impedir concessão indevida.
+      if (!cur) {
+        data.set(email, {
+          ...rec,
+          email,
+          transaction: tx,
+          status: 'revoked',
+        });
+        return 'revoked';
+      }
+
+      const currentTx = normalizeTransaction(cur.transaction);
+
+      // Reembolso antigo não pode revogar uma compra atual diferente e conhecida.
+      if (currentTx && currentTx !== tx) {
+        return cur.status;
+      }
+
+      // Transação atual igual ou desconhecida: revoga por segurança.
+      data.set(email, {
+        ...cur,
+        ...rec,
+        email,
+        transaction: tx,
+        status: 'revoked',
+      });
+
+      return 'revoked';
     },
   };
 }
 
-/** Chave de serviço do Supabase. Aceita SUPABASE_KEY como nome alternativo (erro comum ao cadastrar). */
-export const supabaseServiceKey = (env: Env) => (env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_KEY || '').trim();
-/** URL do projeto, sem barra final e sem /rest/v1 colado por engano. */
-export const supabaseUrl = (env: Env) => (env.SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
+export const supabaseServiceKey = (env: Env) =>
+  (env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_KEY || '').trim();
+
+export const supabaseUrl = (env: Env) =>
+  (env.SUPABASE_URL || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/rest\/v1$/, '');
 
 export function storeFromEnv(env: Env): LicenseStore | null {
-  if (supabaseUrl(env) && supabaseServiceKey(env)) return supabaseStore(supabaseUrl(env), supabaseServiceKey(env));
-  if (env.LICENSE_ALLOWLIST) return allowlistStore(env.LICENSE_ALLOWLIST);
+  if (supabaseUrl(env) && supabaseServiceKey(env)) {
+    return supabaseStore(supabaseUrl(env), supabaseServiceKey(env));
+  }
+
+  if (env.LICENSE_ALLOWLIST) {
+    return allowlistStore(env.LICENSE_ALLOWLIST);
+  }
+
   return null;
 }

@@ -1,0 +1,179 @@
+name: NexoProcess G3 PostgreSQL
+
+on:
+  push:
+    branches:
+      - 'wip/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  g3-postgres:
+    # PRs are filtered by their source branch, not the base branch.
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/wip/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'wip/'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # SHA pins verified against official releases on 2026-10-29:
+      # https://github.com/actions/checkout/releases (v7.0.1)
+      # https://github.com/actions/setup-node/releases (v7.0.0)
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run unit and API tests
+        run: npm run nexo:test -- src tests/api
+      - name: Generate ephemeral credentials
+        shell: bash
+        run: |
+          PG_TEST_PASSWORD="$(openssl rand -hex 32)"
+          PGRST_JWT_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$PG_TEST_PASSWORD"
+          echo "::add-mask::$PGRST_JWT_SECRET"
+          echo "PG_TEST_PASSWORD=$PG_TEST_PASSWORD" >> "$GITHUB_ENV"
+          echo "PGRST_JWT_SECRET=$PGRST_JWT_SECRET" >> "$GITHUB_ENV"
+      - name: Start disposable PostgreSQL
+        shell: bash
+        run: |
+          docker network create g3-test
+          # Official PostgreSQL image; major 16 matches the local PG16 integration environment.
+          # Tag availability verified 2026-10-29: https://hub.docker.com/_/postgres/tags
+          docker run --detach --name g3-postgres --network g3-test --network-alias postgres \
+            --publish 5432:5432 \
+            --env POSTGRES_DB=nexo_it_g3_test \
+            --env POSTGRES_USER=postgres \
+            --env "POSTGRES_PASSWORD=$PG_TEST_PASSWORD" \
+            postgres:16
+          for attempt in {1..30}; do
+            if docker exec g3-postgres pg_isready -U postgres -d nexo_it_g3_test; then exit 0; fi
+            sleep 2
+          done
+          echo 'Postgres did not become ready' >&2
+          exit 1
+      - name: Create test roles and database identity marker before migrations
+        shell: bash
+        run: |
+          docker exec --interactive g3-postgres \
+            psql -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -v "pg_password=$PG_TEST_PASSWORD" <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE ROLE authenticator LOGIN NOINHERIT PASSWORD :'pg_password';
+          GRANT anon, authenticated, service_role TO authenticator;
+          CREATE TABLE public.nexo_it_g3_target (database_name text PRIMARY KEY);
+          INSERT INTO public.nexo_it_g3_target VALUES (current_database());
+          GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+          GRANT SELECT ON public.nexo_it_g3_target TO service_role;
+          SQL
+      - name: Start PostgREST v12 with generated JWT secret
+        shell: bash
+        run: |
+          # Official PostgREST v12.2 image/tag verified 2026-10-29:
+          # https://hub.docker.com/r/postgrest/postgrest/tags and https://github.com/PostgREST/postgrest/blob/main/CHANGELOG.md
+          docker run --detach --name g3-postgrest --network g3-test \
+            --publish 3010:3000 \
+            --env "PGRST_DB_URI=postgres://authenticator:$PG_TEST_PASSWORD@postgres:5432/nexo_it_g3_test" \
+            --env PGRST_DB_SCHEMAS=public \
+            --env PGRST_DB_ANON_ROLE=anon \
+            --env "PGRST_JWT_SECRET=$PGRST_JWT_SECRET" \
+            --env PGRST_SERVER_PORT=3000 \
+            postgrest/postgrest:v12.2.12
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3010/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo 'PostgREST did not become ready' >&2
+          exit 1
+      - name: Generate temporary service-role JWT
+        shell: bash
+        run: |
+          TOKEN="$(node --input-type=module -e '
+            import { createHmac } from "node:crypto";
+            const b64 = (x) => Buffer.from(JSON.stringify(x)).toString("base64url");
+            const body = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role: "service_role", exp: Math.floor(Date.now() / 1000) + 1800 })}`;
+            process.stdout.write(`${body}.${createHmac("sha256", process.env.PGRST_JWT_SECRET).update(body).digest("base64url")}`);
+          ')"
+          echo "::add-mask::$TOKEN"
+          echo "NEXO_IT_SERVICE_JWT=$TOKEN" >> "$GITHUB_ENV"
+      - name: Confirm psql and PostgREST target the same test database
+        shell: bash
+        env:
+          NEXO_IT_POSTGREST_URL: http://127.0.0.1:3010
+        run: |
+          # ubuntu-latest currently provides PostgreSQL 16 and psql; verified 2026-10-29:
+          # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
+          export NEXO_IT_PG_URL="postgresql://postgres:$PG_TEST_PASSWORD@127.0.0.1:5432/nexo_it_g3_test"
+          node --input-type=module -e '
+            import { execFileSync } from "node:child_process";
+            const db = execFileSync("psql", [process.env.NEXO_IT_PG_URL, "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", "SELECT current_database()"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+            if (db !== "nexo_it_g3_test") throw new Error("psql target mismatch");
+            const token = process.env.NEXO_IT_SERVICE_JWT;
+            const response = await fetch(`${process.env.NEXO_IT_POSTGREST_URL}/nexo_it_g3_target?select=database_name&limit=1`, { headers: { apikey: token, Authorization: `Bearer ${token}` } });
+            if (!response.ok) throw new Error("PostgREST marker read failed");
+            const rows = await response.json();
+            if (rows.length !== 1 || rows[0].database_name !== db) throw new Error("PostgREST/psql database mismatch");
+          '
+      - name: Apply schema and purchase migration twice
+        shell: bash
+        run: |
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema.sql
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema-refund-history.sql
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema-purchases.sql
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 -f apps/nexoprocess/api/_lib/schema-purchases.sql
+      - name: Grant service role access to the disposable license table
+        shell: bash
+        run: |
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 \
+            -c 'GRANT SELECT, INSERT, UPDATE, DELETE ON public.nexo_licenses TO service_role;'
+      - name: Reload PostgREST schema cache and wait for license endpoint
+        shell: bash
+        run: |
+          PGPASSWORD="$PG_TEST_PASSWORD" psql -h 127.0.0.1 -U postgres -d nexo_it_g3_test -v ON_ERROR_STOP=1 \
+            -c "NOTIFY pgrst, 'reload schema';"
+          for attempt in {1..30}; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --header "apikey: $NEXO_IT_SERVICE_JWT" \
+              --header "Authorization: Bearer $NEXO_IT_SERVICE_JWT" \
+              'http://127.0.0.1:3010/nexo_licenses?limit=0')"
+            if [ "$status" = '200' ]; then exit 0; fi
+            sleep 2
+          done
+          echo 'PostgREST license endpoint did not become ready after schema reload' >&2
+          exit 1
+      - name: Run PostgreSQL G3 integration suite
+        shell: bash
+        run: |
+          export NEXO_IT_PG_URL="postgresql://postgres:$PG_TEST_PASSWORD@127.0.0.1:5432/nexo_it_g3_test"
+          export NEXO_IT_POSTGREST_URL=http://127.0.0.1:3010
+          export PGRST_JWT_SECRET
+          export NEXO_IT_SERVICE_JWT
+          npm run nexo:test -- tests/integration --reporter=default --reporter=json --outputFile="$GITHUB_WORKSPACE/g3-result.json"
+      - name: Reject skipped or missing G3 tests
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const report = JSON.parse(readFileSync(`${process.env.GITHUB_WORKSPACE}/g3-result.json`, "utf8"));
+            const { numPassedTests: passed, numFailedTests: failed, numPendingTests: pending, numTodoTests: todo } = report;
+            if (![passed, failed, pending, todo].every(Number.isInteger) || passed < 23 || failed !== 0 || pending !== 0 || todo !== 0) {
+              console.error(`G3 inválido: passed=${passed}, failed=${failed}, pending=${pending}, todo=${todo}`);
+              process.exit(1);
+            }
+            console.log(`G3 válido: passed=${passed}, failed=${failed}, pending=${pending}, todo=${todo}`);
+          '
+      - name: Show last 30 lines of container logs after failure
+        if: failure()
+        shell: bash
+        run: |
+          for container in g3-postgrest g3-postgres; do
+            echo "::group::Last 30 lines: $container"
+            docker logs "$container" 2>&1 | tail -n 30 || true
+            echo '::endgroup::'
+          done
