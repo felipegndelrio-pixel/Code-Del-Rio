@@ -107,7 +107,9 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     // Reembolso sem transação: revoga e bloqueia qualquer aprovação automática.
     await s.revoke({ email: e, transaction: null });
     expect((await s.grant({ email: e, transaction: 'HP3' })).result).toBe('blocked');
-    expect(await row(e)).toMatchObject({ status: 'revoked', transaction: 'HP2' });
+    expect(await row(e)).toMatchObject({ status: 'revoked', transaction: 'HP3' });
+    const blocks = await fetch(`${REST}/nexo_reconciliation_blocks?email=eq.${encodeURIComponent(e)}&resolved_at=is.null&select=reason`, { headers: auth() });
+    expect(await blocks.json()).toEqual([{ reason: 'transaction_missing' }]);
   });
 
   it('fora de ordem: reembolso que chega antes da aprovação cria a linha revogada e bloqueia a aprovação', async () => {
