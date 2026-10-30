@@ -100,12 +100,10 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     await s.revoke({ email: e, transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
     await s.revoke({ email: e, transaction: 'HP1', event: 'PURCHASE_REFUNDED' });
     expect((await row(e))?.status).toBe('revoked');
-    const missingTx = await fetch(`${REST}/rpc/nexo_grant_purchase`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_platform: 'hotmart', p_transaction: null, p_email: e, p_product_id: '123', p_event: 'PURCHASE_APPROVED' }) });
-    expect(await missingTx.json()).toMatchObject({ result: 'blocked', status: 'revoked', ignored: 'transaction_missing' });
     expect((await s.grant({ email: e, transaction: 'HP2', event: 'PURCHASE_APPROVED' })).result).toBe('active'); // compra nova
     expect(await row(e)).toEqual({ status: 'active', transaction: 'HP2', event: 'PURCHASE_APPROVED' });
-    expect(await s.grant({ email: e, transaction: null })).toMatchObject({ result: 'blocked', status: 'active' }); // aprovação sem tx não altera acesso
-    expect((await row(e))?.transaction).toBe('HP2');
+    expect(await s.grant({ email: e, transaction: null })).toMatchObject({ result: 'blocked', status: 'revoked' }); // A1: aprovação sem tx abre bloqueio
+    expect(await row(e)).toMatchObject({ status: 'revoked', transaction: 'HP2' });
     // Reembolso sem transação: revoga e bloqueia qualquer aprovação automática.
     await s.revoke({ email: e, transaction: null });
     expect((await s.grant({ email: e, transaction: 'HP3' })).result).toBe('blocked');
@@ -243,7 +241,9 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
       body: JSON.stringify({ event: 'PURCHASE_APPROVED', data: { buyer: { email: 'no-product-id@it.test' }, purchase: { transaction: 'H3' } } }),
     }), { store: raw, hottok: 'segredo' });
     expect(response.status).toBe(200);
-    expect(await row('no-product-id@it.test')).toMatchObject({ status: 'revoked', transaction: 'H3' });
+    expect(await row('no-product-id@it.test')).toMatchObject({ status: 'revoked', transaction: null });
+    const blocks = await fetch(`${REST}/nexo_reconciliation_blocks?email=eq.no-product-id%40it.test&resolved_at=is.null&select=id,reason`, { headers: auth() });
+    expect(await blocks.json()).toEqual([expect.objectContaining({ reason: 'product_missing' })]);
   });
 
   it('service_role não pode executar as RPCs antigas de licença', async () => {
