@@ -302,6 +302,40 @@ describe('POST /api/gumroad-license', () => {
     expect(gumroadDepsFromEnv({ GUMROAD_ALLOW_TEST: '1', GUMROAD_REVERIFY_AFTER_SEC: '3600' }, { store: null, privateJwk: null })).toMatchObject({ allowTest: true, reverifyAfterSec: 3600 });
   });
 
+  it('id fora do formato → 422 ativacao_manual (EN e PT), nada gravado, motivo no log sem a chave', async () => {
+    logs.length = 0;
+    const f = fakeStore();
+    const r = await handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), deps(f.store, gumroad(ok(officialPurchase({ sale_id: 'formato+novo/123' }))).fetchImpl));
+    expect(r.status).toBe(422);
+    const b = (await r.json()) as { error: string; message: string; message_pt: string };
+    expect(b.error).toBe('ativacao_manual');
+    expect(b.message).toMatch(/contact support/i);
+    expect(b.message_pt).toMatch(/suporte/);
+    expect(f.calls.map((c) => c.op)).toEqual(['lookup']); // só leitura: nenhum grant/revoke, nenhum bloqueio
+    expect(logs.join('\n')).toContain('id_fora_do_formato');
+    expect(logs.join('\n')).not.toContain(KEY);
+  });
+  it('id fora do formato com concessão manual ativa (gumroad_manual) → token', async () => {
+    const f = fakeStore();
+    f.store.lookup = async () => 'active';
+    const r = await handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), deps(f.store, gumroad(ok(officialPurchase({ sale_id: 'formato+novo/123' }))).fetchImpl));
+    expect(r.status).toBe(200);
+    expect(f.calls.filter((c) => c.op !== 'lookup')).toEqual([]);
+  });
+  it('compra sem e-mail → 422 sem consultar concessão manual (não dá para provar a posse)', async () => {
+    const f = fakeStore();
+    f.store.lookup = async () => 'active';
+    const r = await handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), deps(f.store, gumroad(ok(officialPurchase({ email: '' }))).fetchImpl));
+    expect(r.status).toBe(422);
+    expect(f.calls).toEqual([]);
+  });
+  it('GUMROAD_ALLOW_TEST=1 libera compra de teste pela rota (pronto se o fundador mudar de ideia)', async () => {
+    const f = fakeStore();
+    const g = () => gumroad(ok(officialPurchase({ test: true }))).fetchImpl;
+    expect((await handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), deps(f.store, g()))).status).toBe(404);
+    expect((await handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), deps(f.store, g(), { allowTest: true }))).status).toBe(200);
+  });
+
   describe('renovação { token, license_key }', () => {
     const tok = async (ageSec: number, sub = 'customer@example.com') => {
       const iat = Math.floor(NOW / 1000) - ageSec;
@@ -369,6 +403,14 @@ describe('POST /api/gumroad-ping', () => {
     expect(r.status).toBe(200);
     expect(f.calls).toEqual([expect.objectContaining({ op: 'revoke', rec: expect.objectContaining({ email: 'customer@example.com', event: 'GUMROAD_REFUNDED' }) })]);
     expect(new URLSearchParams(g.calls[0].body).get('increment_uses_count')).toBe('false');
+  });
+  it('Ping em JSON também é lido (campo de conteúdo configurável na conta)', async () => {
+    const f = fakeStore();
+    const g = gumroad(ok(officialPurchase()));
+    const r = await handleGumroadPing(new Request('https://x.test/api/gumroad-ping?secret=s3cr3t-test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ license_key: KEY, product_id: PRODUCT }) }), pdeps(f.store, g.fetchImpl));
+    expect(r.status).toBe(200);
+    expect(g.calls).toHaveLength(1);
+    expect(f.calls.map((c) => c.op)).toEqual(['grant']);
   });
   it('outro produto ou sem chave → 200 ignorado, sem chamar a Gumroad', async () => {
     const g = gumroad(ok(officialPurchase()));

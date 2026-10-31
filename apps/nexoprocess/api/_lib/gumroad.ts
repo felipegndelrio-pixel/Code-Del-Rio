@@ -170,6 +170,13 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 
 const NOT_FOUND = { error: 'sem_licenca', message: 'We could not find an active purchase for this email and license key.' };
+/** Falha fechada com mensagem clara: compra encontrada, mas sem ativação automática. */
+export const MANUAL_REASONS: ReadonlySet<string> = new Set(['id_fora_do_formato', 'sem_email']);
+const MANUAL = {
+  error: 'ativacao_manual',
+  message: "We found your Gumroad purchase but couldn't activate it automatically. Please contact support and we'll activate it for you.",
+  message_pt: 'Encontramos sua compra na Gumroad, mas não conseguimos ativá-la automaticamente. Fale com o suporte para ativarmos para você.',
+};
 const UNAVAILABLE = { error: 'falha_verificacao', message: 'We could not verify your license right now. Please try again shortly.' };
 
 function notConfigured(route: string, missing: string[] | undefined) {
@@ -240,13 +247,45 @@ export async function handleGumroadLicense(req: Request, deps: GumroadDeps): Pro
     return json(502, { error: 'falha_armazenamento', message: UNAVAILABLE.message });
   }
   console.log(`gumroad ${d.kind} → ${applied.status}${applied.status === 'rejected' ? ` (${applied.reason})` : ''} (${maskEmail(email)})`);
+  if (applied.status === 'rejected' && MANUAL_REASONS.has(applied.reason)) {
+    // Compra real, mas fora do formato esperado (A VALIDAR na 1ª venda). Nada foi gravado.
+    // Com id_fora_do_formato a chave é válida e o e-mail confere: se o fundador já concedeu
+    // manualmente (platform 'gumroad_manual', runbook no doc), libera pelo estado do banco.
+    if (applied.reason === 'id_fora_do_formato') {
+      let manual: Awaited<ReturnType<LicenseStore['lookup']>> = null;
+      try {
+        manual = await deps.store.lookup(email);
+      } catch (e) {
+        console.error(`gumroad: falha ao consultar concessão manual (${maskEmail(email)}) — ${e instanceof Error ? e.message : String(e)}`);
+      }
+      if (manual === 'active') return issue(deps.privateJwk, email, now, deps.ttlDays);
+    }
+    return json(422, MANUAL);
+  }
   if (applied.status !== 'active') return json(404, NOT_FOUND); // mesma resposta para todos os "não"
-  const exp = now + (deps.ttlDays ?? 30) * 86_400;
-  const token = await signToken({ v: 1, sub: email, iat: now, exp }, deps.privateJwk);
-  return json(200, { token, email, exp });
+  return issue(deps.privateJwk, email, now, deps.ttlDays);
 }
 
+async function issue(privateJwk: JsonWebKey, email: string, now: number, ttlDays?: number): Promise<Response> {
+  const exp = now + (ttlDays ?? 30) * 86_400;
+  const token = await signToken({ v: 1, sub: email, iat: now, exp }, privateJwk);
+  return json(200, { token, email, exp });
+}
 export const PING_MAX_BYTES = 64 * 1024;
+
+/** O Ping é form-urlencoded por padrão (doc oficial); aceita também JSON. Só lê campos de texto. */
+function pingFields(text: string, contentType: string | null): (name: string) => string | null {
+  if (contentType?.toLowerCase().includes('application/json') || text.trimStart().startsWith('{')) {
+    try {
+      const o = JSON.parse(text) as Record<string, unknown>;
+      return (n) => (o && typeof o === 'object' && typeof o[n] === 'string' ? (o[n] as string) : null);
+    } catch {
+      return () => null;
+    }
+  }
+  const form = new URLSearchParams(text);
+  return (n) => form.get(n);
+}
 
 /**
  * POST /api/gumroad-ping?secret=… — o Ping não é assinado: serve só de gatilho. Lê a
@@ -263,10 +302,10 @@ export async function handleGumroadPing(req: Request, deps: GumroadDeps): Promis
   }
   const text = await readBodyLimited(req, PING_MAX_BYTES);
   if (text === null) return json(413, { error: 'grande_demais' });
-  const form = new URLSearchParams(text);
-  const productId = form.get('product_id')?.trim();
+  const field = pingFields(text, req.headers.get('content-type'));
+  const productId = field('product_id')?.trim();
   if (productId && productId !== deps.productId.trim()) return json(200, { ignored: 'outro_produto' });
-  const key = normalizeLicenseKey(form.get('license_key'));
+  const key = normalizeLicenseKey(field('license_key'));
   if (!key) return json(200, { ignored: 'sem_license_key' });
   const v = await verifyGumroadLicense(deps.productId, key, deps.fetchImpl ?? fetch, deps.timeoutMs ?? 3500);
   if (v.kind === 'unavailable') {
