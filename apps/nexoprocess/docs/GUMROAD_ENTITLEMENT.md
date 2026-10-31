@@ -1,7 +1,7 @@
 # Gumroad: concessão e revogação de acesso (desenho T1)
 
-Versão 1 do desenho, de 31/10/2026, branch `wip/en-foundation`, base `v2.5.0-rc1` (31f0ed5).
-Status: **desenho para revisão. Nada implementado.** O comportamento PT não muda.
+Versão 2, de 31/10/2026, branch `wip/en-foundation`, base `v2.5.0-rc1` (31f0ed5).
+Status: **T1 aprovada com condições C1–C5 (revisor, 31/10/2026); T2 implementada, aguardando revisão.** Nada publicado; nenhuma migração aplicada fora do G3. O comportamento PT/Hotmart não muda.
 
 ## 0. Fontes e como foram verificadas
 
@@ -195,7 +195,7 @@ Escala de 1 a 5. Severidade (S), ocorrência (O), detecção (D) e RPN (risco) =
 - `GUMROAD_PRODUCT_ID` (obrigatória, com `==`, como a Gumroad mostra).
 - `GUMROAD_ALLOW_TEST` (opcional, padrão desligado).
 - `GUMROAD_REVERIFY_AFTER_SEC` (opcional, padrão 86400).
-- `GUMROAD_PING_SECRET` (só se D4 = sim).
+- `GUMROAD_PING_SECRET` (D4; a URL fica `/api/gumroad-ping?secret=<valor>`).
 - Reusa `LICENSE_PRIVATE_JWK`, `LICENSE_TTL_DAYS` e `SUPABASE_*`. Nenhuma credencial Gumroad: o `verify` não exige token.
 
 ## 10. Plano de testes da T2 (sem chamada real)
@@ -218,18 +218,36 @@ Escala de 1 a 5. Severidade (S), ocorrência (O), detecção (D) e RPN (risco) =
   - Garantir que `GUMROAD_DISPUTE_WON` daria `charged_back` (documenta a armadilha).
   - Mínimo do G3 ajustado ao total exato.
 
-## 11. Decisões do fundador (bloqueiam a T2 onde indicado)
+## 11. Decisões do fundador
 
-| # | Decisão | Recomendação |
+Fonte: fundador ("OK" às recomendações), repassado pelo revisor em 31/10/2026.
+
+| # | Decisão tomada | Onde está na T2 |
 |---|---|---|
-| D1 | Renovação com Gumroad fora do ar | (a) falha fechada e mantém o token atual até vencer |
-| D2 | Exigir que o e-mail digitado seja o da compra | Sim |
-| D3 | `/api/license {email}` (PT) deve ignorar compras `gumroad`? Isso exige mudar `nexo_lookup_license` só para `platform <> 'gumroad'`; PT/Hotmart não muda | Sim, numa etapa própria com G3 (**bloqueia** fechar R3 sem ping) |
-| D4 | Usar o Ping (exige cadastrar a URL na conta Gumroad, ação do fundador) e com segredo na URL? | Sim, com segredo |
-| D5 | Compras de teste (`test:true`) liberam acesso em produção? | Não |
-| D6 | Reembolso parcial mantém o acesso? | Sim (igual ao PT) |
-| D7 | Limitar ativações por chave (`increment_uses_count=true` e teto)? | Não agora |
-| D8 | Liberar `gumroad.com`/`api.gumroad.com` na rede desta sessão para conferir a doc publicada | Sim, antes da T2 |
+| D1 | Com a Gumroad fora do ar na renovação: falha fechada; o cliente mantém o token atual até `exp` | `handleGumroadLicense` → 502 `falha_verificacao`, nada gravado |
+| D2 | O e-mail digitado tem de ser o da compra | `decide(…, expectedEmail)` → `email_diferente` → 404, sem gravar (C4) |
+| D3 | **Obrigatório:** o caminho só por e-mail (`/api/license`) não concede por compras `gumroad`; Hotmart idêntico | `nexo_lookup_license` ignora `platform = 'gumroad'` (`schema-purchases.sql`) e G3 "D3" |
+| D4 | Ping: sim, com `GUMROAD_PING_SECRET` na URL. Cadastrar a URL na conta Gumroad é ação do fundador, fora desta sessão | `/api/gumroad-ping?secret=…` (`functions/api/gumroad-ping.ts`) |
+| D5 | `test:true` só com `GUMROAD_ALLOW_TEST=1` (desligado por padrão) | `decide` → `compra_de_teste` |
+| D6 | Reembolso parcial mantém o acesso (o verify nem o mostra) | `decide` → `grant` |
+| D7 | `increment_uses_count=false` sempre; sem limite de ativações | `verifyGumroadLicense` (teste confere o corpo enviado) |
+| D8 | Não liberar a rede da sessão | ver "A VALIDAR antes do lançamento" abaixo |
+
+**A VALIDAR antes do lançamento (decorre de D8):** fazer uma compra de teste real (pelo fundador) e conferir:
+1. O formato real do `sale_id` e do `product_id` (base64url com `==`) e da `license_key`.
+2. A resposta completa do `verify` para essa compra, inclusive `price` em centavos e `currency`.
+3. A comparação de `/api/gumroad-license` contra essa resposta.
+
+### Condições da revisão da T1, atendidas na T2
+- **C1:** a disputa ganha decide pelo estado da compra no banco. RPC só de leitura `nexo_purchase_state(platform, transaction)`, com `SECURITY DEFINER`, `search_path=''` e `execute` só para `service_role`. `CHARGEBACK_REVERSED` só vai quando a compra está `charged_back`. G3 cobre "reembolsada → disputa ganha não reativa e não cria bloqueio" e as permissões (anon e authenticated negados).
+- **C2/D3:** está no item D3 acima. Os testes `tests/api` existentes ficaram intactos.
+- **C3:** `normalizeGumroadId` = null → decisão `reject` → zero chamadas ao store (teste unitário).
+- **C4:** e-mail diferente → 404, nada gravado, log só com o e-mail mascarado (teste).
+- **C5:** a `license_key` não é gravada nem logada (teste varre logs e gravações).
+
+### Nota de implementação
+- A mudança do D3 e a RPC nova ficaram **dentro de `schema-purchases.sql`**, que é idempotente e o G3 aplica duas vezes.
+- Motivo: com um arquivo separado, reaplicar só o `schema-purchases.sql` desfaria o D3 em silêncio.
 
 ## 12. O que NÃO foi verificado
 
