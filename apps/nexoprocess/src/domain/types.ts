@@ -1,3 +1,4 @@
+import { lazyLabels } from '../i18n';
 // Modelo de dados do NexoProcess. Tudo aqui é serializável (JSON) e fica
 // armazenado localmente no IndexedDB do navegador.
 
@@ -255,29 +256,38 @@ export interface Workspace {
   snapshots: Snapshot[];
 }
 
-export const LEAN_LABEL: Record<LeanClass | 'U', string> = {
-  VA: 'Agrega valor',
-  NNVA: 'Necessário (não agrega valor)',
-  W: 'Desperdício',
-  U: 'Não classificado',
-};
+export const LEAN_LABEL: Record<LeanClass | 'U', string> = lazyLabels({
+  VA: 'd.lean.VA',
+  NNVA: 'd.lean.NNVA',
+  W: 'd.lean.W',
+  U: 'd.lean.U',
+});
 
-export const LEAN_REASON_LABEL: Record<LeanReason, string> = {
-  regulatorio: 'Exigência legal ou regulatória',
-  controle: 'Controle interno ou auditoria',
-  seguranca: 'Segurança (pessoas, dados ou produto)',
-  restricao: 'Restrição técnica ou contratual',
-  outro: 'Outro motivo',
-};
+export const LEAN_REASON_LABEL: Record<LeanReason, string> = lazyLabels({
+  regulatorio: 'd.leanreason.regulatorio',
+  controle: 'd.leanreason.controle',
+  seguranca: 'd.leanreason.seguranca',
+  restricao: 'd.leanreason.restricao',
+  outro: 'd.leanreason.outro',
+});
 /** Motivos que tornam a atividade obrigatória: não pode ser eliminada, apenas simplificada. */
 export const MANDATORY_REASONS: LeanReason[] = ['regulatorio', 'controle', 'seguranca'];
 
-export const TYPE_LABEL: Record<ElementType, string> = {
-  start: 'Início',
-  task: 'Atividade',
-  decision: 'Decisão',
-  end: 'Fim',
-};
+export const TYPE_LABEL: Record<ElementType, string> = lazyLabels({
+  start: 'd.type.start',
+  task: 'd.type.task',
+  decision: 'd.type.decision',
+  end: 'd.type.end',
+});
 
-export const PERIOD_LABEL: Record<Period, string> = { dia: 'dia', semana: 'semana', mes: 'mês', ano: 'ano' };
-export const UNIT_LABEL: Record<DurationUnit, string> = { min: 'minutos', h: 'horas', d: 'dias' };
+export const PERIOD_LABEL: Record<Period, string> = lazyLabels({
+  dia: 'd.period.dia',
+  semana: 'd.period.semana',
+  mes: 'd.period.mes',
+  ano: 'd.period.ano',
+});
+export const UNIT_LABEL: Record<DurationUnit, string> = lazyLabels({
+  min: 'd.unit2.min',
+  h: 'd.unit2.h',
+  d: 'd.unit2.d',
+});

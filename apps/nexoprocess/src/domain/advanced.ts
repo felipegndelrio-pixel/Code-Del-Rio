@@ -5,6 +5,7 @@ import { isWork } from './metrics';
 import type { Activity, AiStage, AutomationAssessment, AutomationCriterion, ProcessModel, RaciState, Risk } from './types';
 import { isNum, toHours } from './units';
 
+import { tr } from '../i18n';
 // ----------------------------------------------------------------- simulação
 
 /** PRNG determinístico (mulberry32) — resultados reproduzíveis com a mesma semente. */
@@ -34,11 +35,11 @@ export interface SimulationInput {
 export function simulationReadiness(p: ProcessModel): SimulationInput {
   const missing: SimulationInput['missing'] = [];
   for (const a of p.activities.filter((x) => x.type === 'task')) {
-    if (!isNum(a.duration) || !isNum(a.minDuration) || !isNum(a.maxDuration)) missing.push({ id: a.id, name: a.name, reason: 'falta mínimo, mais provável (duração) ou máximo' });
-    else if (!(a.minDuration <= a.duration && a.duration <= a.maxDuration)) missing.push({ id: a.id, name: a.name, reason: 'precisa mínimo ≤ mais provável ≤ máximo' });
+    if (!isNum(a.duration) || !isNum(a.minDuration) || !isNum(a.maxDuration)) missing.push({ id: a.id, name: a.name, reason: tr('d.advanced.001') });
+    else if (!(a.minDuration <= a.duration && a.duration <= a.maxDuration)) missing.push({ id: a.id, name: a.name, reason: tr('d.advanced.002') });
   }
   const g = buildGraph(p);
-  if (g.dangling.length || g.unreachable.length) missing.push({ id: '-', name: 'Fluxo', reason: 'há ligações inválidas ou atividades soltas' });
+  if (g.dangling.length || g.unreachable.length) missing.push({ id: '-', name: 'Fluxo', reason: tr('d.advanced.003') });
   return { ready: missing.length === 0 && p.activities.some((a) => a.type === 'task'), missing };
 }
 
@@ -129,9 +130,9 @@ export function raciIssues(p: ProcessModel, r: RaciState): { activityId: string;
   for (const a of p.activities.filter((x) => x.type === 'task')) {
     const cells = Object.values(r.cells[a.id] ?? {});
     const A = cells.filter((x) => x === 'A').length;
-    if (!cells.includes('R')) out.push({ activityId: a.id, name: a.name, issue: 'Sem responsável pela execução (R).' });
-    if (A === 0) out.push({ activityId: a.id, name: a.name, issue: 'Sem quem presta contas (A) — defina e confirme.' });
-    if (A > 1) out.push({ activityId: a.id, name: a.name, issue: 'Mais de um “A”: deve haver apenas um.' });
+    if (!cells.includes('R')) out.push({ activityId: a.id, name: a.name, issue: tr('d.advanced.004') });
+    if (A === 0) out.push({ activityId: a.id, name: a.name, issue: tr('d.advanced.005') });
+    if (A > 1) out.push({ activityId: a.id, name: a.name, issue: tr('d.advanced.006') });
   }
   return out;
 }
@@ -160,33 +161,33 @@ export function fmeaPriority(r: Risk): 'alta' | 'normal' | null {
 // ----------------------------------------------------------------- automação / IA
 
 export const CRITERIA: { key: AutomationCriterion; label: string; help: string; favorable: 'alto' | 'baixo' }[] = [
-  { key: 'repetitividade', label: 'Repetitividade', help: 'A atividade se repete sempre do mesmo jeito? (5 = sempre igual)', favorable: 'alto' },
-  { key: 'regras', label: 'Regras claras', help: 'As decisões seguem regras escritas e estáveis? (5 = regras claras)', favorable: 'alto' },
-  { key: 'dados', label: 'Qualidade dos dados', help: 'Os dados de entrada são digitais, estruturados e confiáveis? (5 = excelentes)', favorable: 'alto' },
-  { key: 'excecoes', label: 'Exceções', help: 'Com que frequência aparecem casos fora do padrão? (5 = muitas exceções)', favorable: 'baixo' },
-  { key: 'julgamento', label: 'Julgamento humano', help: 'Quanto a atividade depende de avaliação/empatia humana? (5 = muito)', favorable: 'baixo' },
-  { key: 'risco_erro', label: 'Impacto de erro', help: 'Qual o impacto se a automação errar? (5 = grave)', favorable: 'baixo' },
+  { key: 'repetitividade', get label() { return tr('d.adv.crit.01'); }, get help() { return tr('d.adv.crit.07'); }, favorable: 'alto' },
+  { key: 'regras', get label() { return tr('d.adv.crit.02'); }, get help() { return tr('d.adv.crit.08'); }, favorable: 'alto' },
+  { key: 'dados', get label() { return tr('d.adv.crit.03'); }, get help() { return tr('d.adv.crit.09'); }, favorable: 'alto' },
+  { key: 'excecoes', get label() { return tr('d.adv.crit.04'); }, get help() { return tr('d.adv.crit.10'); }, favorable: 'baixo' },
+  { key: 'julgamento', get label() { return tr('d.adv.crit.05'); }, get help() { return tr('d.adv.crit.11'); }, favorable: 'baixo' },
+  { key: 'risco_erro', get label() { return tr('d.adv.crit.06'); }, get help() { return tr('d.adv.crit.12'); }, favorable: 'baixo' },
 ];
 
 export const CHECKLIST = [
-  { key: 'valor', label: 'Valor estratégico claro e indicador de sucesso definido' },
-  { key: 'dados', label: 'Dados disponíveis, com qualidade e dono conhecido' },
-  { key: 'governanca', label: 'Governança: quem aprova, monitora e desliga' },
-  { key: 'conformidade', label: 'Conformidade (LGPD, regulatório, contratos) verificada' },
-  { key: 'pessoas', label: 'Pessoas impactadas envolvidas e capacitação planejada' },
-  { key: 'cultura', label: 'Equipe aberta à mudança; patrocinador definido' },
-  { key: 'responsabilidade', label: 'Humano no circuito: a IA sugere, uma pessoa valida' },
+  { key: 'valor', get label() { return tr('d.adv.chk.01'); } },
+  { key: 'dados', get label() { return tr('d.adv.chk.02'); } },
+  { key: 'governanca', get label() { return tr('d.adv.chk.03'); } },
+  { key: 'conformidade', get label() { return tr('d.adv.chk.04'); } },
+  { key: 'pessoas', get label() { return tr('d.adv.chk.05'); } },
+  { key: 'cultura', get label() { return tr('d.adv.chk.06'); } },
+  { key: 'responsabilidade', get label() { return tr('d.adv.chk.07'); } },
 ];
 
 export const AI_STAGES: { key: AiStage; label: string }[] = [
-  { key: 'descoberta', label: 'Descoberta e planejamento' },
-  { key: 'dados', label: 'Preparação dos dados' },
-  { key: 'avaliacao', label: 'Avaliação' },
-  { key: 'piloto', label: 'Piloto' },
-  { key: 'implantacao', label: 'Implantação' },
-  { key: 'monitoramento', label: 'Monitoramento' },
-  { key: 'otimizacao', label: 'Otimização' },
-  { key: 'descontinuada', label: 'Descontinuada' },
+  { key: 'descoberta', get label() { return tr('d.adv.stage.01'); } },
+  { key: 'dados', get label() { return tr('d.adv.stage.02'); } },
+  { key: 'avaliacao', get label() { return tr('d.adv.stage.03'); } },
+  { key: 'piloto', get label() { return tr('d.adv.stage.04'); } },
+  { key: 'implantacao', get label() { return tr('d.adv.stage.05'); } },
+  { key: 'monitoramento', get label() { return tr('d.adv.stage.06'); } },
+  { key: 'otimizacao', get label() { return tr('d.adv.stage.07'); } },
+  { key: 'descontinuada', get label() { return tr('d.adv.stage.08'); } },
 ];
 
 /**
@@ -206,9 +207,9 @@ export function automationScore(x: Pick<AutomationAssessment, 'answers'>): { sco
 }
 
 export function automationVerdict(score: number | null, judgment?: number): string {
-  if (score === null) return 'Responda pelo menos 4 critérios para avaliar.';
-  if (isNum(judgment) && judgment >= 4) return 'Alto julgamento humano: prefira apoio à decisão (IA sugere, pessoa decide) a automação completa.';
-  if (score >= 70) return 'Boa candidata: testar um piloto pequeno com métrica de sucesso definida.';
-  if (score >= 45) return 'Candidata parcial: simplificar/padronizar antes, ou automatizar só o caminho padrão.';
-  return 'Baixa aptidão: priorize padronização e qualidade dos dados.';
+  if (score === null) return tr('d.advanced.008');
+  if (isNum(judgment) && judgment >= 4) return tr('d.advanced.009');
+  if (score >= 70) return tr('d.advanced.010');
+  if (score >= 45) return tr('d.advanced.011');
+  return tr('d.advanced.012');
 }

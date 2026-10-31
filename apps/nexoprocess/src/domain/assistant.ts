@@ -4,6 +4,7 @@ import { newActivity, newProcess, normalizeStages } from './factory';
 import type { Activity, DurationUnit, LeanClass, Period, ProcessModel } from './types';
 import { parseLocaleNumber, uid } from './units';
 
+import { tr } from '../i18n';
 export type Unknown = 'nao_sei';
 export interface DraftActivity {
   key: string;
@@ -154,8 +155,8 @@ export function analyzeDraft(d: AssistantDraft): DraftAnalysis {
  * Várias decisões depois da mesma atividade viram uma sequência (sim → próxima decisão).
  */
 export function draftToProcess(d: AssistantDraft): ProcessModel {
-  const p = newProcess(d.name.trim() || 'Novo processo');
-  p.description = [d.trigger && `Início: ${d.trigger.trim()}`, d.outcome && `Resultado: ${d.outcome.trim()}`].filter(Boolean).join(' · ') || undefined;
+  const p = newProcess(d.name.trim() || tr('d.assistant.001'));
+  p.description = [d.trigger && tr('d.assistant.002', { p0: d.trigger.trim() }), d.outcome && tr('d.assistant.003', { p0: d.outcome.trim() })].filter(Boolean).join(' · ') || undefined;
   p.volume = d.volumeUnknown ? undefined : d.volume;
   p.volumePeriod = d.period;
   p.defaultCostPerHour = d.costUnknown ? undefined : d.costPerHour;
@@ -168,7 +169,7 @@ export function draftToProcess(d: AssistantDraft): ProcessModel {
   let order = 0;
   const firstStage = flat[0].s.name.trim();
   const lastStage = flat[flat.length - 1].s.name.trim();
-  acts.push(newActivity({ id: 'INICIO', stage: firstStage, name: d.trigger?.trim() || 'Início', type: 'start', order: ++order, next: [idOf.get(flat[0].a.key)!] }));
+  acts.push(newActivity({ id: 'INICIO', stage: firstStage, name: d.trigger?.trim() || tr('d.assistant.004'), type: 'start', order: ++order, next: [idOf.get(flat[0].a.key)!] }));
   let needsNoEnd = false;
   flat.forEach(({ s, a }, i) => {
     const nextId = flat[i + 1] ? idOf.get(flat[i + 1].a.key)! : 'FIM';
@@ -185,7 +186,7 @@ export function draftToProcess(d: AssistantDraft): ProcessModel {
       rework: a.rework === 'sim' || undefined,
       frequencyPct: a.rework === 'sim' ? a.reworkPct : undefined,
       lean: a.lean && a.lean !== 'nao_sei' ? a.lean : undefined,
-      notes: [a.durationUnknown && 'Duração ainda não medida.', a.waitState === 'nao_sei' && 'Espera ainda não medida.', a.rework === 'nao_sei' && 'Retrabalho: não se sabe.'].filter(Boolean).join(' ') || undefined,
+      notes: [a.durationUnknown && tr('d.assistant.005'), a.waitState === 'nao_sei' && tr('d.assistant.006'), a.rework === 'nao_sei' && tr('d.assistant.007')].filter(Boolean).join(' ') || undefined,
     });
     const chain = decAfter.get(a.key) ?? [];
     act.next = [chain[0]?.id ?? nextId];
@@ -197,7 +198,7 @@ export function draftToProcess(d: AssistantDraft): ProcessModel {
     });
   });
   acts.push(newActivity({ id: 'FIM', stage: lastStage, name: d.outcome?.trim() || 'Fim', type: 'end', order: ++order }));
-  if (needsNoEnd) acts.push(newActivity({ id: 'FIM_NAO', stage: lastStage, name: 'Encerrado (resposta não)', type: 'end', order: ++order }));
+  if (needsNoEnd) acts.push(newActivity({ id: 'FIM_NAO', stage: lastStage, name: tr('d.assistant.008'), type: 'end', order: ++order }));
   p.activities = acts;
   p.stageOrder = stages.map((s) => s.name.trim());
   return normalizeStages(p);

@@ -5,13 +5,15 @@ import { bottlenecks, computeMetrics, type ProcessMetrics } from './metrics';
 import { LEAN_REASON_LABEL, MANDATORY_REASONS, type Activity, type BottleneckCriterion, type ProcessModel } from './types';
 import { fmtHours, fmtNum, fmtPct, isNum } from './units';
 
+import { lazyLabels } from '../i18n';
+import { tr } from '../i18n';
 export type RecGroup = 'resolver' | 'investigar' | 'automatizar' | 'monitorar';
-export const GROUP_LABEL: Record<RecGroup, string> = {
-  resolver: 'Resolver primeiro',
-  investigar: 'Investigar',
-  automatizar: 'Automatizar ou simplificar',
-  monitorar: 'Monitorar',
-};
+export const GROUP_LABEL: Record<RecGroup, string> = lazyLabels({
+  resolver: 'd.recgroup.resolver',
+  investigar: 'd.recgroup.investigar',
+  automatizar: 'd.recgroup.automatizar',
+  monitorar: 'd.recgroup.monitorar',
+});
 
 export interface Evidence {
   /** Fato = consta nos dados; Inferência = derivado por regra. */
@@ -59,11 +61,11 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
   const work = m.workItems;
   const totalActive = m.activeSumH.value ?? 0;
   const per = (a: Activity) => m.per.get(a.id)!;
-  const periodTxt = p.volumePeriod === 'mes' ? 'mês' : p.volumePeriod;
+  const periodTxt = p.volumePeriod === 'mes' ? tr('d.rec.001') : p.volumePeriod;
   const ceilingOf = (a: Activity) => {
     const x = per(a);
-    if (x.effortPeriodH !== null) return `Até ${fmtNum(x.effortPeriodH)} pessoa-h/${periodTxt} se a atividade deixasse de existir (teto teórico, não previsão).`;
-    if (x.effortH !== null) return `Até ${fmtNum(x.effortH * x.weight)} pessoa-h por execução (teto teórico, não previsão).`;
+    if (x.effortPeriodH !== null) return tr('d.rec.002', { p0: fmtNum(x.effortPeriodH), periodTxt });
+    if (x.effortH !== null) return tr('d.rec.003', { p0: fmtNum(x.effortH * x.weight) });
     return undefined;
   };
 
@@ -77,22 +79,22 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: 'resolver',
       priority: P(score),
       score,
-      title: `Eliminar ou reduzir “${a.name}”`,
+      title: tr('d.rec.004', { name: a.name }),
       activityId: a.id,
-      problem: 'A atividade foi classificada como desperdício: consome tempo sem gerar valor para o cliente.',
+      problem: tr('d.rec.005'),
       evidence: [
-        { kind: 'fato', text: `Classificação Lean informada: desperdício.` },
-        ...(x.activeH !== null ? [{ kind: 'fato' as const, text: `Duração ativa: ${fmtHours(x.activeH)} por ocorrência.` }] : []),
-        ...(share !== null ? [{ kind: 'inferencia' as const, text: `${fmtPct(share)} da soma das durações registradas.` }] : []),
+        { kind: 'fato', text: tr('d.rec.006') },
+        ...(x.activeH !== null ? [{ kind: 'fato' as const, text: tr('d.rec.007', { p0: fmtHours(x.activeH) }) }] : []),
+        ...(share !== null ? [{ kind: 'inferencia' as const, text: tr('d.rec.008', { p0: fmtPct(share) }) }] : []),
       ],
-      rule: 'Regra R1: toda atividade classificada como desperdício gera recomendação; prioridade cresce com a participação na duração total.',
-      hypothesis: 'A atividade pode ser eliminada ou reduzida sem prejudicar o resultado do processo.',
-      action: 'Entender por que a atividade existe (5 porquês) e testar removê-la ou combiná-la com outra.',
+      rule: tr('d.rec.009'),
+      hypothesis: tr('d.rec.010'),
+      action: tr('d.rec.011'),
       ceiling: ceilingOf(a),
       owner: a.owner,
-      successIndicator: 'Redução do tempo ativo e do esforço por execução, sem aumento de erros.',
-      risks: 'Remover um controle disfarçado de desperdício pode aumentar falhas a jusante.',
-      nextStep: 'Validar com quem executa se a atividade pode deixar de existir.',
+      successIndicator: tr('d.rec.012'),
+      risks: tr('d.rec.013'),
+      nextStep: tr('d.rec.014'),
       changeKind: 'remove',
     });
   }
@@ -107,23 +109,23 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: hasFreq ? 'resolver' : 'investigar',
       priority: P(score),
       score,
-      title: `Reduzir retrabalho em “${a.name}”`,
+      title: tr('d.rec.015', { name: a.name }),
       activityId: a.id,
-      problem: 'Retrabalho indica que algo saiu errado antes — o custo real está na causa, não na correção.',
+      problem: tr('d.rec.016'),
       evidence: [
-        { kind: 'fato', text: 'Atividade marcada como retrabalho.' },
-        ...(isNum(a.frequencyPct) ? [{ kind: 'fato' as const, text: `Ocorre em ${fmtPct(a.frequencyPct)} das execuções (informado).` }] : [{ kind: 'fato' as const, text: 'Frequência não informada.' }]),
-        ...(x.effortPeriodH !== null && hasFreq ? [{ kind: 'inferencia' as const, text: `Esforço estimado: ${fmtNum(x.effortPeriodH)} pessoa-h/${periodTxt}.` }] : []),
+        { kind: 'fato', text: tr('d.rec.017') },
+        ...(isNum(a.frequencyPct) ? [{ kind: 'fato' as const, text: tr('d.rec.018', { p0: fmtPct(a.frequencyPct) }) }] : [{ kind: 'fato' as const, text: tr('d.rec.019') }]),
+        ...(x.effortPeriodH !== null && hasFreq ? [{ kind: 'inferencia' as const, text: tr('d.rec.020', { p0: fmtNum(x.effortPeriodH), periodTxt }) }] : []),
       ],
-      rule: 'Regra R2: atividades marcadas como retrabalho geram recomendação; com frequência informada vão para “Resolver primeiro”, sem ela para “Investigar”.',
-      hypothesis: 'A causa do retrabalho está em uma etapa anterior (dados incompletos, instrução ambígua, falta de checagem na origem).',
-      action: 'Mapear as causas do retrabalho e criar prevenção na origem (checklist, campo obrigatório, validação automática).',
+      rule: tr('d.rec.021'),
+      hypothesis: tr('d.rec.022'),
+      action: tr('d.rec.023'),
       ceiling: hasFreq ? ceilingOf(a) : undefined,
       owner: a.owner,
-      successIndicator: 'Queda da frequência de retrabalho (%) e do esforço associado.',
-      risks: 'Barreiras na origem podem aumentar o tempo da etapa anterior.',
-      dataNeeded: hasFreq ? undefined : 'Informe a frequência (%) para estimar o impacto.',
-      nextStep: hasFreq ? 'Levantar as 3 causas mais frequentes com quem executa.' : 'Medir em quantas execuções o retrabalho acontece.',
+      successIndicator: tr('d.rec.024'),
+      risks: tr('d.rec.025'),
+      dataNeeded: hasFreq ? undefined : tr('d.rec.026'),
+      nextStep: hasFreq ? tr('d.rec.027') : tr('d.rec.028'),
       changeKind: 'reduce_rework',
     });
   }
@@ -139,21 +141,21 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: 'investigar',
       priority: P(score),
       score,
-      title: `Investigar o gargalo “${a.name}”`,
+      title: tr('d.rec.029', { name: a.name }),
       activityId: a.id,
-      problem: 'A atividade concentra uma parte desproporcional do processo no critério selecionado.',
+      problem: tr('d.rec.030'),
       evidence: [
-        { kind: 'inferencia', text: `${fmtPct(b.share)} do total do critério (${criterionLabel(criterion)}).` },
-        { kind: 'fato', text: `Posição ${i + 1} no Pareto.` },
+        { kind: 'inferencia', text: tr('d.rec.031', { p0: fmtPct(b.share), p1: criterionLabel(criterion) }) },
+        { kind: 'fato', text: tr('d.rec.032', { p0: i + 1 }) },
       ],
-      rule: `Regra R3: atividades com participação ≥ ${thresholdPct}% no critério “${criterionLabel(criterion)}” (máx. 5) são destacadas. Concentração não prova causa-raiz.`,
-      hypothesis: 'A concentração decorre de método, capacidade, dependência ou variação — precisa de observação para confirmar.',
-      action: 'Observar a execução (gemba), medir variação e verificar se há fila, falta de padrão ou excesso de aprovações.',
+      rule: tr('d.rec.033', { thresholdPct, p1: criterionLabel(criterion) }),
+      hypothesis: tr('d.rec.034'),
+      action: tr('d.rec.035'),
       ceiling: ceilingOf(a),
       owner: a.owner,
-      successIndicator: `Redução da participação da atividade em ${criterionLabel(criterion).toLowerCase()}.`,
-      risks: 'Otimizar uma atividade que não limita o fluxo pode não reduzir o tempo total.',
-      nextStep: 'Cronometrar 10 execuções reais e comparar com o valor informado.',
+      successIndicator: tr('d.rec.036', { p0: criterionLabel(criterion).toLowerCase() }),
+      risks: tr('d.rec.037'),
+      nextStep: tr('d.rec.038'),
       changeKind: 'simplify',
     });
   });
@@ -171,20 +173,20 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: 'resolver',
       priority: P(score),
       score,
-      title: `Reduzir a espera antes de “${a.name}”`,
+      title: tr('d.rec.039', { name: a.name }),
       activityId: a.id,
-      problem: 'O item fica mais tempo parado do que sendo trabalhado — o cliente sente a espera.',
+      problem: tr('d.rec.040'),
       evidence: [
-        { kind: 'fato', text: `Espera informada: ${fmtHours(x.waitH)}; trabalho ativo: ${fmtHours(x.activeH)}.` },
-        { kind: 'inferencia', text: Number.isFinite(ratio) ? `Espera ${fmtNum(ratio, 1)}× maior que o trabalho.` : 'Espera sem trabalho ativo correspondente.' },
+        { kind: 'fato', text: tr('d.rec.041', { p0: fmtHours(x.waitH), p1: fmtHours(x.activeH) }) },
+        { kind: 'inferencia', text: Number.isFinite(ratio) ? tr('d.rec.042', { p0: fmtNum(ratio, 1) }) : tr('d.rec.043') },
       ],
-      rule: 'Regra R4: espera informada ≥ 2× o tempo ativo da atividade e ≥ 5% da soma das esperas.',
-      hypothesis: 'A espera vem de fila, lote, aprovação ou dependência externa que pode ser reduzida.',
-      action: 'Identificar a fonte da espera (lote, horário fixo, aprovação) e testar fluxo contínuo ou SLA.',
+      rule: tr('d.rec.044'),
+      hypothesis: tr('d.rec.045'),
+      action: tr('d.rec.046'),
       owner: a.owner,
-      successIndicator: 'Tempo decorrido por execução (lead time) menor.',
-      risks: 'Reduzir lotes pode aumentar trocas de contexto da equipe.',
-      nextStep: 'Medir quando o item chega e quando é iniciado durante uma semana.',
+      successIndicator: tr('d.rec.047'),
+      risks: tr('d.rec.048'),
+      nextStep: tr('d.rec.049'),
       changeKind: 'reduce_wait',
     });
   }
@@ -201,22 +203,22 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: 'automatizar',
       priority: P(score),
       score,
-      title: `Avaliar automação ou simplificação de “${a.name}”`,
+      title: tr('d.rec.050', { name: a.name }),
       activityId: a.id,
-      problem: 'Atividade necessária, mas que não agrega valor, com volume relevante.',
+      problem: tr('d.rec.051'),
       evidence: [
-        { kind: 'fato', text: 'Classificação Lean informada: necessário (não agrega valor).' },
-        { kind: 'fato', text: `Ocorre ${fmtNum(x.execPerPeriod)} vez(es)/${periodTxt}.` },
-        { kind: 'inferencia', text: `${fmtPct(share)} do esforço do período.` },
+        { kind: 'fato', text: tr('d.rec.052') },
+        { kind: 'fato', text: tr('d.rec.053', { p0: fmtNum(x.execPerPeriod), periodTxt }) },
+        { kind: 'inferencia', text: tr('d.rec.054', { p0: fmtPct(share) }) },
       ],
-      rule: 'Regra R5: atividade “necessária” com ≥ 5% do esforço do período.',
-      hypothesis: 'A atividade segue regras estáveis e dados estruturados, podendo ser automatizada ou simplificada.',
-      action: 'Avaliar critérios de automação (regras, dados, exceções, julgamento humano) na seção Automação e IA.',
+      rule: tr('d.rec.055'),
+      hypothesis: tr('d.rec.056'),
+      action: tr('d.rec.057'),
       ceiling: ceilingOf(a),
       owner: a.owner,
-      successIndicator: 'Esforço por execução menor com a mesma taxa de erro ou menor.',
-      risks: 'Automatizar um processo ruim acelera o erro; exceções podem exigir tratamento humano.',
-      nextStep: 'Contar exceções em uma amostra de 20 execuções.',
+      successIndicator: tr('d.rec.058'),
+      risks: tr('d.rec.059'),
+      nextStep: tr('d.rec.060'),
       changeKind: 'automate',
     });
   }
@@ -229,15 +231,15 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: 'monitorar',
       priority: 'baixa',
       score: 20,
-      title: `Classificar ${unclassified.length} atividade(s) quanto ao valor (Lean)`,
-      problem: 'Sem classificação não dá para separar valor de desperdício.',
-      evidence: [{ kind: 'fato', text: `${unclassified.length} de ${work.filter((a) => a.type === 'task').length} atividades sem classificação.` }],
-      rule: 'Regra R6: existência de atividades não classificadas.',
-      hypothesis: 'Parte dessas atividades pode ser desperdício não visível hoje.',
-      action: 'Classificar com quem executa: o cliente pagaria por isso? É exigido por lei/controle? Senão, é desperdício.',
-      successIndicator: '100% das atividades classificadas.',
-      risks: 'Classificação feita por uma só pessoa tende a ser enviesada.',
-      nextStep: 'Fazer uma sessão curta de classificação com a equipe.',
+      title: tr('d.rec.061', { length: unclassified.length }),
+      problem: tr('d.rec.062'),
+      evidence: [{ kind: 'fato', text: tr('d.rec.063', { length: unclassified.length, p1: work.filter((a) => a.type === 'task').length }) }],
+      rule: tr('d.rec.064'),
+      hypothesis: tr('d.rec.065'),
+      action: tr('d.rec.066'),
+      successIndicator: tr('d.rec.067'),
+      risks: tr('d.rec.068'),
+      nextStep: tr('d.rec.069'),
     });
   }
   const noOwner = work.filter((a) => a.type === 'task' && !a.owner?.trim());
@@ -247,15 +249,15 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: 'monitorar',
       priority: 'media',
       score: 40,
-      title: `Definir responsável de ${noOwner.length} atividade(s)`,
-      problem: 'Atividades sem dono tendem a atrasar e a gerar retrabalho.',
-      evidence: [{ kind: 'fato', text: `${noOwner.length} atividade(s) sem responsável informado.` }],
-      rule: 'Regra R7: atividade sem responsável.',
-      hypothesis: 'Falta clareza de papéis nessas atividades.',
-      action: 'Definir o responsável (R) e quem presta contas (A) na matriz RACI.',
-      successIndicator: 'Todas as atividades com responsável definido.',
-      risks: 'Nenhum relevante.',
-      nextStep: 'Abrir a aba Responsabilidades e completar a matriz.',
+      title: tr('d.rec.070', { length: noOwner.length }),
+      problem: tr('d.rec.071'),
+      evidence: [{ kind: 'fato', text: tr('d.rec.072', { length: noOwner.length }) }],
+      rule: tr('d.rec.073'),
+      hypothesis: tr('d.rec.074'),
+      action: tr('d.rec.075'),
+      successIndicator: tr('d.rec.076'),
+      risks: tr('d.rec.077'),
+      nextStep: tr('d.rec.078'),
     });
 
   // R8 — Muitas trocas de responsável em sequência (handoffs)
@@ -272,15 +274,15 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: 'investigar',
       priority: 'media',
       score: 45,
-      title: `Reduzir passagens de bastão (${handoffs} trocas de responsável)`,
-      problem: 'Cada troca de responsável costuma adicionar espera e risco de perda de informação.',
-      evidence: [{ kind: 'inferencia', text: `${handoffs} ligações diretas entre atividades de responsáveis diferentes.` }],
-      rule: 'Regra R8: 4 ou mais trocas diretas de responsável entre atividades.',
-      hypothesis: 'Agrupar atividades sequenciais sob o mesmo responsável reduz espera e erros.',
-      action: 'Avaliar se atividades vizinhas podem ser feitas pela mesma função.',
-      successIndicator: 'Menos trocas de responsável e menor tempo decorrido.',
-      risks: 'Concentrar atividades pode exigir capacitação e mudar a carga de trabalho.',
-      nextStep: 'Revisar as trocas no mapa com os responsáveis envolvidos.',
+      title: tr('d.rec.079', { handoffs }),
+      problem: tr('d.rec.080'),
+      evidence: [{ kind: 'inferencia', text: tr('d.rec.081', { handoffs }) }],
+      rule: tr('d.rec.082'),
+      hypothesis: tr('d.rec.083'),
+      action: tr('d.rec.084'),
+      successIndicator: tr('d.rec.085'),
+      risks: tr('d.rec.086'),
+      nextStep: tr('d.rec.087'),
     });
 
   // R9 — Atividade crítica: monitorar
@@ -290,29 +292,29 @@ export function recommend(p: ProcessModel, criterion: BottleneckCriterion = 'dur
       group: 'monitorar',
       priority: 'media',
       score: 38,
-      title: `Garantir controle em “${a.name}” (crítica)`,
+      title: tr('d.rec.088', { name: a.name }),
       activityId: a.id,
-      problem: 'Falhas nesta atividade têm impacto relevante.',
-      evidence: [{ kind: 'fato', text: 'Atividade marcada como crítica.' }],
-      rule: 'Regra R9: atividade marcada como crítica.',
-      hypothesis: 'Um controle preventivo (checagem, indicador) reduz o risco de falha.',
-      action: 'Registrar o risco na aba Riscos e definir controle e indicador.',
+      problem: tr('d.rec.089'),
+      evidence: [{ kind: 'fato', text: tr('d.rec.090') }],
+      rule: tr('d.rec.091'),
+      hypothesis: tr('d.rec.092'),
+      action: tr('d.rec.093'),
       owner: a.owner,
-      successIndicator: 'Risco registrado com controle e responsável.',
-      risks: 'Controles excessivos aumentam o tempo do processo.',
-      nextStep: 'Cadastrar o risco e a mitigação.',
+      successIndicator: tr('d.rec.094'),
+      risks: tr('d.rec.095'),
+      nextStep: tr('d.rec.096'),
     });
   }
   return recs.map((r) => enrich(r, p, m)).sort((a, b) => b.score - a.score);
 }
 
-const DEPS: Record<NonNullable<Recommendation['changeKind']>, string> = {
-  remove: 'Acordo do dono do processo e de quem usa o resultado da atividade.',
-  simplify: 'Padrão de trabalho revisado e comunicado a quem executa.',
-  automate: 'Acesso aos sistemas e dados de entrada estruturados; apoio de TI ou de quem mantém a ferramenta.',
-  reduce_wait: 'Acordo com a área que gera a fila (prazo de atendimento ou capacidade).',
-  reduce_rework: 'Registro das causas do retrabalho em uma amostra de casos.',
-};
+const DEPS: Record<NonNullable<Recommendation['changeKind']>, string> = lazyLabels({
+  remove: 'd.recdep.remove',
+  simplify: 'd.recdep.simplify',
+  automate: 'd.recdep.automate',
+  reduce_wait: 'd.recdep.reduce_wait',
+  reduce_rework: 'd.recdep.reduce_rework',
+});
 
 /** Completa a recomendação com impacto, dependências, dados ausentes e alertas — só a partir dos dados. */
 function enrich(r: RawRec, p: ProcessModel, m: ProcessMetrics): Recommendation {
@@ -320,27 +322,27 @@ function enrich(r: RawRec, p: ProcessModel, m: ProcessMetrics): Recommendation {
   const x = a ? m.per.get(a.id) : undefined;
   const dependencies: string[] = [];
   if (r.changeKind) dependencies.push(DEPS[r.changeKind]);
-  if (a && !a.owner?.trim()) dependencies.push('Definir o responsável pela atividade.');
-  if (r.group === 'investigar' || r.group === 'monitorar') dependencies.push('Tempo da equipe para levantar os fatos antes de mudar o processo.');
+  if (a && !a.owner?.trim()) dependencies.push(tr('d.rec.097'));
+  if (r.group === 'investigar' || r.group === 'monitorar') dependencies.push(tr('d.rec.098'));
   const missingInfo: string[] = [];
   if (r.dataNeeded) missingInfo.push(r.dataNeeded);
   if (a && x) {
-    if (x.activeH === null) missingInfo.push('Duração da atividade.');
-    if (x.effortH === null && x.activeH !== null) missingInfo.push('Pessoas envolvidas.');
-    if (x.execPerPeriod === null) missingInfo.push('Volume de execuções do processo.');
-    if (x.costPerHour === null) missingInfo.push('Custo-hora de quem executa (para estimar valor em R$).');
-    if (a.rework && !isNum(a.frequencyPct)) missingInfo.push('Frequência do retrabalho (%).');
+    if (x.activeH === null) missingInfo.push(tr('d.rec.099'));
+    if (x.effortH === null && x.activeH !== null) missingInfo.push(tr('d.rec.100'));
+    if (x.execPerPeriod === null) missingInfo.push(tr('d.rec.101'));
+    if (x.costPerHour === null) missingInfo.push(tr('d.rec.102'));
+    if (a.rework && !isNum(a.frequencyPct)) missingInfo.push(tr('d.rec.103'));
   }
   let caution: string | undefined;
   if (a?.lean === 'NNVA' && a.leanReason && MANDATORY_REASONS.includes(a.leanReason)) {
-    caution = `Atividade exigida (${LEAN_REASON_LABEL[a.leanReason].toLowerCase()}${a.leanReasonNote ? `: ${a.leanReasonNote}` : ''}). Não elimine: simplifique ou automatize preservando o requisito, com validação de quem responde por ele.`;
-    dependencies.push('Validação da área responsável pelo requisito (jurídico, compliance, qualidade ou segurança).');
+    caution = tr('d.rec.104', { p0: LEAN_REASON_LABEL[a.leanReason].toLowerCase(), p1: a.leanReasonNote ? `: ${a.leanReasonNote}` : '' });
+    dependencies.push(tr('d.rec.105'));
   } else if (a?.lean === 'NNVA' && !a.leanReason) {
-    missingInfo.push('Motivo de a atividade ser necessária (regulatório, controle, segurança…).');
+    missingInfo.push(tr('d.rec.106'));
   }
   return {
     ...r,
-    impact: r.ceiling ?? (r.activityId ? 'Não quantificável com os dados atuais.' : 'Melhora a qualidade da análise; sem ganho direto estimado.'),
+    impact: r.ceiling ?? (r.activityId ? tr('d.rec.107') : tr('d.rec.108')),
     dependencies: [...new Set(dependencies)],
     missingInfo: [...new Set(missingInfo)],
     caution,
@@ -348,5 +350,5 @@ function enrich(r: RawRec, p: ProcessModel, m: ProcessMetrics): Recommendation {
 }
 
 function criterionLabel(c: BottleneckCriterion) {
-  return { duration: 'Duração ativa', effort: 'Esforço', cost: 'Custo', wait: 'Espera', rework: 'Retrabalho' }[c];
+  return { duration: tr('d.rec.109'), effort: tr('d.rec.110'), cost: 'Custo', wait: 'Espera', rework: 'Retrabalho' }[c];
 }

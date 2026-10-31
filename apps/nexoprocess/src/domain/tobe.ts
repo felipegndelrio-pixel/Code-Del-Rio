@@ -5,18 +5,20 @@ import { normalizeStages } from './factory';
 import type { Activity, ChangeEntry, ChangeKind, Scenario } from './types';
 import { nowIso, uid } from './units';
 
-export const CHANGE_LABEL: Record<ChangeKind, string> = {
-  remove: 'Remover atividade',
-  simplify: 'Simplificar',
-  automate: 'Automatizar (parcial ou total)',
-  combine: 'Combinar atividades',
-  reorder: 'Mudar sequência',
-  reduce_wait: 'Reduzir espera',
-  reduce_rework: 'Reduzir retrabalho',
-  edit: 'Editar dados',
-  add: 'Adicionar atividade',
-  restore: 'Restaurar do AS-IS',
-};
+import { lazyLabels } from '../i18n';
+import { tr } from '../i18n';
+export const CHANGE_LABEL: Record<ChangeKind, string> = lazyLabels({
+  remove: 'd.chg.remove',
+  simplify: 'd.chg.simplify',
+  automate: 'd.chg.automate',
+  combine: 'd.chg.combine',
+  reorder: 'd.chg.reorder',
+  reduce_wait: 'd.chg.reduce_wait',
+  reduce_rework: 'd.chg.reduce_rework',
+  edit: 'd.chg.edit',
+  add: 'd.chg.add',
+  restore: 'd.chg.restore',
+});
 
 export interface ChangeMeta {
   justification?: string;
@@ -78,7 +80,7 @@ export function removeActivity(sc: Scenario, id: string, meta: ChangeMeta): Scen
     if (a.nextNo === id) a.nextNo = successors[0];
   }
   next.process.activities = acts.filter((a) => a.id !== id);
-  next.changes.push(entry('remove', `Remover “${victim.name}” e religar ${successors.length ? 'ao(s) sucessor(es)' : 'o fluxo'}`, meta, victim, structuredClone(victim), undefined));
+  next.changes.push(entry('remove', tr('d.tobe.001', { name: victim.name, p1: successors.length ? tr('d.tobe.002') : tr('d.tobe.003') }), meta, victim, structuredClone(victim), undefined));
   next.process = normalizeStages(next.process);
   next.updatedAt = nowIso();
   return next;
@@ -93,8 +95,8 @@ export function combineActivities(sc: Scenario, keepId: string, mergeId: string,
   const updated = updateActivity(next, keepId, patch, 'combine', meta);
   next = updated ?? next;
   const last = next.changes[next.changes.length - 1];
-  if (last && last.kind === 'combine') last.summary = `Combinar “${merged.name}” em “${next.process.activities.find((a) => a.id === keepId)!.name}”`;
-  else next.changes.push(entry('combine', `Combinar “${merged.name}”`, meta, merged));
+  if (last && last.kind === 'combine') last.summary = tr('d.tobe.004', { name: merged.name, p1: next.process.activities.find((a) => a.id === keepId)!.name });
+  else next.changes.push(entry('combine', tr('d.tobe.005', { name: merged.name }), meta, merged));
   return next;
 }
 
@@ -112,7 +114,7 @@ export function addActivity(sc: Scenario, act: Activity, afterId: string | undef
   next.process.activities.push(act);
   // Renumera a ordem para inteiros preservando a sequência.
   next.process.activities.sort((a, b) => a.order - b.order).forEach((a, i) => (a.order = i + 1));
-  next.changes.push(entry('add', `Adicionar “${act.name}”`, meta, act, undefined, structuredClone(act)));
+  next.changes.push(entry('add', tr('d.tobe.006', { name: act.name }), meta, act, undefined, structuredClone(act)));
   next.process = normalizeStages(next.process);
   next.updatedAt = nowIso();
   return next;
@@ -126,7 +128,7 @@ export function restoreFromAsIs(sc: Scenario, asIsActs: Activity[], id: string, 
   const i = next.process.activities.findIndex((a) => a.id === id);
   if (i < 0) next.process.activities.push(structuredClone(src));
   else next.process.activities[i] = structuredClone(src);
-  next.changes.push(entry('restore', `Restaurar “${src.name}” como no AS-IS`, meta, src));
+  next.changes.push(entry('restore', tr('d.tobe.007', { name: src.name }), meta, src));
   next.process = normalizeStages(next.process);
   next.updatedAt = nowIso();
   return next;
