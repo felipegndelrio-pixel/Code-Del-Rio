@@ -23,11 +23,18 @@ export interface GrantResult {
   status: LicenseStatus;
 }
 
+export interface PurchaseState {
+  status: string;
+  access_active: boolean;
+}
+
 export interface LicenseStore {
   kind: 'supabase' | 'allowlist' | 'memory';
   lookup(email: string): Promise<LicenseStatus | null>;
   grant(rec: Omit<LicenseRecord, 'status'>): Promise<GrantResult>;
   revoke(rec: Omit<LicenseRecord, 'status'>): Promise<LicenseStatus>;
+  /** Estado de uma compra (platform, transação), ou null. Usado pela Gumroad (disputa ganha). */
+  purchaseState?(platform: string, transaction: string): Promise<PurchaseState | null>;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -119,6 +126,27 @@ export function supabaseStore(
       }
 
       return { result, status };
+    },
+
+    async purchaseState(platform, transaction) {
+      const r = await fetchImpl(`${root}/rpc/nexo_purchase_state`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ p_platform: platform, p_transaction: transaction }),
+      });
+      if (!r.ok) {
+        throw new Error(`Supabase purchaseState: HTTP ${r.status}`);
+      }
+      const body: unknown = await r.json().catch(() => undefined);
+      if (body === null) return null;
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        throw new Error('Supabase purchaseState: resposta inesperada');
+      }
+      const { status, access_active } = body as Record<string, unknown>;
+      if (typeof status !== 'string' || typeof access_active !== 'boolean') {
+        throw new Error('Supabase purchaseState: resposta inesperada');
+      }
+      return { status, access_active };
     },
 
     async revoke(rec) {
