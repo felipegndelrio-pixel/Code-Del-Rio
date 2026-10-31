@@ -1,0 +1,166 @@
+{
+  "source": "src/config/nav.ts @ v2.5.0-rc1 (31f0ed5)",
+  "nav": [
+    {
+      "label": "Projeto",
+      "items": [
+        {
+          "path": "visao-geral",
+          "label": "Visão geral",
+          "short": "Visão geral",
+          "objective": "Onde o projeto está, o que falta e qual é a próxima ação.",
+          "step": null
+        }
+      ]
+    },
+    {
+      "label": "Levantamento",
+      "items": [
+        {
+          "path": "dados",
+          "label": "Dados do processo",
+          "short": "Dados",
+          "objective": "",
+          "step": "asis"
+        },
+        {
+          "path": "validar",
+          "label": "Validação",
+          "short": "Validar",
+          "objective": "",
+          "step": "validar"
+        }
+      ]
+    },
+    {
+      "label": "Análise",
+      "items": [
+        {
+          "path": "mapa",
+          "label": "Mapa AS-IS",
+          "short": "Mapa",
+          "objective": "",
+          "step": "mapa"
+        },
+        {
+          "path": "diagnostico",
+          "label": "Diagnóstico",
+          "short": "Diagnóstico",
+          "objective": "",
+          "step": "diagnostico"
+        },
+        {
+          "path": "recomendacoes",
+          "label": "Oportunidades",
+          "short": "Oportunidades",
+          "objective": "",
+          "step": "recomendacoes"
+        }
+      ]
+    },
+    {
+      "label": "Melhoria",
+      "items": [
+        {
+          "path": "tobe",
+          "label": "Cenário futuro (TO-BE)",
+          "short": "TO-BE",
+          "objective": "",
+          "step": "tobe"
+        },
+        {
+          "path": "comparar",
+          "label": "Comparação e impacto",
+          "short": "Comparar",
+          "objective": "",
+          "step": "comparar"
+        },
+        {
+          "path": "plano",
+          "label": "Plano de ação",
+          "short": "Plano",
+          "objective": "",
+          "step": "plano"
+        },
+        {
+          "path": "resultados",
+          "label": "Resultados reais",
+          "short": "Resultados",
+          "objective": "",
+          "step": "resultados"
+        }
+      ]
+    },
+    {
+      "label": "Análises complementares",
+      "items": [
+        {
+          "path": "riscos",
+          "label": "Riscos e FMEA",
+          "short": "Riscos",
+          "objective": "Registrar o que pode dar errado, a prioridade e o controle.",
+          "step": null
+        },
+        {
+          "path": "responsabilidades",
+          "label": "Responsabilidades (RACI)",
+          "short": "RACI",
+          "objective": "Definir quem executa, quem presta contas, quem é consultado e informado.",
+          "step": null
+        },
+        {
+          "path": "simulacao",
+          "label": "Simulação de prazo",
+          "short": "Simulação",
+          "objective": "Ver a faixa provável do prazo a partir de mínimos e máximos informados.",
+          "step": null
+        },
+        {
+          "path": "automacao",
+          "label": "Automação e IA",
+          "short": "Automação",
+          "objective": "Avaliar com critérios explícitos onde automação ou IA fazem sentido.",
+          "step": null
+        }
+      ]
+    },
+    {
+      "label": "Saídas",
+      "items": [
+        {
+          "path": "exportar",
+          "label": "Exportar",
+          "short": "Exportar",
+          "objective": "Baixar mapas, dados e o projeto completo.",
+          "step": null
+        },
+        {
+          "path": "relatorio",
+          "label": "Relatório executivo",
+          "short": "Relatório",
+          "objective": "Documento para apresentar e imprimir em PDF.",
+          "step": null
+        }
+      ]
+    }
+  ],
+  "mobileTabs": [
+    "visao-geral",
+    "dados",
+    "mapa",
+    "diagnostico",
+    "plano"
+  ],
+  "stepPath": {
+    "iniciar": "visao-geral",
+    "asis": "dados",
+    "validar": "validar",
+    "mapa": "mapa",
+    "diagnostico": "diagnostico",
+    "recomendacoes": "recomendacoes",
+    "tobe": "tobe",
+    "comparar": "comparar",
+    "plano": "plano",
+    "resultados": "resultados"
+  }
+}
