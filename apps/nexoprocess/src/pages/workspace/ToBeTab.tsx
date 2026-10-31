@@ -15,38 +15,41 @@ import type { Activity, AssumptionStatus, ChangeKind, Scenario } from '../../dom
 import { fmtDateTime, fmtDuration, nowIso, uid } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
 
+import { useI18n } from '../../i18n/I18nProvider';
+import { lazyLabels, tr } from '../../i18n';
 type Pending = { kind: ChangeKind; activity: Activity; draft: Activity; recId?: string } | { kind: 'remove'; activity: Activity; recId?: string } | null;
 
-const FIELD_LABEL: Partial<Record<keyof Activity, string>> = {
-  name: 'Nome',
-  duration: 'Duração',
-  unit: 'Unidade',
-  wait: 'Espera',
-  people: 'Pessoas',
-  owner: 'Responsável',
-  lean: 'Lean',
-  rework: 'Retrabalho',
-  frequencyPct: 'Frequência %',
-  costPerHour: 'Custo-hora',
-  variableCost: 'Custo variável',
-  next: 'Próxima',
-  nextYes: 'Se sim',
-  nextNo: 'Se não',
-  order: 'Ordem',
-  stage: 'Etapa',
-  minDuration: 'Mínimo',
-  maxDuration: 'Máximo',
-  notes: 'Observações',
-  critical: 'Crítica',
-  volume: 'Volume',
-};
-const show = (v: unknown) => (v === undefined || v === null || v === '' ? 'vazio' : Array.isArray(v) ? v.join(', ') || 'vazio' : typeof v === 'boolean' ? (v ? 'sim' : 'não') : String(v));
+const FIELD_LABEL: Partial<Record<keyof Activity, string>> = lazyLabels({
+  name: 'd.field.name',
+  duration: 'd.field.duration',
+  unit: 'd.field.unit',
+  wait: 'd.field.wait',
+  people: 'd.field.people',
+  owner: 'd.field.owner',
+  lean: 'd.field.lean',
+  rework: 'd.field.rework',
+  frequencyPct: 'd.field.frequencyPct',
+  costPerHour: 'd.field.costPerHour',
+  variableCost: 'd.field.variableCost',
+  next: 'd.field.next',
+  nextYes: 'd.field.nextYes',
+  nextNo: 'd.field.nextNo',
+  order: 'd.field.order',
+  stage: 'd.field.stage',
+  minDuration: 'd.field.minDuration',
+  maxDuration: 'd.field.maxDuration',
+  notes: 'd.field.notes',
+  critical: 'd.field.critical',
+  volume: 'd.field.volume',
+});
+const show = (v: unknown) => (v === undefined || v === null || v === '' ? tr('d.show.empty') : Array.isArray(v) ? v.join(', ') || tr('d.show.empty') : typeof v === 'boolean' ? (v ? tr('d.show.yes') : tr('d.show.no')) : String(v));
 
 export default function ToBeTab() {
+  const { t } = useI18n();
   const { w, update, recs } = useWorkspace();
   const toast = useToast();
   const confirm = useConfirm();
-  const [newName, setNewName] = useState('Cenário futuro 1');
+  const [newName, setNewName] = useState(t('ws.tobe.001'));
   const sc = w.scenarios.find((s) => s.id === w.activeScenarioId) ?? w.scenarios[0];
   const [pending, setPending] = useState<Pending>(null);
   const [meta, setMeta] = useState<ChangeMeta>({});
@@ -58,7 +61,7 @@ export default function ToBeTab() {
     if (!sc) return;
     const next = fn(structuredClone(sc));
     if (!next) {
-      toast('info', 'Nada mudou por aqui.');
+      toast('info', t('ws.tobe.002'));
       return;
     }
     update(
@@ -66,30 +69,30 @@ export default function ToBeTab() {
         const i = d.scenarios.findIndex((s) => s.id === sc.id);
         d.scenarios[i] = { ...next, updatedAt: nowIso() };
       },
-      message ? { area: `TO-BE: ${sc.name}`, message } : undefined,
+      message ? { area: t('ws.tobe.003', { name: sc.name }), message } : undefined,
     );
   };
 
   const create = (from?: Scenario) => {
-    const s = from ? { ...structuredClone(from), id: uid('s_'), name: `${from.name} (cópia)`, createdAt: nowIso(), updatedAt: nowIso() } : newScenario(w.asIs, newName.trim() || 'Cenário futuro');
+    const s = from ? { ...structuredClone(from), id: uid('s_'), name: t('ws.tobe.004', { name: from.name }), createdAt: nowIso(), updatedAt: nowIso() } : newScenario(w.asIs, newName.trim() || t('ws.tobe.005'));
     update(
       (d) => {
         d.scenarios.push(s);
         d.activeScenarioId = s.id;
       },
-      { area: 'TO-BE', message: from ? `Cenário duplicado: ${s.name}` : `Cenário criado a partir do AS-IS: ${s.name}` },
+      { area: t('ws.tobe.006'), message: from ? t('ws.tobe.007', { name: s.name }) : t('ws.tobe.008', { name: s.name }) },
     );
-    toast('ok', from ? 'Cenário duplicado.' : 'Cenário TO-BE criado como cópia independente do AS-IS.');
+    toast('ok', from ? t('ws.tobe.009') : t('ws.tobe.010'));
   };
 
   const removeScenario = async () => {
-    if (!sc || !(await confirm({ title: `Excluir o cenário “${sc.name}”?`, body: 'O AS-IS e os outros cenários não são afetados.', confirm: 'Excluir', danger: true }))) return;
+    if (!sc || !(await confirm({ title: t('ws.tobe.011', { name: sc.name }), body: t('ws.tobe.012'), confirm: t('ws.tobe.013'), danger: true }))) return;
     update(
       (d) => {
         d.scenarios = d.scenarios.filter((s) => s.id !== sc.id);
         d.activeScenarioId = d.scenarios[0]?.id;
       },
-      { area: 'TO-BE', message: `Cenário excluído: ${sc.name}` },
+      { area: t('ws.tobe.006'), message: t('ws.tobe.015', { name: sc.name }) },
     );
   };
 
@@ -97,18 +100,16 @@ export default function ToBeTab() {
 
   if (!sc)
     return (
-      <Card title={<>Construir o cenário futuro <Term k="tobe" iconOnly /></>} subtitle="TO-BE">
+      <Card title={<>{t('ws.tobe.016')}<Term k="tobe" iconOnly /></>} subtitle={t('ws.tobe.006')}>
         <Empty
-          title="Nenhum cenário TO-BE ainda"
+          title={t('ws.tobe.018')}
           action={
             <div className="flex flex-wrap items-end justify-center gap-2">
-              <Field label="Nome do cenário">{(f) => <Input {...f} value={newName} onChange={(e) => setNewName(e.target.value)} />}</Field>
-              <Button onClick={() => create()}>Criar cenário a partir do AS-IS</Button>
+              <Field label={t('ws.tobe.019')}>{(f) => <Input {...f} value={newName} onChange={(e) => setNewName(e.target.value)} />}</Field>
+              <Button onClick={() => create()}>{t('ws.tobe.020')}</Button>
             </div>
           }
-        >
-          Criamos uma cópia independente do processo atual. Você propõe mudanças nela; o AS-IS original continua intacto e restaurável. Você pode criar vários cenários alternativos.
-        </Empty>
+        >{t('ws.tobe.021')}</Empty>
       </Card>
     );
 
@@ -120,7 +121,7 @@ export default function ToBeTab() {
   const startFromRec = (r: Recommendation) => {
     const a = sc.process.activities.find((x) => x.id === r.activityId);
     if (!a) {
-      toast('info', 'Esta atividade não existe mais no cenário (talvez já tenha sido removida).');
+      toast('info', t('ws.tobe.022'));
       return;
     }
     setMeta({ recId: r.id, justification: r.problem, hypothesis: r.hypothesis });
@@ -131,16 +132,16 @@ export default function ToBeTab() {
   const confirmPending = () => {
     if (!pending) return;
     if (!meta.justification?.trim()) {
-      toast('bad', 'Faltou só uma coisinha: o motivo da mudança.');
+      toast('bad', t('ws.tobe.023'));
       return;
     }
     try {
-      if (pending.kind === 'remove' && !('draft' in pending)) setScenario((s) => removeActivity(s, pending.activity.id, meta), `Removida “${pending.activity.name}”`);
+      if (pending.kind === 'remove' && !('draft' in pending)) setScenario((s) => removeActivity(s, pending.activity.id, meta), t('ws.tobe.024', { name: pending.activity.name }));
       else if ('draft' in pending) setScenario((s) => updateActivity(s, pending.activity.id, pending.draft, pending.kind, meta), `${CHANGE_LABEL[pending.kind]}: “${pending.activity.name}”`);
       setPending(null);
       setMeta({});
     } catch (e) {
-      toast('bad', e instanceof Error ? e.message : 'Não foi possível aplicar.');
+      toast('bad', e instanceof Error ? e.message : t('ws.tobe.025'));
     }
   };
 
@@ -149,9 +150,9 @@ export default function ToBeTab() {
 
   return (
     <div className="space-y-4">
-      <Card title="Cenário futuro" subtitle="TO-BE — hipótese até ser implantado e medido">
+      <Card title={t('ws.tobe.005')} subtitle={t('ws.tobe.027')}>
         <div className="flex flex-wrap items-end gap-2">
-          <Field label="Cenário em edição" className="min-w-[min(100%,280px)] flex-1">
+          <Field label={t('ws.tobe.028')} className="min-w-[min(100%,280px)] flex-1">
             {(f) => (
               <Select {...f} value={sc.id} onChange={(e) => update((d) => void (d.activeScenarioId = e.target.value))}>
                 {w.scenarios.map((s) => (
@@ -162,26 +163,22 @@ export default function ToBeTab() {
               </Select>
             )}
           </Field>
-          <Field label="Renomear" className="min-w-[200px] flex-1">
+          <Field label={t('ws.tobe.029')} className="min-w-[200px] flex-1">
             {(f) => <Input {...f} value={sc.name} onChange={(e) => setScenario((s) => ({ ...s, name: e.target.value }))} />}
           </Field>
           <Button variant="secondary" size="sm" onClick={() => create()}>
-            <Plus className="h-4 w-4" /> Novo do AS-IS
-          </Button>
+            <Plus className="h-4 w-4" />{t('ws.tobe.030')}</Button>
           <Button variant="secondary" size="sm" onClick={() => create(sc)}>
-            <Copy className="h-4 w-4" /> Duplicar
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => void removeScenario()} aria-label="Excluir cenário">
+            <Copy className="h-4 w-4" />{t('ws.tobe.031')}</Button>
+          <Button variant="ghost" size="sm" onClick={() => void removeScenario()} aria-label={t('ws.tobe.032')}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-        <p className="mt-2 text-xs text-muted">
-          Criado em {fmtDateTime(sc.createdAt)} · {sc.changes.length} mudança(s) registrada(s). O AS-IS não é alterado por nada feito aqui.
-        </p>
+        <p className="mt-2 text-xs text-muted">{t('ws.tobe.033')}{fmtDateTime(sc.createdAt)} · {sc.changes.length}{t('ws.tobe.034')}</p>
       </Card>
 
       {accepted.length > 0 && (
-        <Card title="Recomendações aceitas para aplicar" subtitle="Assistido">
+        <Card title={t('ws.tobe.035')} subtitle={t('ws.tobe.036')}>
           <ul className="space-y-2">
             {accepted.map((r) => {
               const applied = sc.changes.some((c) => c.recId === r.id);
@@ -189,43 +186,38 @@ export default function ToBeTab() {
                 <li key={r.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-line/15 bg-surface2/40 p-3 text-sm">
                   <span className="min-w-0 flex-1 text-ink">{r.title}</span>
                   {applied ? (
-                    <Badge tone="ok">Aplicada</Badge>
+                    <Badge tone="ok">{t('ws.tobe.037')}</Badge>
                   ) : (
                     <Button size="sm" onClick={() => startFromRec(r)}>
-                      <Wand2 className="h-4 w-4" /> Aplicar…
-                    </Button>
+                      <Wand2 className="h-4 w-4" />{t('ws.tobe.038')}</Button>
                   )}
                 </li>
               );
             })}
           </ul>
-          <p className="mt-2 text-xs text-muted">Antes de aplicar, você informa os valores futuros esperados. Marcar algo como automatizável não reduz tempo nem custo sozinho.</p>
+          <p className="mt-2 text-xs text-muted">{t('ws.tobe.039')}</p>
         </Card>
       )}
       {accepted.length === 0 && (
-        <Callout tone="info">
-          Dica: aceite recomendações na aba <Link className="font-semibold text-brand" to={`/app/p/${w.id}/recomendacoes`}>Recomendações</Link> para aplicá-las aqui com assistência — ou edite as atividades diretamente abaixo.
-        </Callout>
+        <Callout tone="info">{t('ws.tobe.040')}<Link className="font-semibold text-brand" to={`/app/p/${w.id}/recomendacoes`}>{t('ws.tobe.041')}</Link>{t('ws.tobe.042')}</Callout>
       )}
 
       <Card
-        title={`Atividades do TO-BE (${acts.length})`}
-        subtitle="Edite, remova, combine ou adicione"
+        title={t('ws.tobe.043', { length: acts.length })}
+        subtitle={t('ws.tobe.044')}
         action={
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="secondary" onClick={() => setCombine({ keep: '', merge: '', name: '' })}>
-              <GitMerge className="h-4 w-4" /> Combinar
-            </Button>
+              <GitMerge className="h-4 w-4" />{t('ws.tobe.045')}</Button>
             <Button size="sm" variant="secondary" onClick={() => setAdding({ act: newActivity({ id: nextActivityId(sc.process), stage: sc.process.stageOrder[0] ?? '', name: '' }) })}>
-              <Plus className="h-4 w-4" /> Adicionar
-            </Button>
+              <Plus className="h-4 w-4" />{t('ws.tobe.046')}</Button>
           </div>
         }
       >
-        <Table caption="Atividades do cenário futuro">
+        <Table caption={t('ws.tobe.047')}>
           <thead>
             <tr>
-              {['Atividade', 'Etapa', 'Duração', 'Espera', 'Pessoas', 'Situação', ''].map((h) => (
+              {[t('ws.tobe.048'), t('ws.tobe.049'), t('ws.tobe.050'), t('ws.tobe.051'), t('ws.tobe.052'), t('ws.tobe.053'), ''].map((h) => (
                 <th key={h} className={th}>
                   {h}
                 </th>
@@ -253,7 +245,7 @@ export default function ToBeTab() {
                     {orig && orig.wait !== a.wait && <span className="block text-xs text-muted line-through">{fmtDuration(orig.wait, orig.unit)}</span>}
                   </td>
                   <td className={clsx(td, 'tabular')}>{a.people ?? '—'}</td>
-                  <td className={td}>{st ? <Badge tone={st === 'nova' ? 'violet' : 'brand'}>{st}</Badge> : <span className="text-muted">igual ao AS-IS</span>}</td>
+                  <td className={td}>{st ? <Badge tone={st === 'nova' ? 'violet' : 'brand'}>{st}</Badge> : <span className="text-muted">{t('ws.tobe.054')}</span>}</td>
                   <td className={clsx(td, 'whitespace-nowrap')}>
                     {a.type !== 'start' && a.type !== 'end' && (
                       <Button
@@ -263,15 +255,13 @@ export default function ToBeTab() {
                           setMeta({});
                           setPending({ kind: 'edit', activity: a, draft: structuredClone(a) });
                         }}
-                      >
-                        Mudar
-                      </Button>
+                      >{t('ws.tobe.055')}</Button>
                     )}
                     {a.type === 'task' && (
                       <Button
                         size="sm"
                         variant="ghost"
-                        aria-label={`Remover ${a.name}`}
+                        aria-label={t('ws.tobe.056', { name: a.name })}
                         onClick={() => {
                           setMeta({});
                           setPending({ kind: 'remove', activity: a });
@@ -281,7 +271,7 @@ export default function ToBeTab() {
                       </Button>
                     )}
                     {st === 'alterada' && (
-                      <Button size="sm" variant="ghost" aria-label={`Restaurar ${a.name} do AS-IS`} onClick={() => setScenario((s) => restoreFromAsIs(s, w.asIs.activities, a.id, { justification: 'Restaurado pelo usuário' }), `Restaurada “${a.name}”`)}>
+                      <Button size="sm" variant="ghost" aria-label={t('ws.tobe.057', { name: a.name })} onClick={() => setScenario((s) => restoreFromAsIs(s, w.asIs.activities, a.id, { justification: t('ws.tobe.058') }), t('ws.tobe.059', { name: a.name }))}>
                         <RotateCcw className="h-4 w-4" />
                       </Button>
                     )}
@@ -292,17 +282,16 @@ export default function ToBeTab() {
           </tbody>
         </Table>
         {removed.length > 0 && (
-          <p className="mt-2 text-sm text-ink2">
-            Removidas em relação ao AS-IS: {removed.map((a) => a.name).join(', ')}.
+          <p className="mt-2 text-sm text-ink2">{t('ws.tobe.060')}{removed.map((a) => a.name).join(', ')}.
           </p>
         )}
       </Card>
 
       <ScenarioAssumptions sc={sc} setScenario={setScenario} assumption={assumption} setAssumption={setAssumption} asIsVolume={w.asIs.volume} />
 
-      <Card title="Registro de mudanças" subtitle="O quê, por quê, quem valida">
+      <Card title={t('ws.tobe.061')} subtitle={t('ws.tobe.062')}>
         {sc.changes.length === 0 ? (
-          <p className="text-sm text-muted">Nenhuma mudança ainda.</p>
+          <p className="text-sm text-muted">{t('ws.tobe.063')}</p>
         ) : (
           <ol className="space-y-2 text-sm">
             {[...sc.changes].reverse().map((c) => (
@@ -317,13 +306,12 @@ export default function ToBeTab() {
                     {Object.keys(c.after).map((k) => `${FIELD_LABEL[k as keyof Activity] ?? k}: ${show((c.before as any)[k])} → ${show((c.after as any)[k])}`).join(' · ')}
                   </p>
                 )}
-                {c.justification && <p className="mt-1 text-xs text-ink2">Justificativa: {c.justification}</p>}
+                {c.justification && <p className="mt-1 text-xs text-ink2">{t('ws.tobe.064')}{c.justification}</p>}
                 {c.hypothesis && (
-                  <p className="text-xs text-ink2">
-                    Hipótese <BasisTag basis="a_validar" />: {c.hypothesis}
+                  <p className="text-xs text-ink2">{t('ws.tobe.065')}<BasisTag basis="a_validar" />: {c.hypothesis}
                   </p>
                 )}
-                {c.validator && <p className="text-xs text-ink2">Quem valida: {c.validator}</p>}
+                {c.validator && <p className="text-xs text-ink2">{t('ws.tobe.066')}{c.validator}</p>}
               </li>
             ))}
           </ol>
@@ -337,25 +325,19 @@ export default function ToBeTab() {
         title={pending ? `${CHANGE_LABEL[pending.kind]}: ${pending.activity.name}` : ''}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setPending(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmPending} disabled={!!diff && !Object.keys(diff.after).length}>
-              Confirmar mudança
-            </Button>
+            <Button variant="secondary" onClick={() => setPending(null)}>{t('ws.tobe.067')}</Button>
+            <Button onClick={confirmPending} disabled={!!diff && !Object.keys(diff.after).length}>{t('ws.tobe.068')}</Button>
           </>
         }
       >
         {pending && (
           <div className="space-y-4">
             {pending.kind === 'remove' ? (
-              <Callout tone="warn" title="A atividade será removida do TO-BE">
-                O fluxo será religado: quem vinha para “{pending.activity.name}” passa a seguir para {successors.length ? successors.join(', ') : 'o fim do caminho'}. O AS-IS continua com ela.
-              </Callout>
+              <Callout tone="warn" title={t('ws.tobe.069')}>{t('ws.tobe.070')}{pending.activity.name}{t('ws.tobe.071')}{successors.length ? successors.join(', ') : t('ws.tobe.072')}{t('ws.tobe.073')}</Callout>
             ) : (
               'draft' in pending && (
                 <>
-                  <Field label="Tipo de mudança">
+                  <Field label={t('ws.tobe.074')}>
                     {(f) => (
                       <Select {...f} value={pending.kind} onChange={(e) => setPending({ ...pending, kind: e.target.value as ChangeKind })}>
                         {(['simplify', 'automate', 'reduce_wait', 'reduce_rework', 'reorder', 'edit'] as ChangeKind[]).map((k) => (
@@ -367,13 +349,11 @@ export default function ToBeTab() {
                     )}
                   </Field>
                   {pending.kind === 'automate' && (
-                    <Callout tone="info">
-                      Informe o tempo e as pessoas que continuarão necessários (supervisão, exceções). Não presumimos eliminação total do trabalho humano.
-                    </Callout>
+                    <Callout tone="info">{t('ws.tobe.075')}</Callout>
                   )}
                   <ActivityForm value={pending.draft} onChange={(d) => setPending({ ...pending, draft: d })} all={sc.process.activities} stages={sc.process.stageOrder} />
                   <div className="rounded-xl border border-line/15 bg-surface2/50 p-3 text-sm">
-                    <p className="font-semibold text-ink">Antes → depois</p>
+                    <p className="font-semibold text-ink">{t('ws.tobe.076')}</p>
                     {diff && Object.keys(diff.after).length ? (
                       <ul className="mt-1 space-y-0.5 text-ink2">
                         {Object.keys(diff.after).map((k) => (
@@ -383,19 +363,19 @@ export default function ToBeTab() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-muted">Altere algum campo acima.</p>
+                      <p className="text-muted">{t('ws.tobe.077')}</p>
                     )}
                   </div>
                 </>
               )
             )}
-            <Field label="Justificativa" required help="Por que esta mudança? Qual evidência?">
+            <Field label={t('ws.tobe.078')} required help={t('ws.tobe.079')}>
               {(f) => <Textarea {...f} value={meta.justification ?? ''} onChange={(e) => setMeta({ ...meta, justification: e.target.value })} />}
             </Field>
-            <Field label="Hipótese a validar" help="O que precisa ser verdade para o benefício acontecer?">
+            <Field label={t('ws.tobe.080')} help={t('ws.tobe.081')}>
               {(f) => <Textarea {...f} value={meta.hypothesis ?? ''} onChange={(e) => setMeta({ ...meta, hypothesis: e.target.value })} />}
             </Field>
-            <Field label="Quem valida" help="Opcional — função ou nome.">
+            <Field label={t('ws.tobe.082')} help={t('ws.tobe.083')}>
               {(f) => <Input {...f} value={meta.validator ?? ''} onChange={(e) => setMeta({ ...meta, validator: e.target.value })} />}
             </Field>
           </div>
@@ -405,37 +385,33 @@ export default function ToBeTab() {
       <Modal
         open={!!combine}
         onClose={() => setCombine(null)}
-        title="Combinar duas atividades"
+        title={t('ws.tobe.084')}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setCombine(null)}>
-              Cancelar
-            </Button>
+            <Button variant="secondary" onClick={() => setCombine(null)}>{t('ws.tobe.067')}</Button>
             <Button
               disabled={!combine?.keep || !combine?.merge || combine.keep === combine.merge || !combine.name.trim() || !meta.justification?.trim()}
               onClick={() => {
                 const c = combine!;
                 try {
-                  setScenario((s) => combineActivities(s, c.keep, c.merge, { name: c.name.trim(), duration: c.duration }, meta), `Combinadas ${c.keep} e ${c.merge}`);
+                  setScenario((s) => combineActivities(s, c.keep, c.merge, { name: c.name.trim(), duration: c.duration }, meta), t('ws.tobe.086', { keep: c.keep, merge: c.merge }));
                   setCombine(null);
                   setMeta({});
                 } catch (e) {
-                  toast('bad', e instanceof Error ? e.message : 'Não foi possível combinar.');
+                  toast('bad', e instanceof Error ? e.message : t('ws.tobe.087'));
                 }
               }}
-            >
-              Confirmar
-            </Button>
+            >{t('ws.tobe.088')}</Button>
           </>
         }
       >
         {combine && (
           <div className="space-y-3">
             {(['keep', 'merge'] as const).map((k) => (
-              <Field key={k} label={k === 'keep' ? 'Atividade que permanece' : 'Atividade absorvida (será removida)'}>
+              <Field key={k} label={k === 'keep' ? t('ws.tobe.089') : t('ws.tobe.090')}>
                 {(f) => (
                   <Select {...f} value={combine[k]} onChange={(e) => setCombine({ ...combine, [k]: e.target.value })}>
-                    <option value="">Escolha…</option>
+                    <option value="">{t('ws.tobe.091')}</option>
                     {acts
                       .filter((a) => a.type === 'task')
                       .map((a) => (
@@ -447,11 +423,11 @@ export default function ToBeTab() {
                 )}
               </Field>
             ))}
-            <Field label="Nome da atividade combinada">{(f) => <Input {...f} value={combine.name} onChange={(e) => setCombine({ ...combine, name: e.target.value })} />}</Field>
-            <Field label="Nova duração esperada" help="Na unidade da atividade que permanece. Informe a sua hipótese — não somamos nem reduzimos automaticamente.">
+            <Field label={t('ws.tobe.092')}>{(f) => <Input {...f} value={combine.name} onChange={(e) => setCombine({ ...combine, name: e.target.value })} />}</Field>
+            <Field label={t('ws.tobe.093')} help={t('ws.tobe.094')}>
               {(f) => <NumberInput {...f} value={combine.duration} onChange={(v) => setCombine({ ...combine, duration: v })} />}
             </Field>
-            <Field label="Justificativa" required>
+            <Field label={t('ws.tobe.078')} required>
               {(f) => <Textarea {...f} value={meta.justification ?? ''} onChange={(e) => setMeta({ ...meta, justification: e.target.value })} />}
             </Field>
           </div>
@@ -461,35 +437,31 @@ export default function ToBeTab() {
       <Drawer
         open={!!adding}
         onClose={() => setAdding(null)}
-        title="Adicionar atividade ao TO-BE"
+        title={t('ws.tobe.096')}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setAdding(null)}>
-              Cancelar
-            </Button>
+            <Button variant="secondary" onClick={() => setAdding(null)}>{t('ws.tobe.067')}</Button>
             <Button
               disabled={!adding?.act.name.trim() || !meta.justification?.trim()}
               onClick={() => {
                 try {
-                  setScenario((s) => addActivity(s, { ...adding!.act, name: adding!.act.name.trim() }, adding!.after, meta), `Adicionada “${adding!.act.name}”`);
+                  setScenario((s) => addActivity(s, { ...adding!.act, name: adding!.act.name.trim() }, adding!.after, meta), t('ws.tobe.098', { name: adding!.act.name }));
                   setAdding(null);
                   setMeta({});
                 } catch (e) {
-                  toast('bad', e instanceof Error ? e.message : 'Não foi possível adicionar.');
+                  toast('bad', e instanceof Error ? e.message : t('ws.tobe.099'));
                 }
               }}
-            >
-              Adicionar
-            </Button>
+            >{t('ws.tobe.100')}</Button>
           </>
         }
       >
         {adding && (
           <div className="space-y-4">
-            <Field label="Inserir depois de" help="O fluxo é religado automaticamente (você vê o resultado no mapa e na comparação).">
+            <Field label={t('ws.tobe.101')} help={t('ws.tobe.102')}>
               {(f) => (
                 <Select {...f} value={adding.after ?? ''} onChange={(e) => setAdding({ ...adding, after: e.target.value || undefined })}>
-                  <option value="">— não ligar automaticamente —</option>
+                  <option value="">{t('ws.tobe.103')}</option>
                   {acts
                     .filter((a) => a.type === 'task' || a.type === 'start')
                     .map((a) => (
@@ -501,7 +473,7 @@ export default function ToBeTab() {
               )}
             </Field>
             <ActivityForm value={adding.act} onChange={(a) => setAdding({ ...adding, act: a })} all={sc.process.activities} stages={sc.process.stageOrder} />
-            <Field label="Justificativa" required>
+            <Field label={t('ws.tobe.078')} required>
               {(f) => <Textarea {...f} value={meta.justification ?? ''} onChange={(e) => setMeta({ ...meta, justification: e.target.value })} />}
             </Field>
           </div>
@@ -512,61 +484,60 @@ export default function ToBeTab() {
 }
 
 function ScenarioAssumptions({ sc, setScenario, assumption, setAssumption, asIsVolume }: { sc: Scenario; setScenario: (fn: (s: Scenario) => Scenario | null, m?: string) => void; assumption: string; setAssumption: (s: string) => void; asIsVolume?: number }) {
+  const { t } = useI18n();
   return (
-    <Card title="Premissas financeiras e de cenário" subtitle="Informadas por você — usadas no business case">
+    <Card title={t('ws.tobe.105')} subtitle={t('ws.tobe.106')}>
       <div className="grid gap-3 md:grid-cols-4">
-        <Field label="Investimento inicial (R$)" help="Implantação, licenças, treinamento. Pode ser 0.">
+        <Field label={t('ws.tobe.107')} help={t('ws.tobe.108')}>
           {(f) => <NumberInput {...f} value={sc.investment} onChange={(v) => setScenario((s) => ({ ...s, investment: v }))} />}
         </Field>
-        <Field label="Custo recorrente novo (R$/mês)" help="Ex.: assinatura de software. Pode ser 0.">
+        <Field label={t('ws.tobe.109')} help={t('ws.tobe.110')}>
           {(f) => <NumberInput {...f} value={sc.recurringCostPerMonth} onChange={(v) => setScenario((s) => ({ ...s, recurringCostPerMonth: v }))} />}
         </Field>
-        <Field label="Horizonte do ROI (meses)" help="Convenção de análise.">
+        <Field label={t('ws.tobe.111')} help={t('ws.tobe.112')}>
           {(f) => <NumberInput {...f} value={sc.horizonMonths} onChange={(v) => v && v >= 1 && setScenario((s) => ({ ...s, horizonMonths: Math.round(v) }))} />}
         </Field>
-        <Field label="Volume no TO-BE" help={`Vazio = igual ao AS-IS (${asIsVolume ?? 'não informado'}). Se diferente, a comparação é normalizada.`}>
+        <Field label={t('ws.tobe.113')} help={t('ws.tobe.114', { p0: asIsVolume ?? t('ws.tobe.115') })}>
           {(f) => <NumberInput {...f} value={sc.process.volume} onChange={(v) => setScenario((s) => ({ ...s, process: { ...s.process, volume: v } }))} />}
         </Field>
       </div>
       <div className="mt-4">
-        <p className="text-sm font-semibold text-ink">Premissas e hipóteses do cenário</p>
+        <p className="text-sm font-semibold text-ink">{t('ws.tobe.116')}</p>
         <ul className="mt-2 space-y-2">
           {sc.assumptions.map((a) => (
             <li key={a.id} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="min-w-0 flex-1 text-ink2">{a.text}</span>
               <Select
-                aria-label="Situação da premissa"
+                aria-label={t('ws.tobe.117')}
                 className="w-40"
                 value={a.status}
-                onChange={(e) => setScenario((s) => ({ ...s, assumptions: s.assumptions.map((x) => (x.id === a.id ? { ...x, status: e.target.value as AssumptionStatus } : x)) }), `Premissa: ${a.text} → ${e.target.value}`)}
+                onChange={(e) => setScenario((s) => ({ ...s, assumptions: s.assumptions.map((x) => (x.id === a.id ? { ...x, status: e.target.value as AssumptionStatus } : x)) }), t('ws.tobe.118', { text: a.text, value: e.target.value }))}
               >
-                <option value="a_validar">A validar</option>
-                <option value="validada">Validada</option>
-                <option value="rejeitada">Rejeitada</option>
+                <option value="a_validar">{t('ws.tobe.119')}</option>
+                <option value="validada">{t('ws.tobe.120')}</option>
+                <option value="rejeitada">{t('ws.tobe.121')}</option>
               </Select>
-              <Button size="sm" variant="ghost" aria-label="Remover premissa" onClick={() => setScenario((s) => ({ ...s, assumptions: s.assumptions.filter((x) => x.id !== a.id) }))}>
+              <Button size="sm" variant="ghost" aria-label={t('ws.tobe.122')} onClick={() => setScenario((s) => ({ ...s, assumptions: s.assumptions.filter((x) => x.id !== a.id) }))}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </li>
           ))}
         </ul>
         <div className="mt-2 flex gap-2">
-          <Input aria-label="Nova premissa" placeholder="Ex.: transportadora aceita agendamento por API" value={assumption} onChange={(e) => setAssumption(e.target.value)} />
+          <Input aria-label={t('ws.tobe.123')} placeholder={t('ws.tobe.124')} value={assumption} onChange={(e) => setAssumption(e.target.value)} />
           <Button
             variant="secondary"
             disabled={!assumption.trim()}
             onClick={() => {
-              setScenario((s) => ({ ...s, assumptions: [...s.assumptions, { id: uid('as_'), text: assumption.trim(), status: 'a_validar' }] }), `Premissa adicionada: ${assumption.trim()}`);
+              setScenario((s) => ({ ...s, assumptions: [...s.assumptions, { id: uid('as_'), text: assumption.trim(), status: 'a_validar' }] }), t('ws.tobe.125', { p0: assumption.trim() }));
               setAssumption('');
             }}
-          >
-            Adicionar
-          </Button>
+          >{t('ws.tobe.100')}</Button>
         </div>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <Field label="Dependências">{(f) => <Textarea {...f} value={sc.dependencies ?? ''} onChange={(e) => setScenario((s) => ({ ...s, dependencies: e.target.value || undefined }))} />}</Field>
-        <Field label="Riscos do cenário">{(f) => <Textarea {...f} value={sc.risks ?? ''} onChange={(e) => setScenario((s) => ({ ...s, risks: e.target.value || undefined }))} />}</Field>
+        <Field label={t('ws.tobe.127')}>{(f) => <Textarea {...f} value={sc.dependencies ?? ''} onChange={(e) => setScenario((s) => ({ ...s, dependencies: e.target.value || undefined }))} />}</Field>
+        <Field label={t('ws.tobe.128')}>{(f) => <Textarea {...f} value={sc.risks ?? ''} onChange={(e) => setScenario((s) => ({ ...s, risks: e.target.value || undefined }))} />}</Field>
       </div>
     </Card>
   );
