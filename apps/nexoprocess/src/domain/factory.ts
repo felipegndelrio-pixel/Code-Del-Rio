@@ -2,7 +2,8 @@
 import type { Activity, Assumption, ChangeEntry, ProcessModel, Scenario, Workspace } from './types';
 import { nowIso, uid } from './units';
 
-export function newProcess(name = 'Novo processo'): ProcessModel {
+import { tr } from '../i18n';
+export function newProcess(name = tr('d.factory.001')): ProcessModel {
   return { name, volumePeriod: 'mes', hoursPerDay: 8, costPerHourByRole: {}, stageOrder: [], activities: [] };
 }
 
@@ -30,7 +31,7 @@ export function newWorkspace(asIs: ProcessModel, source: Workspace['source'], is
     risks: [],
     raci: { roles: [], cells: {}, suggested: {} },
     automation: {},
-    history: [{ at, area: 'Processo', message: source.kind === 'import' ? `Importado de ${source.fileName ?? 'planilha'}` : source.kind === 'demo' ? 'Exemplo demonstrativo aberto' : 'Processo criado' }],
+    history: [{ at, area: tr('d.factory.002'), message: source.kind === 'import' ? tr('d.factory.003', { p0: source.fileName ?? 'planilha' }) : source.kind === 'demo' ? tr('d.factory.004') : tr('d.factory.005') }],
     snapshots: [],
   };
 }
@@ -119,7 +120,7 @@ function normalizeProcess(v: unknown): ProcessModel | undefined {
   const p = v as Partial<ProcessModel>;
   if (!Array.isArray(p.activities)) return undefined;
   return {
-    ...newProcess(typeof p.name === 'string' ? p.name : 'Processo'),
+    ...newProcess(typeof p.name === 'string' ? p.name : tr('d.factory.002')),
     ...p,
     activities: p.activities.filter((a): a is Activity => !!a && typeof a === 'object' && typeof a.id === 'string' && typeof a.name === 'string').map((a) => ({ ...a, next: Array.isArray(a.next) ? a.next : [] })),
     stageOrder: Array.isArray(p.stageOrder) ? p.stageOrder : [],

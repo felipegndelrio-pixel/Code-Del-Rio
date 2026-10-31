@@ -17,9 +17,12 @@ import { demoBlocked } from '../license/demo';
 import { useHardwareBack } from '../state/backNav';
 import { BackButton } from '../components/BackButton';
 
-const STEPS = ['Arquivo', 'Colunas', 'Validação'];
+import { useI18n } from '../i18n/I18nProvider';
+import { tr } from '../i18n';
+const steps = () => [tr('d.imp.step1'), tr('d.imp.step2'), tr('d.imp.step3')];
 
 export default function ImportPage() {
+  const { t } = useI18n();
   const nav = useNavigate();
   const toast = useToast();
   const [step, setStep] = useState(0);
@@ -50,7 +53,7 @@ export default function ImportPage() {
       const idx = pickActivitySheet(parsed.sheets);
       setSheetIdx(idx);
       setMapping(autoMap(parsed.sheets[idx].headers).mapping);
-      const procSheet = findSheet(parsed.sheets, 'Processo');
+      const procSheet = findSheet(parsed.sheets, t('pg.imp.001'));
       const nm = procSheet?.rows.find((r) => /nome do processo/i.test(String(r.values[0] ?? '')))?.values[1];
       setName(nm ? String(nm) : f.name.replace(/\.(xlsx|xlsm|csv|txt)$/i, ''));
       const existing = (await db.listWorkspaces()).find((w) => w.source.fileHash === parsed.hash);
@@ -66,10 +69,10 @@ export default function ImportPage() {
 
   const result = useMemo(() => {
     if (!file || !sheet || step < 2) return null;
-    const r = rowsToProcess(sheet, mapping, { defaultUnit: unit, processName: name }, findSheet(file.sheets, 'Processo'), findSheet(file.sheets, 'Custos por função'));
+    const r = rowsToProcess(sheet, mapping, { defaultUnit: unit, processName: name }, findSheet(file.sheets, t('pg.imp.001')), findSheet(file.sheets, t('pg.imp.003')));
     if (name.trim()) r.process.name = name.trim();
     return { ...r, validation: validateProcess(r.process) };
-  }, [file, sheet, mapping, unit, name, step]);
+  }, [file, sheet, mapping, unit, name, step, t]);
 
   const missingMinimal = FIELDS.filter((f) => f.minimal && f.key !== 'ordem' && mapping[f.key] === undefined);
   const blocking = result ? result.issues.filter((i) => i.severity === 'error').length + result.validation.filter((i) => i.severity === 'error').length : 0;
@@ -81,22 +84,22 @@ export default function ImportPage() {
       const source = { kind: 'import' as const, fileName: file.fileName, fileHash: file.hash, importedAt: nowIso() };
       if (mode === 'replace' && dup) {
         const w = structuredClone(dup);
-        w.snapshots = [...w.snapshots, { id: uid('snap_'), at: nowIso(), label: 'Antes de reimportar', process: w.asIs }].slice(-15);
+        w.snapshots = [...w.snapshots, { id: uid('snap_'), at: nowIso(), label: t('pg.imp.004'), process: w.asIs }].slice(-15);
         w.asIs = result.process;
         w.asIsBaseline = structuredClone(result.process);
         w.source = source;
         w.updatedAt = nowIso();
         w.validationAcceptedAt = undefined;
-        w.history.push({ at: nowIso(), area: 'Processo', message: `AS-IS substituído pela reimportação de ${file.fileName} (versão anterior guardada nas cópias)` });
+        w.history.push({ at: nowIso(), area: t('pg.imp.001'), message: t('pg.imp.006', { fileName: file.fileName }) });
         await db.putWorkspace(w);
         nav(`/app/p/${w.id}/validar`);
       } else {
         const w = await createWorkspace(result.process, source);
         nav(`/app/p/${w.id}/validar`);
       }
-      toast('ok', 'Ótimo! Planilha importada. Vamos conferir a validação e o mapa.');
+      toast('ok', t('pg.imp.007'));
     } catch {
-      toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
+      toast('bad', t('pg.imp.008'));
     }
   };
 
@@ -104,12 +107,12 @@ export default function ImportPage() {
     <div className="safe-x mx-auto max-w-5xl space-y-5 py-6">
       <div>
         {step === 0 && <BackButton />}
-        <p className="text-sm font-semibold text-brand">Importar planilha</p>
+        <p className="text-sm font-semibold text-brand">{t('pg.imp.009')}</p>
         <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold outline-none">
-          {step === 0 ? 'Escolha o arquivo' : step === 1 ? 'Confirme as colunas' : 'Validação dos dados'}
+          {step === 0 ? t('pg.imp.010') : step === 1 ? t('pg.imp.011') : t('pg.imp.012')}
         </h1>
-        <ol className="mt-3 flex gap-2" aria-label="Passos da importação">
-          {STEPS.map((s, i) => (
+        <ol className="mt-3 flex gap-2" aria-label={t('pg.imp.013')}>
+          {steps().map((s, i) => (
             <li key={s} className={clsx('flex-1 rounded-full py-1 text-center text-xs font-semibold', i === step ? 'bg-brand text-brandInk' : i < step ? 'bg-brand/20 text-brand' : 'bg-surface2 text-muted')} aria-current={i === step ? 'step' : undefined}>
               {i + 1}. {s}
             </li>
@@ -135,17 +138,16 @@ export default function ImportPage() {
               className={clsx('flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-8 text-center transition', drag ? 'border-brand bg-brand/5' : 'border-line/25')}
             >
               <UploadCloud className="h-10 w-10 text-brand" aria-hidden />
-              <p className="font-semibold">Arraste a planilha aqui ou escolha no aparelho</p>
-              <p className="text-sm text-muted">XLSX ou CSV, até 10 MB. A leitura acontece no seu navegador — nada é enviado.</p>
+              <p className="font-semibold">{t('pg.imp.015')}</p>
+              <p className="text-sm text-muted">{t('pg.imp.016')}</p>
               <Button onClick={() => inputRef.current?.click()} loading={reading}>
-                <FileSpreadsheet className="h-4 w-4" /> Escolher arquivo
-              </Button>
+                <FileSpreadsheet className="h-4 w-4" />{t('pg.imp.017')}</Button>
               <input
                 ref={inputRef}
                 type="file"
                 accept=".xlsx,.xlsm,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 className="hidden"
-                aria-label="Arquivo da planilha"
+                aria-label={t('pg.imp.018')}
                 data-testid="file-input"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -154,11 +156,8 @@ export default function ImportPage() {
                 }}
               />
               {file && (
-                <p className="text-sm text-ink2">
-                  Arquivo atual: <strong>{file.fileName}</strong> —{' '}
-                  <button type="button" className="font-semibold text-brand underline" onClick={() => setStep(1)}>
-                    continuar com ele
-                  </button>
+                <p className="text-sm text-ink2">{t('pg.imp.019')}<strong>{file.fileName}</strong> —{' '}
+                  <button type="button" className="font-semibold text-brand underline" onClick={() => setStep(1)}>{t('pg.imp.020')}</button>
                 </p>
               )}
             </div>
@@ -166,29 +165,23 @@ export default function ImportPage() {
               <div className="mt-4">
                 <Callout tone="bad" title={err.message}>
                   <p>
-                    <strong>Por quê:</strong> {err.why}
+                    <strong>{t('pg.imp.021')}</strong> {err.why}
                   </p>
                   <p>
-                    <strong>Como resolver:</strong> {err.fix}
+                    <strong>{t('pg.imp.022')}</strong> {err.fix}
                   </p>
                 </Callout>
               </div>
             )}
           </Card>
-          <Card title="Não tem planilha pronta?" subtitle="Modelo oficial">
-            <p className="text-sm text-ink2">O modelo XLSX já vem com listas suspensas, explicações e campos calculados protegidos. Campos coloridos: preencher. Campos cinza: calculados ou protegidos.</p>
+          <Card title={t('pg.imp.023')} subtitle={t('pg.imp.024')}>
+            <p className="text-sm text-ink2">{t('pg.imp.025')}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => void downloadTemplateXlsx()}>
-                Baixar modelo XLSX
-              </Button>
-              <Button variant="secondary" onClick={() => void downloadTemplateCsv()}>
-                Baixar exemplo CSV
-              </Button>
-              <Link to="/app/novo" className="inline-flex min-h-[44px] items-center px-2 text-sm font-semibold text-brand hover:underline">
-                Prefiro responder perguntas
-              </Link>
+              <Button variant="secondary" onClick={() => void downloadTemplateXlsx()}>{t('pg.imp.026')}</Button>
+              <Button variant="secondary" onClick={() => void downloadTemplateCsv()}>{t('pg.imp.027')}</Button>
+              <Link to="/app/novo" className="inline-flex min-h-[44px] items-center px-2 text-sm font-semibold text-brand hover:underline">{t('pg.imp.028')}</Link>
             </div>
-            <p className="mt-3 text-xs text-muted">Mínimo: Etapa macro, Atividade, Ordem, Duração e Unidade. O resto é opcional.</p>
+            <p className="mt-3 text-xs text-muted">{t('pg.imp.029')}</p>
           </Card>
         </>
       )}
@@ -196,24 +189,18 @@ export default function ImportPage() {
       {step === 1 && file && sheet && auto && (
         <>
           {dup && (
-            <Callout tone="warn" title="Este arquivo já foi importado">
-              O conteúdo é idêntico ao do processo “{dup.asIs.name}”. Para não duplicar dados, você pode abri-lo, substituir o AS-IS dele (a versão atual fica guardada) ou criar uma nova cópia conscientemente no último passo.
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button size="sm" variant="secondary" onClick={() => nav(`/app/p/${dup.id}`)}>
-                  Abrir o existente
-                </Button>
+            <Callout tone="warn" title={t('pg.imp.030')}>{t('pg.imp.031')}{dup.asIs.name}{t('pg.imp.032')}<div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" onClick={() => nav(`/app/p/${dup.id}`)}>{t('pg.imp.033')}</Button>
               </div>
             </Callout>
           )}
           {file.fileName.toLowerCase().endsWith('.xlsm') && (
-            <Callout tone="info" title="Macros do arquivo são ignoradas; só os valores das células são lidos">
-              O NexoProcess não executa macros (VBA): o arquivo é aberto só para ler os valores das células.
-            </Callout>
+            <Callout tone="info" title={t('pg.imp.034')}>{t('pg.imp.035')}</Callout>
           )}
-          <Card title="De onde vêm os dados?" subtitle={file.fileName}>
+          <Card title={t('pg.imp.036')} subtitle={file.fileName}>
             <div className="grid gap-4 sm:grid-cols-3">
               {file.sheets.length > 1 && (
-                <Field label="Aba com as atividades">
+                <Field label={t('pg.imp.037')}>
                   {(p) => (
                     <Select
                       {...p}
@@ -226,34 +213,33 @@ export default function ImportPage() {
                     >
                       {file.sheets.map((s, i) => (
                         <option key={s.name} value={i}>
-                          {s.name} ({s.rows.length} linhas)
-                        </option>
+                          {s.name} ({s.rows.length}{t('pg.imp.038')}</option>
                       ))}
                     </Select>
                   )}
                 </Field>
               )}
-              <Field label="Nome do processo">{(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
-              <Field label="Unidade quando a célula estiver vazia" help="Escolha consciente; cada uso é avisado na validação.">
+              <Field label={t('pg.imp.039')}>{(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
+              <Field label={t('pg.imp.040')} help={t('pg.imp.041')}>
                 {(p) => (
                   <Select {...p} value={unit} onChange={(e) => setUnit(e.target.value as DurationUnit)}>
-                    <option value="min">minutos</option>
-                    <option value="h">horas</option>
-                    <option value="d">dias</option>
+                    <option value="min">{t('pg.imp.042')}</option>
+                    <option value="h">{t('pg.imp.043')}</option>
+                    <option value="d">{t('pg.imp.044')}</option>
                   </Select>
                 )}
               </Field>
             </div>
           </Card>
 
-          <Card title="Prévia" subtitle={`${sheet.rows.length} linhas na aba “${sheet.name}”`}>
-            <Table caption="Primeiras linhas da planilha">
+          <Card title={t('pg.imp.045')} subtitle={t('pg.imp.046', { length: sheet.rows.length, name: sheet.name })}>
+            <Table caption={t('pg.imp.047')}>
               <thead>
                 <tr>
-                  <th className={th}>Linha</th>
+                  <th className={th}>{t('pg.imp.048')}</th>
                   {sheet.headers.map((h, i) => (
                     <th key={i} className={th}>
-                      {h || `(coluna ${i + 1})`}
+                      {h || t('pg.imp.049', { p0: i + 1 })}
                     </th>
                   ))}
                 </tr>
@@ -273,19 +259,15 @@ export default function ImportPage() {
             </Table>
           </Card>
 
-          <Card title="Mapeamento de colunas" subtitle="Confira e ajuste">
+          <Card title={t('pg.imp.051')} subtitle={t('pg.imp.052')}>
             {missingMinimal.length > 0 && (
               <div className="mb-3">
-                <Callout tone="warn" title="Faltam colunas do conjunto mínimo">
-                  Não encontramos: {missingMinimal.map((f) => f.label).join(', ')}. Escolha a coluna correspondente abaixo; se a planilha não tiver, a análise fica limitada (avisaremos o que falta).
-                </Callout>
+                <Callout tone="warn" title={t('pg.imp.053')}>{t('pg.imp.054')}{missingMinimal.map((f) => f.label).join(', ')}{t('pg.imp.055')}</Callout>
               </div>
             )}
-            {auto.ignored.length > 0 && <p className="mb-3 text-xs text-muted">Colunas não reconhecidas (ignoradas, a menos que você as escolha): {auto.ignored.join(', ')}</p>}
+            {auto.ignored.length > 0 && <p className="mb-3 text-xs text-muted">{t('pg.imp.056')}{auto.ignored.join(', ')}</p>}
             {auto.duplicates.length > 0 && (
-              <p className="mb-3 text-xs text-warn">
-                Colunas parecidas para o mesmo campo: {auto.duplicates.map((d) => `${FIELDS.find((f) => f.key === d.field)!.label} (${d.headers.join(' / ')})`).join('; ')}. Confira qual usar.
-              </p>
+              <p className="mb-3 text-xs text-warn">{t('pg.imp.057')}{auto.duplicates.map((d) => `${FIELDS.find((f) => f.key === d.field)!.label} (${d.headers.join(' / ')})`).join('; ')}{t('pg.imp.058')}</p>
             )}
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
               {FIELDS.map((f) => {
@@ -296,8 +278,8 @@ export default function ImportPage() {
                     label={
                       <span className="flex items-center gap-2">
                         {f.label}
-                        {f.minimal && <Badge tone="brand">mínimo</Badge>}
-                        {conf === 'provável' && mapping[f.key] === auto.mapping[f.key] && <Badge tone="amber">confira</Badge>}
+                        {f.minimal && <Badge tone="brand">{t('pg.imp.059')}</Badge>}
+                        {conf === 'provável' && mapping[f.key] === auto.mapping[f.key] && <Badge tone="amber">{t('pg.imp.060')}</Badge>}
                       </span>
                     }
                     help={f.help}
@@ -316,10 +298,10 @@ export default function ImportPage() {
                           });
                         }}
                       >
-                        <option value="">— não usar —</option>
+                        <option value="">{t('pg.imp.061')}</option>
                         {sheet.headers.map((h, i) => (
                           <option key={i} value={i}>
-                            {h || `(coluna ${i + 1})`}
+                            {h || t('pg.imp.062', { p0: i + 1 })}
                           </option>
                         ))}
                       </Select>
@@ -335,19 +317,17 @@ export default function ImportPage() {
       {step === 2 && result && (
         <>
           <div className="grid gap-3 sm:grid-cols-4">
-            <SummaryTile label="Elementos lidos" value={result.process.activities.length} />
-            <SummaryTile label="Etapas" value={result.process.stageOrder.length} />
-            <SummaryTile label="Erros" value={blocking} tone={blocking ? 'bad' : 'ok'} />
-            <SummaryTile label="Alertas" value={result.issues.filter((i) => i.severity === 'warning').length + result.validation.filter((i) => i.severity === 'warning').length} tone="amber" />
+            <SummaryTile label={t('pg.imp.063')} value={result.process.activities.length} />
+            <SummaryTile label={t('pg.imp.064')} value={result.process.stageOrder.length} />
+            <SummaryTile label={t('pg.imp.065')} value={blocking} tone={blocking ? 'bad' : 'ok'} />
+            <SummaryTile label={t('pg.imp.066')} value={result.issues.filter((i) => i.severity === 'warning').length + result.validation.filter((i) => i.severity === 'warning').length} tone="amber" />
           </div>
           {result.flowInferred && (
-            <Callout tone="info" title="Fluxo montado pela ordem das linhas">
-              A planilha não tem coluna de próxima atividade, então ligamos as atividades em sequência. Revise o mapa; decisões e caminhos alternativos podem ser ajustados depois.
-            </Callout>
+            <Callout tone="info" title={t('pg.imp.067')}>{t('pg.imp.068')}</Callout>
           )}
-          <Card title="O que encontramos" subtitle="Por linha da planilha">
+          <Card title={t('pg.imp.069')} subtitle={t('pg.imp.070')}>
             {[...result.issues, ...result.validation.filter((v) => !['flow_inferred'].includes(v.code)).map((v) => ({ row: v.row ?? 0, severity: v.severity, message: `${v.message} ${v.fix}`, field: undefined }))].length === 0 ? (
-              <Callout tone="ok">Nenhum problema encontrado.</Callout>
+              <Callout tone="ok">{t('pg.imp.071')}</Callout>
             ) : (
               <ul className="space-y-2" data-testid="import-issues">
                 {[...result.issues, ...result.validation.filter((v) => v.code !== 'flow_inferred').map((v) => ({ row: v.row ?? 0, severity: v.severity, message: `${v.message} ${v.fix}`, field: undefined }))]
@@ -355,9 +335,9 @@ export default function ImportPage() {
                   .slice(0, 200)
                   .map((i, n) => (
                     <li key={n} className="flex items-start gap-2 text-sm">
-                      <Badge tone={i.severity === 'error' ? 'bad' : i.severity === 'warning' ? 'amber' : 'accent'}>{i.severity === 'error' ? 'Erro' : i.severity === 'warning' ? 'Alerta' : 'Info'}</Badge>
+                      <Badge tone={i.severity === 'error' ? 'bad' : i.severity === 'warning' ? 'amber' : 'accent'}>{i.severity === 'error' ? t('pg.imp.072') : i.severity === 'warning' ? t('pg.imp.073') : t('pg.imp.074')}</Badge>
                       <span className="text-ink2">
-                        {i.row ? <strong className="text-ink">Linha {i.row}: </strong> : null}
+                        {i.row ? <strong className="text-ink">{t('pg.imp.075')}{i.row}: </strong> : null}
                         {i.message}
                       </span>
                     </li>
@@ -366,12 +346,8 @@ export default function ImportPage() {
             )}
           </Card>
           {blocking > 0 && (
-            <Callout tone="warn" title={`${blocking} erro(s) encontrados`}>
-              Valores inválidos ficarão em branco e precisarão ser corrigidos no app (aba Dados) antes da análise completa. Você também pode corrigir na planilha e importar de novo — o arquivo atual continua selecionado.
-              <label className="mt-2 flex items-center gap-2 font-medium text-ink">
-                <input type="checkbox" className="h-4 w-4" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-                Entendi; quero importar e corrigir no app.
-              </label>
+            <Callout tone="warn" title={t('pg.imp.076', { blocking })}>{t('pg.imp.077')}<label className="mt-2 flex items-center gap-2 font-medium text-ink">
+                <input type="checkbox" className="h-4 w-4" checked={ack} onChange={(e) => setAck(e.target.checked)} />{t('pg.imp.078')}</label>
             </Callout>
           )}
         </>
@@ -380,21 +356,18 @@ export default function ImportPage() {
       {step > 0 && (
         <div className="safe-bottom sticky bottom-0 -mx-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/15 bg-bg/90 px-4 py-3 backdrop-blur">
           <Button variant="ghost" onClick={() => setStep(step - 1)}>
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Button>
+            <ArrowLeft className="h-4 w-4" />{t('pg.imp.079')}</Button>
           {step === 1 ? (
-            <Button onClick={() => setStep(2)}>
-              Validar dados <ArrowRight className="h-4 w-4" />
+            <Button onClick={() => setStep(2)}>{t('pg.imp.080')}<ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
             <div className="flex flex-wrap gap-2">
               {dup && (
-                <Button variant="secondary" disabled={blocking > 0 && !ack} onClick={() => void create('replace')}>
-                  Substituir AS-IS de “{dup.asIs.name}”
+                <Button variant="secondary" disabled={blocking > 0 && !ack} onClick={() => void create('replace')}>{t('pg.imp.081')}{dup.asIs.name}”
                 </Button>
               )}
               <Button disabled={blocking > 0 && !ack} onClick={() => void create('new')}>
-                {dup ? 'Criar nova cópia' : 'Criar processo'}
+                {dup ? t('pg.imp.082') : t('pg.imp.083')}
               </Button>
             </div>
           )}

@@ -25,7 +25,7 @@ export default function CompareTab() {
   const sc = w.scenarios.find((s) => s.id === sid) ?? w.scenarios[0];
   const cmp = useMemo(() => (sc ? compareScenarios(w.asIs, sc) : null), [w.asIs, sc]);
   const all = useMemo(() => w.scenarios.map((s) => ({ s, c: compareScenarios(w.asIs, s) })), [w.asIs, w.scenarios]);
-  const [target, setTarget] = useState({ description: '', value: undefined as number | undefined, unit: 'pessoa-h/mês', approvedBy: '' });
+  const [target, setTarget] = useState({ description: '', value: undefined as number | undefined, unit: t('ws.res.m1.unit'), approvedBy: '' });
   useEffect(() => {
     if (sc && !w.visited.compare) update((d) => void (d.visited.compare = nowIso()));
   }, [sc, w.visited.compare, update]);
@@ -109,7 +109,7 @@ export default function CompareTab() {
 
       <Card title={t('ws.cmp.020')} subtitle={t('ws.cmp.021')}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label={<>{t('ws.cmp.022')}<Term k="capacity" iconOnly /></>} value={`${fmtNum(b.freedHoursMonth)} pessoa-h/mês`} sub={b.freedHoursMonth !== null ? t('ws.cmp.023', { p0: fmtNum(b.freedHoursMonth * 12) }) : undefined} basis="estimado" missing={b.freedHoursMonth === null ? b.reasons.freed : undefined} />
+          <Stat label={<>{t('ws.cmp.022')}<Term k="capacity" iconOnly /></>} value={t('m.personHMonth', { n: fmtNum(b.freedHoursMonth) })} sub={b.freedHoursMonth !== null ? t('ws.cmp.023', { p0: fmtNum(b.freedHoursMonth * 12) }) : undefined} basis="estimado" missing={b.freedHoursMonth === null ? b.reasons.freed : undefined} />
           <Stat label={t('ws.cmp.024')} value={`${fmtNum(b.capacityExtraExecMonth)} execuções/mês`} sub={t('ws.cmp.025')} basis="estimado" missing={b.capacityExtraExecMonth === null ? t('ws.cmp.026') : undefined} />
           <Stat label={t('ws.cmp.027')} value={`${fmtBRL(b.grossBenefitMonth)}/mês`} sub={b.grossBenefitMonth !== null ? t('ws.cmp.028', { p0: fmtBRL(b.grossBenefitMonth * 12) }) : undefined} basis="estimado" missing={b.grossBenefitMonth === null ? b.reasons.gross : undefined} />
           <Stat label={t('ws.cmp.029')} value={`${fmtBRL(b.netBenefitMonth)}/mês`} sub={b.netBenefitMonth !== null ? t('ws.cmp.030', { p0: fmtBRL(b.recurringCostPerMonth) }) : undefined} basis="estimado" missing={b.netBenefitMonth === null ? b.reasons.net : undefined} tone={b.netBenefitMonth !== null && b.netBenefitMonth < 0 ? 'bad' : undefined} />
@@ -291,12 +291,12 @@ function CasesCard({ sc }: { sc: Scenario }) {
               </div>
             )}
             <dl className="mt-3 space-y-1.5 text-sm">
-              <Row k="Horas liberadas" v={c.freedHoursMonth === null ? '—' : t('ws.cmp.102', { p0: fmtNum(c.freedHoursMonth) })} />
-              <Row k="Benefício bruto" v={money(c.grossBenefitMonth)} />
-              <Row k="Benefício líquido" v={money(c.netBenefitMonth)} bad={c.netBenefitMonth !== null && c.netBenefitMonth <= 0} />
-              <Row k="Investimento" v={c.investment === null ? '—' : fmtBRL(c.investment)} />
-              <Row k="Payback" v={c.paybackMonths === null ? t('ws.cmp.103') : c.paybackMonths === 0 ? 'imediato' : t('ws.cmp.104', { p0: fmtNum(c.paybackMonths, 1) })} />
-              <Row k={`ROI em ${cmp.business.horizonMonths} meses`} v={c.roiPct === null ? '—' : fmtPct(c.roiPct)} />
+              <Row k={t('m.freedHours')} v={c.freedHoursMonth === null ? '—' : t('ws.cmp.102', { p0: fmtNum(c.freedHoursMonth) })} />
+              <Row k={t('m.grossBenefit')} v={money(c.grossBenefitMonth)} />
+              <Row k={t('m.netBenefit')} v={money(c.netBenefitMonth)} bad={c.netBenefitMonth !== null && c.netBenefitMonth <= 0} />
+              <Row k={t('m.investment')} v={c.investment === null ? '—' : fmtBRL(c.investment)} />
+              <Row k="Payback" v={c.paybackMonths === null ? t('ws.cmp.103') : c.paybackMonths === 0 ? t('m.immediate') : t('ws.cmp.104', { p0: fmtNum(c.paybackMonths, 1) })} />
+              <Row k={t('m.roiIn', { n: cmp.business.horizonMonths })} v={c.roiPct === null ? '—' : fmtPct(c.roiPct)} />
             </dl>
             {c.reason && <p className="mt-2 text-xs text-muted">{c.reason}</p>}
           </section>

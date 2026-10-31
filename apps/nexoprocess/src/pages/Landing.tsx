@@ -8,9 +8,15 @@ import { openDemo } from '../state/actions';
 import { LICENSE } from '../license/config';
 import { startDemo } from '../license/demo';
 
+import { useI18n } from '../i18n/I18nProvider';
+import { getActiveLocale } from '../i18n';
 const FEATURE_ICONS = [GitBranch, BarChart3, Lightbulb, Scale, ScrollText, Lock];
 
+/** Link de compra do idioma ativo: Gumroad em EN, Hotmart em PT. */
+const checkoutUrl = () => (getActiveLocale() === 'en' ? LICENSE.gumroadCheckoutUrl : LICENSE.checkoutUrl);
+
 export default function Landing() {
+  const { t } = useI18n();
   const nav = useNavigate();
   const toast = useToast();
   const demo = async () => {
@@ -18,7 +24,7 @@ export default function Landing() {
       const w = await openDemo();
       nav(`/app/p/${w.id}/visao-geral`);
     } catch {
-      toast('bad', 'Não conseguimos abrir o exemplo neste navegador. Tente recarregar a página.');
+      toast('bad', t('pg.land.001'));
     }
   };
   // Modo de venda: liga a demonstração e abre a Home; o exemplo só é criado quando a pessoa
@@ -34,19 +40,15 @@ export default function Landing() {
           <Logo className="h-8 w-8" />
           <span>{BRAND.name}</span>
         </Link>
-        <Link to="/app/ajuda" className="hidden text-sm font-semibold text-ink2 hover:text-ink sm:inline">
-          Como funciona
-        </Link>
+        <Link to="/app/ajuda" className="hidden text-sm font-semibold text-ink2 hover:text-ink sm:inline">{t('pg.land.002')}</Link>
         <ThemeToggle />
-        <Button size="sm" onClick={() => nav('/app')}>
-          Abrir o app
-        </Button>
+        <Button size="sm" onClick={() => nav('/app')}>{t('pg.land.003')}</Button>
       </header>
 
       <main id="conteudo" className="safe-x mx-auto max-w-6xl pb-16">
         <section className="grid items-center gap-10 py-10 lg:grid-cols-[1.1fr_.9fr] lg:py-16">
           <div>
-            <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">Processos · BPMN · Lean · Plano de melhoria</p>
+            <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">{t('pg.land.004')}</p>
             <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
               <span className="headline">{LANDING.heroTitle}</span>
             </h1>
@@ -63,20 +65,16 @@ export default function Landing() {
               )}
             </div>
             <p className="mt-3 text-sm text-muted">
-              {LICENSE.required ? 'Acesso com o e-mail usado na compra.' : 'Sem cadastro.'} Suas planilhas são lidas no navegador e ficam salvas só neste aparelho.
-            </p>
+              {LICENSE.required ? t('pg.land.005') : t('pg.land.006')}{t('pg.land.007')}</p>
             {/* No celular o cabeçalho não tem espaço para "Como funciona": a Ajuda fica aqui. */}
             <Link to="/app/ajuda" className="mt-1 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-brand underline-offset-4 hover:underline sm:hidden">
-              <HelpCircle className="h-4 w-4" aria-hidden /> Como funciona
-            </Link>
+              <HelpCircle className="h-4 w-4" aria-hidden />{t('pg.land.008')}</Link>
           </div>
           <HeroVisual />
         </section>
 
         <section aria-labelledby="como" className="py-8">
-          <h2 id="como" className="text-2xl font-bold">
-            Como funciona, em 3 passos
-          </h2>
+          <h2 id="como" className="text-2xl font-bold">{t('pg.land.009')}</h2>
           <ol className="mt-5 grid gap-4 md:grid-cols-3">
             {LANDING.steps.map((s, i) => (
               <li key={s.title} className="rounded-2xl border border-line/15 bg-surface p-5 shadow-card">
@@ -89,31 +87,23 @@ export default function Landing() {
         </section>
 
         <section aria-labelledby="rotas" className="grid gap-4 py-8 md:grid-cols-2">
-          <h2 id="rotas" className="sr-only">
-            Duas formas de começar
-          </h2>
+          <h2 id="rotas" className="sr-only">{t('pg.land.010')}</h2>
           <div className="rounded-2xl border border-line/15 bg-surface p-6 shadow-card">
             <Wand2 className="h-7 w-7 text-accent" aria-hidden />
-            <h3 className="mt-3 text-lg font-bold">Sem planilha</h3>
-            <p className="mt-1 text-sm text-ink2">Um assistente faz perguntas simples: quais as etapas, o que acontece em cada uma, quanto tempo leva.</p>
-            <Button className="mt-4" variant="secondary" onClick={() => nav('/app/novo')}>
-              Começar sem planilha
-            </Button>
+            <h3 className="mt-3 text-lg font-bold">{t('pg.land.011')}</h3>
+            <p className="mt-1 text-sm text-ink2">{t('pg.land.012')}</p>
+            <Button className="mt-4" variant="secondary" onClick={() => nav('/app/novo')}>{t('pg.land.013')}</Button>
           </div>
           <div className="rounded-2xl border border-line/15 bg-surface p-6 shadow-card">
             <FileSpreadsheet className="h-7 w-7 text-ok" aria-hidden />
-            <h3 className="mt-3 text-lg font-bold">Com a sua planilha</h3>
-            <p className="mt-1 text-sm text-ink2">Importe XLSX ou CSV. Reconhecemos colunas comuns em português e inglês e você confirma o mapeamento.</p>
-            <Button className="mt-4" variant="secondary" onClick={() => nav('/app/importar')}>
-              Importar minha planilha
-            </Button>
+            <h3 className="mt-3 text-lg font-bold">{t('pg.land.014')}</h3>
+            <p className="mt-1 text-sm text-ink2">{t('pg.land.015')}</p>
+            <Button className="mt-4" variant="secondary" onClick={() => nav('/app/importar')}>{t('pg.land.016')}</Button>
           </div>
         </section>
 
         <section aria-labelledby="rec" className="py-8">
-          <h2 id="rec" className="text-2xl font-bold">
-            O que você recebe
-          </h2>
+          <h2 id="rec" className="text-2xl font-bold">{t('pg.land.017')}</h2>
           <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {LANDING.features.map((f, i) => {
               const Icon = FEATURE_ICONS[i];
@@ -129,20 +119,17 @@ export default function Landing() {
         </section>
 
         <section className="mt-6 rounded-2xl border border-brand/30 bg-surface p-6 text-center ">
-          <h2 className="text-2xl font-bold">Seu processo. Seu mapa. Seus gargalos.</h2>
-          <p className="mx-auto mt-2 max-w-xl text-ink2">{LICENSE.required ? 'Entre com o e-mail da compra e traga o seu processo agora.' : 'Explore a demonstração fictícia ou traga o seu processo agora.'}</p>
+          <h2 className="text-2xl font-bold">{t('pg.land.018')}</h2>
+          <p className="mx-auto mt-2 max-w-xl text-ink2">{LICENSE.required ? t('pg.land.019') : t('pg.land.020')}</p>
           <div className="mt-4 flex flex-wrap justify-center gap-3">
-            <Button size="lg" onClick={() => nav('/app')}>
-              Começar agora
-            </Button>
+            <Button size="lg" onClick={() => nav('/app')}>{t('pg.land.021')}</Button>
             <SecondaryCta onDemo={demo} onTryDemo={tryDemo} />
           </div>
         </section>
       </main>
       <footer className="safe-x safe-bottom mx-auto max-w-6xl border-t border-line/15 py-6 text-xs text-muted">
         <p>
-          {BRAND.name} · versão {BRAND.version}. Diagramas renderizados com bpmn-js (bpmn.io). Não é afiliado ao PMI® nem a fornecedores de ferramentas de processos.
-          {COMMERCIAL.contactEmail && (
+          {BRAND.name}{t('pg.land.022')}{BRAND.version}{t('pg.land.023')}{COMMERCIAL.contactEmail && (
             <>
               {' '}
               · <a href={`mailto:${COMMERCIAL.contactEmail}`}>{COMMERCIAL.contactEmail}</a>
@@ -150,17 +137,11 @@ export default function Landing() {
           )}
         </p>
         <p className="mt-2">
-          <Link to="/privacidade" className="underline">
-            Política de Privacidade
-          </Link>{' '}
+          <Link to="/privacidade" className="underline">{t('pg.land.024')}</Link>{' '}
           ·{' '}
-          <Link to="/termos" className="underline">
-            Termos de Uso
-          </Link>{' '}
+          <Link to="/termos" className="underline">{t('pg.land.025')}</Link>{' '}
           ·{' '}
-          <Link to="/app/ajuda" className="underline">
-            Ajuda
-          </Link>
+          <Link to="/app/ajuda" className="underline">{t('pg.land.026')}</Link>
         </p>
       </footer>
     </div>
@@ -169,8 +150,9 @@ export default function Landing() {
 
 /** Ilustração vetorial própria (não é captura de tela nem dado real). */
 function HeroVisual() {
+  const { t } = useI18n();
   return (
-    <figure className="rounded-3xl border border-line/15 bg-surface p-4 shadow-card" aria-label="Ilustração: mapa de processo com etapas, decisão e um gargalo destacado">
+    <figure className="rounded-3xl border border-line/15 bg-surface p-4 shadow-card" aria-label={t('pg.land.027')}>
       <svg viewBox="0 0 420 260" className="h-auto w-full" role="img" aria-hidden>
         <defs>
           <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
@@ -181,28 +163,28 @@ function HeroVisual() {
         <circle cx="34" cy="90" r="12" fill="none" stroke="rgb(var(--ok))" strokeWidth="3" />
         <line x1="46" y1="90" x2="70" y2="90" stroke="rgb(var(--ink-2))" strokeWidth="2" markerEnd="url(#ar)" />
         <rect x="72" y="66" width="86" height="48" rx="10" fill="rgb(var(--surface))" stroke="rgb(var(--accent))" strokeWidth="2" />
-        <text x="115" y="94" textAnchor="middle" fontSize="11" fill="rgb(var(--ink))">Recebimento</text>
+        <text x="115" y="94" textAnchor="middle" fontSize="11" fill="rgb(var(--ink))">{t('pg.land.028')}</text>
         <line x1="158" y1="90" x2="182" y2="90" stroke="rgb(var(--ink-2))" strokeWidth="2" markerEnd="url(#ar)" />
         <path d="M206 68l22 22-22 22-22-22z" fill="rgb(var(--surface))" stroke="rgb(var(--violet))" strokeWidth="2" />
         <text x="206" y="94" textAnchor="middle" fontSize="13" fontWeight="700" fill="rgb(var(--violet))">?</text>
         <line x1="228" y1="90" x2="256" y2="90" stroke="rgb(var(--ink-2))" strokeWidth="2" markerEnd="url(#ar)" />
-        <text x="236" y="82" fontSize="9" fill="rgb(var(--ink-2))">Sim</text>
+        <text x="236" y="82" fontSize="9" fill="rgb(var(--ink-2))">{t('pg.land.029')}</text>
         <rect x="258" y="66" width="86" height="48" rx="10" fill="rgb(var(--surface))" stroke="rgb(var(--bad))" strokeWidth="3" />
-        <text x="301" y="94" textAnchor="middle" fontSize="11" fill="rgb(var(--ink))">Separação</text>
+        <text x="301" y="94" textAnchor="middle" fontSize="11" fill="rgb(var(--ink))">{t('pg.land.030')}</text>
         <rect x="270" y="52" width="62" height="18" rx="9" fill="rgb(var(--bad))" />
-        <text x="301" y="64" textAnchor="middle" fontSize="9" fontWeight="700" fill="#fff">GARGALO</text>
+        <text x="301" y="64" textAnchor="middle" fontSize="9" fontWeight="700" fill="#fff">{t('pg.land.031')}</text>
         <line x1="344" y1="90" x2="372" y2="90" stroke="rgb(var(--ink-2))" strokeWidth="2" markerEnd="url(#ar)" />
         <circle cx="386" cy="90" r="12" fill="none" stroke="rgb(var(--bad))" strokeWidth="4" />
         <path d="M206 112v38h52" fill="none" stroke="rgb(var(--amber))" strokeWidth="2" strokeDasharray="6 4" markerEnd="url(#ar)" />
-        <text x="212" y="134" fontSize="9" fill="rgb(var(--ink-2))">Não</text>
+        <text x="212" y="134" fontSize="9" fill="rgb(var(--ink-2))">{t('pg.land.032')}</text>
         <rect x="260" y="128" width="86" height="44" rx="10" fill="rgb(var(--surface))" stroke="rgb(var(--amber))" strokeWidth="2" strokeDasharray="6 3" />
-        <text x="303" y="154" textAnchor="middle" fontSize="11" fill="rgb(var(--ink))">Retrabalho</text>
+        <text x="303" y="154" textAnchor="middle" fontSize="11" fill="rgb(var(--ink))">{t('pg.land.033')}</text>
         <g transform="translate(24 192)">
           <rect width="372" height="14" rx="7" fill="rgb(var(--surface))" />
           <rect width="150" height="14" rx="7" fill="#199e70" />
           <rect x="152" width="140" height="14" fill="#c98500" />
           <rect x="294" width="78" height="14" rx="7" fill="#d03b3b" />
-          <text y="34" fontSize="10" fill="rgb(var(--ink-2))">Agrega valor · Necessário · Desperdício (ilustrativo)</text>
+          <text y="34" fontSize="10" fill="rgb(var(--ink-2))">{t('pg.land.034')}</text>
         </g>
       </svg>
     </figure>
@@ -214,22 +196,17 @@ function HeroVisual() {
  * versão Demo (navega no exemplo, sem salvar nem exportar).
  */
 function SecondaryCta({ onDemo, onTryDemo }: { onDemo: () => void; onTryDemo: () => void }) {
+  const { t } = useI18n();
   if (!LICENSE.required)
     return (
-      <Button size="lg" variant="secondary" onClick={onDemo}>
-        Ver demonstração fictícia
-      </Button>
+      <Button size="lg" variant="secondary" onClick={onDemo}>{t('pg.land.035')}</Button>
     );
   return (
     <>
-      {LICENSE.checkoutUrl && (
-        <a href={LICENSE.checkoutUrl} rel="noopener noreferrer" target="_blank" className="inline-flex min-h-[52px] items-center rounded-xl border border-line/20 bg-surface px-5 font-semibold text-ink hover:border-line/40">
-          Comprar na Hotmart
-        </a>
+      {checkoutUrl() && (
+        <a href={checkoutUrl()} rel="noopener noreferrer" target="_blank" className="inline-flex min-h-[52px] items-center rounded-xl border border-line/20 bg-surface px-5 font-semibold text-ink hover:border-line/40">{t('pg.land.036')}</a>
       )}
-      <Button size="lg" variant="ghost" onClick={onTryDemo}>
-        Experimentar a versão Demo
-      </Button>
+      <Button size="lg" variant="ghost" onClick={onTryDemo}>{t('pg.land.037')}</Button>
     </>
   );
 }
