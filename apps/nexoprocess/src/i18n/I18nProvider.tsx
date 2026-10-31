@@ -1,5 +1,6 @@
 // Contexto de idioma. Fora do Provider vale PT (componentes e testes antigos seguem iguais).
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { setActiveLocale } from './active';
 import { formatters, type Formatters } from './format';
 import { translator, type MessageKey, type MessageVars } from './index';
 import { DEFAULT_LOCALE, htmlLang, resolveLocale, saveLocale, type Locale } from './locale';
@@ -38,8 +39,15 @@ export function I18nProvider({ children, locale: fixed }: { children: ReactNode;
   useEffect(() => {
     if (typeof document !== 'undefined') document.documentElement.lang = htmlLang(locale);
   }, [locale]);
+  // Código fora de componentes (units.ts, domínio) lê o idioma ativo; definido antes dos filhos renderizarem.
+  setActiveLocale(locale);
   const value = useMemo(() => make(locale, setLocale), [locale, setLocale]);
-  return <I18nCtx.Provider value={value}>{children}</I18nCtx.Provider>;
+  // key={locale}: trocar o idioma remonta a árvore, para nada ficar com texto do idioma anterior.
+  return (
+    <I18nCtx.Provider value={value}>
+      <Fragment key={locale}>{children}</Fragment>
+    </I18nCtx.Provider>
+  );
 }
 
 export const useI18n = () => useContext(I18nCtx);

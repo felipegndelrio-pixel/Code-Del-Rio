@@ -1,5 +1,8 @@
 // Conversões de unidade e formatação. Os cálculos usam sempre valores
 // originais (sem arredondamento); só a apresentação é arredondada.
+import { formatters } from '../i18n/format';
+import { getActiveLocale } from '../i18n/active';
+import { tr } from '../i18n';
 import type { DurationUnit, ProcessModel } from './types';
 
 /** Converte uma duração para horas. Dias usam a premissa `hoursPerDay` (dia de trabalho). */
@@ -52,31 +55,21 @@ export function reductionPct(before: number | null | undefined, after: number | 
   return ((before - after) / before) * 100;
 }
 
-const nf = (min: number, max: number) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: min, maximumFractionDigits: max });
-const NF0 = nf(0, 0);
-const NF1 = nf(0, 1);
-const NF2 = nf(0, 2);
+// Formatação pelo idioma ativo (src/i18n/active.ts). PT é o padrão e reproduz o formato anterior.
+const F = () => formatters(getActiveLocale());
 
 /** Número com precisão adequada à magnitude (evita precisão excessiva). */
 export function fmtNum(v: number | null | undefined, digits?: number): string {
-  if (!isNum(v)) return '—';
-  if (digits !== undefined) return nf(0, digits).format(v);
-  const a = Math.abs(v);
-  if (a >= 100) return NF0.format(v);
-  if (a >= 10) return NF1.format(v);
-  return NF2.format(v);
+  return F().number(v, digits);
 }
 
 export function fmtPct(v: number | null | undefined, digits = 0): string {
-  if (!isNum(v)) return '—';
-  return `${nf(0, digits).format(v)}%`;
+  return F().percent(v, digits);
 }
 
-const BRL0 = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-const BRL2 = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Moeda do idioma ativo: BRL em PT, USD em EN. */
 export function fmtBRL(v: number | null | undefined): string {
-  if (!isNum(v)) return '—';
-  return Math.abs(v) >= 1000 ? BRL0.format(v) : BRL2.format(v);
+  return F().currency(v);
 }
 
 /** Horas em texto legível: "45 min", "2 h 30 min", "1.250 h". */
@@ -84,44 +77,37 @@ export function fmtHours(h: number | null | undefined): string {
   if (!isNum(h)) return '—';
   const sign = h < 0 ? '−' : '';
   const a = Math.abs(h);
-  if (a === 0) return '0 min';
-  if (a < 1) return `${sign}${NF0.format(Math.round(a * 60))} min`;
+  const min = tr('unit.min');
+  const hr = tr('unit.h');
+  const n0 = (v: number) => F().number(v, 0);
+  if (a === 0) return `0 ${min}`;
+  if (a < 1) return `${sign}${n0(Math.round(a * 60))} ${min}`;
   if (a < 10) {
     const hh = Math.floor(a);
     const mm = Math.round((a - hh) * 60);
-    if (mm === 60) return `${sign}${hh + 1} h`;
-    return mm ? `${sign}${hh} h ${mm} min` : `${sign}${hh} h`;
+    if (mm === 60) return `${sign}${hh + 1} ${hr}`;
+    return mm ? `${sign}${hh} ${hr} ${mm} ${min}` : `${sign}${hh} ${hr}`;
   }
-  return `${sign}${NF0.format(Math.round(a))} h`;
+  return `${sign}${n0(Math.round(a))} ${hr}`;
 }
 
 /** Pessoa-hora, sempre explicitando a unidade. */
 export function fmtPersonHours(h: number | null | undefined): string {
   if (!isNum(h)) return '—';
-  return `${fmtNum(h)} pessoa-h`;
+  return `${fmtNum(h)} ${tr('unit.personHours')}`;
 }
 
 export function fmtDuration(v: number | undefined, unit: DurationUnit): string {
   if (!isNum(v)) return '—';
-  const u = unit === 'min' ? 'min' : unit === 'h' ? 'h' : v === 1 ? 'dia' : 'dias';
+  const u = unit === 'min' ? tr('unit.min') : unit === 'h' ? tr('unit.h') : v === 1 ? tr('unit.day') : tr('unit.days');
   return `${fmtNum(v)} ${u}`;
 }
 
 export function fmtDate(iso: string | undefined): string {
-  if (!iso) return '—';
-  // Data pura (prazo): mostra o dia digitado. new Date('aaaa-mm-dd') é meia-noite UTC
-  // e, no Brasil (UTC−3), apareceria como o dia anterior.
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('pt-BR');
+  return F().date(iso);
 }
 export function fmtDateTime(iso: string | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return F().dateTime(iso);
 }
 
 /** Lê número em formato brasileiro ou internacional ("1.234,5", "1,234.5", "30"). */
