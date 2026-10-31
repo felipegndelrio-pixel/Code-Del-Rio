@@ -29,7 +29,7 @@ export interface LocaleStorage {
  * Falha de armazenamento (aba privada, cota) nunca quebra a escolha.
  */
 export function resolveLocale(search: string, storage: LocaleStorage | null | undefined): Locale {
-  let fromQuery: Locale | null = null;
+  let fromQuery: Locale | null;
   try {
     fromQuery = parseLocale(new URLSearchParams(search).get('lang'));
   } catch {

@@ -4,6 +4,7 @@ import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import { Providers } from './components/ui';
 import PwaUpdater from './components/PwaUpdater';
+import { I18nProvider } from './i18n/I18nProvider';
 import './state/install'; // captura o convite de instalação o quanto antes
 import '@fontsource/ibm-plex-sans/latin-400.css';
 import '@fontsource/ibm-plex-sans/latin-500.css';
@@ -22,10 +23,12 @@ if (!boot.__nexoIncompativel) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <Router basename={import.meta.env.VITE_ROUTER === 'hash' ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
-        <Providers>
-          <App />
-          <PwaUpdater />
-        </Providers>
+        <I18nProvider>
+          <Providers>
+            <App />
+            <PwaUpdater />
+          </Providers>
+        </I18nProvider>
       </Router>
     </StrictMode>,
   );
