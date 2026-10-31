@@ -21,14 +21,11 @@ export default function Landing() {
       toast('bad', 'Não conseguimos abrir o exemplo neste navegador. Tente recarregar a página.');
     }
   };
-  const tryDemo = async () => {
+  // Modo de venda: liga a demonstração e abre a Home; o exemplo só é criado quando a pessoa
+  // escolhe "Abrir demonstração" (comportamento definido nos e2e da v2.5.0-rc1).
+  const tryDemo = () => {
     startDemo();
-    try {
-      const w = await openDemo();
-      nav(`/app/p/${w.id}/visao-geral`);
-    } catch {
-      toast('bad', 'Não conseguimos abrir a demonstração neste navegador. Tente recarregar a página.');
-    }
+    nav('/app');
   };
   return (
     <div className="min-h-screen">
