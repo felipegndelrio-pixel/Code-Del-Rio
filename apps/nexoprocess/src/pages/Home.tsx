@@ -5,18 +5,20 @@ import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { ArrowRight, ChevronDown, Download, FileJson, FileSpreadsheet, FlaskConical, MessageSquareText, Plus, Search, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import { Badge, Button, Callout, Card, Input, Segmented, Skeleton, useConfirm, useToast } from '../components/ui';
-import { journey } from '../domain/journey';
+import { journey, type StepKey } from '../domain/journey';
 import type { Workspace } from '../domain/types';
-import { fmtDateTime } from '../domain/units';
 import { db, exportBackup, parseBackup, restoreBackup, storageMode } from '../storage/db';
 import { download, downloadTemplateCsv, downloadTemplateXlsx, openDemo } from '../state/actions';
 import { STEP_PATH } from '../config/nav';
 import { demoBlocked } from '../license/demo';
 import InstallHint from '../components/InstallHint';
+import { useI18n } from '../i18n/I18nProvider';
+import type { MessageKey } from '../i18n';
 
 type Filter = 'todos' | 'andamento' | 'exemplo';
 
 export default function Home() {
+  const { t, fmt } = useI18n();
   const nav = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
@@ -47,16 +49,16 @@ export default function Home() {
   };
 
   const remove = async (w: Workspace) => {
-    if (!(await confirm({ title: 'Excluir projeto?', body: <>“{w.asIs.name}” e todos os cenários, ações e resultados serão apagados deste aparelho. Não dá para desfazer.</>, confirm: 'Excluir', danger: true }))) return;
+    if (!(await confirm({ title: t('home.remove.title'), body: <>{t('home.remove.body', { name: w.asIs.name })}</>, confirm: t('home.remove.confirm'), danger: true }))) return;
     await db.deleteWorkspace(w.id);
-    toast('ok', 'Projeto excluído.');
+    toast('ok', t('home.remove.done'));
     void load();
   };
 
   const wipe = async () => {
-    if (!(await confirm({ title: 'Apagar todos os dados locais?', body: <>Todos os projetos, rascunhos e preferências deste navegador serão apagados. Faça um backup antes se quiser guardar algo.</>, confirm: 'Apagar tudo', danger: true }))) return;
+    if (!(await confirm({ title: t('home.wipe.title'), body: <>{t('home.wipe.body')}</>, confirm: t('home.wipe.confirm'), danger: true }))) return;
     await db.clearAll();
-    toast('ok', 'Pronto, os dados deste aparelho foram apagados.');
+    toast('ok', t('home.wipe.done'));
     void load();
   };
 
@@ -64,7 +66,7 @@ export default function Home() {
     if (demoBlocked('exportar')) return;
     const b = await exportBackup();
     await download(`nexoprocess-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(b, null, 2), 'application/json');
-    toast('ok', `Backup com ${b.workspaces.length} projeto(s) baixado.`);
+    toast('ok', t('home.toast.backup', { n: b.workspaces.length }));
   };
 
   const restore = async (f: File, kind: 'projeto' | 'backup') => {
@@ -72,10 +74,10 @@ export default function Home() {
     try {
       const ws = parseBackup(await f.text());
       const n = await restoreBackup(ws);
-      toast('ok', kind === 'projeto' ? `${n} projeto(s) importado(s). Ele(s) aparecem na lista abaixo.` : `${n} projeto(s) restaurado(s).`);
+      toast('ok', kind === 'projeto' ? t('home.toast.imported', { n }) : t('home.toast.restored', { n }));
       void load();
     } catch (e) {
-      toast('bad', `${e instanceof Error ? e.message : 'Arquivo inválido.'} Use um arquivo gerado pelo NexoProcess (.nexoprocess.json ou backup).`);
+      toast('bad', `${e instanceof Error ? e.message : t('home.error.invalidFile')} ${t('home.error.useFile')}`);
     }
   };
 
@@ -87,17 +89,18 @@ export default function Home() {
       .map((w) => ({ w, j: journey(w) }));
   }, [list, q, filter]);
 
+  const stepShort = (key: StepKey) => t(`journey.${key}.short` as MessageKey);
   const real = (list ?? []).filter((w) => !w.isDemo);
   const hasProjects = (list?.length ?? 0) > 0;
 
   const fileInputs = (
     <>
-      <input ref={projectRef} type="file" accept="application/json,.json" className="hidden" aria-label="Arquivo de projeto" onChange={(e) => {
+      <input ref={projectRef} type="file" accept="application/json,.json" className="hidden" aria-label={t('home.file.project')} onChange={(e) => {
         const f = e.target.files?.[0];
         if (f) void restore(f, 'projeto');
         e.target.value = '';
       }} />
-      <input ref={backupRef} type="file" accept="application/json,.json" className="hidden" aria-label="Arquivo de backup" onChange={(e) => {
+      <input ref={backupRef} type="file" accept="application/json,.json" className="hidden" aria-label={t('home.file.backup')} onChange={(e) => {
         const f = e.target.files?.[0];
         if (f) void restore(f, 'backup');
         e.target.value = '';
@@ -107,18 +110,18 @@ export default function Home() {
 
   const ways = (
     <div className="grid gap-3 md:grid-cols-3">
-      <StartOption icon={<MessageSquareText className="h-5 w-5" />} title="Responder perguntas" text="Um assistente guiado, ideal no celular e para quem nunca mapeou um processo." cta="Criar com o assistente" primary onClick={() => nav('/app/novo')} />
-      <StartOption icon={<FileSpreadsheet className="h-5 w-5" />} title="Importar planilha" text="XLSX ou CSV. Você confirma as colunas; a leitura acontece no seu navegador." cta="Importar planilha" onClick={() => nav('/app/importar')}>
+      <StartOption icon={<MessageSquareText className="h-5 w-5" />} title={t('home.way.questions.title')} text={t('home.way.questions.text')} cta={t('home.way.questions.cta')} primary onClick={() => nav('/app/novo')} />
+      <StartOption icon={<FileSpreadsheet className="h-5 w-5" />} title={t('home.way.import.title')} text={t('home.way.import.text')} cta={t('home.way.import.cta')} onClick={() => nav('/app/importar')}>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
           <button type="button" className="font-semibold text-accent hover:underline" onClick={() => void downloadTemplateXlsx()}>
-            Baixar modelo XLSX
+            {t('home.template.xlsx')}
           </button>
           <button type="button" className="font-semibold text-accent hover:underline" onClick={() => void downloadTemplateCsv()}>
-            Baixar exemplo CSV
+            {t('home.template.csv')}
           </button>
         </div>
       </StartOption>
-      <StartOption icon={<FlaskConical className="h-5 w-5" />} title="Explorar a demonstração" text="Processo de pedidos fictício, completo: mapa, diagnóstico, TO-BE e plano. Não mistura com seus projetos." cta="Abrir demonstração" onClick={() => void demo()} />
+      <StartOption icon={<FlaskConical className="h-5 w-5" />} title={t('home.way.demo.title')} text={t('home.way.demo.text')} cta={t('home.way.demo.cta')} onClick={() => void demo()} />
     </div>
   );
 
@@ -126,8 +129,8 @@ export default function Home() {
     <div className="safe-x mx-auto max-w-content space-y-6 py-8">
       {fileInputs}
       {mode === 'memoria' && (
-        <Callout tone="warn" title="Armazenamento local indisponível">
-          Este navegador bloqueou o banco local (comum em janelas anônimas). Você pode usar o app, mas os dados somem ao fechar a aba. Baixe um backup antes de sair.
+        <Callout tone="warn" title={t('home.memory.title')}>
+          {t('home.memory.body')}
         </Callout>
       )}
 
@@ -140,32 +143,28 @@ export default function Home() {
       ) : !hasProjects ? (
         <>
           <section className="max-w-3xl">
-            <p className="eyebrow">Análise e melhoria de processos</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Entenda seu processo, encontre os gargalos e saia com um plano de melhoria.</h1>
-            <p className="mt-3 text-base text-ink2">Você conta como o trabalho acontece hoje; nós desenhamos o mapa, mostramos onde estão o tempo e o desperdício e ajudamos a montar o plano de melhoria. Leva poucos minutos.</p>
+            <p className="eyebrow">{t('home.hero.eyebrow')}</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{t('home.hero.title')}</h1>
+            <p className="mt-3 text-base text-ink2">{t('home.hero.text')}</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button size="lg" onClick={() => nav('/app/novo')}>
-                <Plus className="h-5 w-5" aria-hidden /> Mapear meu primeiro processo
+                <Plus className="h-5 w-5" aria-hidden /> {t('home.hero.first')}
               </Button>
               <Button size="lg" variant="secondary" onClick={() => nav('/app/importar')}>
-                <FileSpreadsheet className="h-5 w-5" aria-hidden /> Importar planilha
+                <FileSpreadsheet className="h-5 w-5" aria-hidden /> {t('home.way.import.cta')}
               </Button>
               <Button size="lg" variant="ghost" onClick={() => void demo()}>
-                Abrir demonstração <ArrowRight className="h-4 w-4" aria-hidden />
+                {t('home.way.demo.cta')} <ArrowRight className="h-4 w-4" aria-hidden />
               </Button>
             </div>
           </section>
-          <ol className="grid gap-4 border-y border-line/10 py-6 md:grid-cols-3" aria-label="Como funciona">
-            {[
-              ['Levantar', 'Etapas, atividades, tempos e responsáveis — por perguntas ou planilha. Pode dizer “não sei”.'],
-              ['Analisar', 'Mapa BPMN, tempo decorrido, esforço, esperas, retrabalho e oportunidades com evidência.'],
-              ['Melhorar', 'Cenário futuro comparável, plano de ação e acompanhamento do que realmente mudou.'],
-            ].map(([t, d], i) => (
-              <li key={t} className="flex gap-3">
+          <ol className="grid gap-4 border-y border-line/10 py-6 md:grid-cols-3" aria-label={t('home.how.aria')}>
+            {(['1', '2', '3'] as const).map((n, i) => (
+              <li key={n} className="flex gap-3">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-semibold text-brandInk">{i + 1}</span>
                 <div>
-                  <p className="font-semibold">{t}</p>
-                  <p className="text-sm text-ink2">{d}</p>
+                  <p className="font-semibold">{t(`home.how.${n}.title` as MessageKey)}</p>
+                  <p className="text-sm text-ink2">{t(`home.how.${n}.text` as MessageKey)}</p>
                 </div>
               </li>
             ))}
@@ -173,23 +172,23 @@ export default function Home() {
           {/* As três formas de começar já estão no topo; aqui só os atalhos de quem chega com arquivo. */}
           <div className="grid gap-3 text-sm text-ink2 sm:grid-cols-2">
             <p>
-              <span className="font-semibold text-ink">Já tem uma planilha?</span> Comece pelo modelo:{' '}
+              <span className="font-semibold text-ink">{t('home.shortcut.sheet')}</span>{t('home.shortcut.sheetRest')}{' '}
               <button type="button" className="font-semibold text-accent hover:underline" onClick={() => void downloadTemplateXlsx()}>
-                Baixar modelo XLSX
+                {t('home.template.xlsx')}
               </button>{' '}
               ·{' '}
               <button type="button" className="font-semibold text-accent hover:underline" onClick={() => void downloadTemplateCsv()}>
-                Baixar exemplo CSV
+                {t('home.template.csv')}
               </button>
             </p>
             <p>
-              <span className="font-semibold text-ink">Trocou de aparelho?</span>{' '}
+              <span className="font-semibold text-ink">{t('home.shortcut.device')}</span>{' '}
               <button type="button" className="font-semibold text-accent hover:underline" onClick={() => projectRef.current?.click()}>
-                Importar projeto
-              </button>{' '}
-              ou{' '}
+                {t('home.shortcut.importProject')}
+              </button>
+              {t('home.shortcut.or')}
               <button type="button" className="font-semibold text-accent hover:underline" onClick={() => backupRef.current?.click()}>
-                Restaurar backup
+                {t('home.shortcut.restoreBackup')}
               </button>
               .
             </p>
@@ -201,15 +200,15 @@ export default function Home() {
               IBM Plex não pode mudar a quebra de linha (era a causa do CLS 0,146 em /app). */}
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <div>
-              <p className="eyebrow">Seu trabalho</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Meus projetos</h1>
+              <p className="eyebrow">{t('home.list.eyebrow')}</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{t('home.list.title')}</h1>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <Button variant="secondary" onClick={() => projectRef.current?.click()}>
-                <Upload className="h-4 w-4" aria-hidden /> Importar projeto
+                <Upload className="h-4 w-4" aria-hidden /> {t('home.shortcut.importProject')}
               </Button>
               <Button onClick={() => nav('/app/novo')}>
-                <Plus className="h-4 w-4" aria-hidden /> Mapear novo processo
+                <Plus className="h-4 w-4" aria-hidden /> {t('home.list.mapNew')}
               </Button>
             </div>
           </div>
@@ -218,13 +217,13 @@ export default function Home() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative w-full max-w-xs">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
-                <Input aria-label="Buscar projeto" placeholder="Buscar por nome ou área" value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
+                <Input aria-label={t('home.list.searchAria')} placeholder={t('home.list.searchPlaceholder')} value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
               </div>
-              <Segmented<Filter> label="Filtrar projetos" value={filter} onChange={setFilter} options={[{ value: 'todos', label: 'Todos' }, { value: 'andamento', label: 'Meus' }, { value: 'exemplo', label: 'Exemplo' }]} />
+              <Segmented<Filter> label={t('home.list.filterLabel')} value={filter} onChange={setFilter} options={[{ value: 'todos', label: t('home.list.filterAll') }, { value: 'andamento', label: t('home.list.filterMine') }, { value: 'exemplo', label: t('home.list.filterSample') }]} />
             </div>
           )}
 
-          <ul className="divide-y divide-line/10 overflow-hidden rounded-2xl border border-line/15 bg-surface shadow-card" aria-label="Projetos">
+          <ul className="divide-y divide-line/10 overflow-hidden rounded-2xl border border-line/15 bg-surface shadow-card" aria-label={t('home.list.aria')}>
             {rows.map(({ w, j }) => {
               const done = j.steps.filter((s) => s.state === 'feito').length;
               const nextPath = j.next ? STEP_PATH[j.next.key] : 'visao-geral';
@@ -235,50 +234,50 @@ export default function Home() {
                       <Link to={`/app/p/${w.id}/visao-geral`} className="font-semibold text-ink hover:text-accent">
                         {w.asIs.name}
                       </Link>
-                      {w.isDemo && <Badge tone="amber">Exemplo fictício</Badge>}
-                      {j.blocked && <Badge tone="bad">Dados com erro</Badge>}
+                      {w.isDemo && <Badge tone="amber">{t('home.item.sample')}</Badge>}
+                      {j.blocked && <Badge tone="bad">{t('home.item.error')}</Badge>}
                     </div>
                     <p className="mt-0.5 text-xs text-muted">
                       {w.asIs.area ? `${w.asIs.area} · ` : ''}
-                      {w.asIs.activities.filter((a) => a.type === 'task').length} atividades · atualizado {fmtDateTime(w.updatedAt)}
+                      {t('home.item.meta', { n: w.asIs.activities.filter((a) => a.type === 'task').length, date: fmt.dateTime(w.updatedAt) })}
                     </p>
                   </div>
                   <div className="w-full min-w-[9rem] sm:w-44">
                     <div className="flex justify-between text-xs text-muted">
-                      <span>Etapa {done}/{j.steps.length}</span>
-                      <span className="truncate pl-2">{j.next ? j.next.short : 'Concluído'}</span>
+                      <span>{t('home.item.step', { done, total: j.steps.length })}</span>
+                      <span className="truncate pl-2">{j.next ? stepShort(j.next.key) : t('journey.done')}</span>
                     </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label={`Andamento de ${w.asIs.name}`} aria-valuenow={done} aria-valuemin={0} aria-valuemax={j.steps.length}>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label={t('home.item.progressAria', { name: w.asIs.name })} aria-valuenow={done} aria-valuemin={0} aria-valuemax={j.steps.length}>
                       <div className="h-full rounded-full bg-accentStrong" style={{ width: `${(done / j.steps.length) * 100}%` }} />
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button size="sm" onClick={() => nav(`/app/p/${w.id}/${nextPath}`)} aria-label={`Continuar${j.next ? `: ${j.next.short}` : ''} — ${w.asIs.name}`}>
-                      Continuar{j.next ? `: ${j.next.short}` : ''}
+                    <Button size="sm" onClick={() => nav(`/app/p/${w.id}/${nextPath}`)} aria-label={`${t('home.item.continue')}${j.next ? `: ${stepShort(j.next.key)}` : ''} — ${w.asIs.name}`}>
+                      {t('home.item.continue')}{j.next ? `: ${stepShort(j.next.key)}` : ''}
                     </Button>
                     {w.isDemo && (
-                      <Button size="sm" variant="ghost" onClick={() => void demo(true)} title="Recriar a demonstração do zero">
-                        Reiniciar
+                      <Button size="sm" variant="ghost" onClick={() => void demo(true)} title={t('home.item.resetTitle')}>
+                        {t('home.item.reset')}
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => void remove(w)} aria-label={`Excluir ${w.asIs.name}`}>
+                    <Button size="sm" variant="ghost" onClick={() => void remove(w)} aria-label={t('home.item.deleteAria', { name: w.asIs.name })}>
                       <Trash2 className="h-4 w-4" aria-hidden />
                     </Button>
                   </div>
                 </li>
               );
             })}
-            {!rows.length && <li className="p-6 text-center text-sm text-muted">Nada encontrado com esse filtro. Que tal tentar outro termo?</li>}
+            {!rows.length && <li className="p-6 text-center text-sm text-muted">{t('home.list.empty')}</li>}
           </ul>
           {!real.length && (
-            <Callout tone="info" title="Por enquanto, só a demonstração por aqui">
-              Quando quiser, vamos mapear seu primeiro processo — respondendo perguntas ou a partir de uma planilha. Leva poucos minutos.
+            <Callout tone="info" title={t('home.onlyDemo.title')}>
+              {t('home.onlyDemo.body')}
             </Callout>
           )}
 
           <section>
             <button type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-ink2 hover:text-ink">
-              <ChevronDown className={clsx('h-4 w-4 transition-transform', moreOpen && 'rotate-180')} aria-hidden /> Outras formas de começar
+              <ChevronDown className={clsx('h-4 w-4 transition-transform', moreOpen && 'rotate-180')} aria-hidden /> {t('home.more')}
             </button>
             {moreOpen && <div className="mt-2">{ways}</div>}
           </section>
@@ -290,9 +289,9 @@ export default function Home() {
         <p className="flex items-start gap-2 text-sm text-ink2">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-ok" aria-hidden />
           <span>
-            Seus processos ficam salvos só neste aparelho; o conteúdo não é enviado a servidores.{' '}
+            {t('home.privacy.short')}{' '}
             <Link to="/app/ajuda#privacidade" className="font-semibold text-accent hover:underline">
-              Detalhes
+              {t('home.details')}
             </Link>
           </span>
         </p>
@@ -300,41 +299,41 @@ export default function Home() {
 
       {/* Só depois de carregar a lista: evita deslocar o layout (CLS). */}
       {list !== null && hasProjects && (
-        <Card title="Seus dados, seu controle" subtitle="Privacidade e continuidade">
+        <Card title={t('home.control.title')} subtitle={t('home.control.subtitle')}>
           <div className="grid gap-4 md:grid-cols-[1fr_auto]">
             <div className="flex gap-3 text-sm text-ink2">
               <ShieldCheck className="h-6 w-6 shrink-0 text-ok" aria-hidden />
               <div className="space-y-1">
                 <p>
-                  Projetos e planilhas ficam apenas neste navegador (IndexedDB). O app não envia o conteúdo dos seus projetos a servidores e <strong>não sincroniza entre aparelhos</strong>.
+                  {t('home.control.p1a')}<strong>{t('home.control.p1b')}</strong>.
                 </p>
                 <p>
-                  Para continuar em outro aparelho: abra o projeto → Visão geral → <em>Gerar arquivo do projeto</em>; no outro aparelho use <em>Importar projeto</em>.{' '}
+                  {t('home.control.p2a')}<em>{t('home.control.p2b')}</em>{t('home.control.p2c')}<em>{t('home.control.p2d')}</em>.{' '}
                   <Link to="/app/ajuda#privacidade" className="font-semibold text-accent hover:underline">
-                    Detalhes
+                    {t('home.details')}
                   </Link>
                 </p>
                 <p>
-                  Documentos:{' '}
+                  {t('home.docs')}{' '}
                   <Link to="/privacidade" className="font-semibold text-accent hover:underline">
-                    Política de Privacidade
+                    {t('home.docs.privacy')}
                   </Link>{' '}
                   ·{' '}
                   <Link to="/termos" className="font-semibold text-accent hover:underline">
-                    Termos de Uso
+                    {t('home.docs.terms')}
                   </Link>
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-start gap-2">
               <Button size="sm" variant="secondary" onClick={() => void backup()}>
-                <Download className="h-4 w-4" aria-hidden /> Baixar backup
+                <Download className="h-4 w-4" aria-hidden /> {t('home.backup.download')}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => backupRef.current?.click()}>
-                <FileJson className="h-4 w-4" aria-hidden /> Restaurar backup
+                <FileJson className="h-4 w-4" aria-hidden /> {t('home.backup.restore')}
               </Button>
               <Button size="sm" variant="ghost" className="text-bad" onClick={() => void wipe()}>
-                <Trash2 className="h-4 w-4" aria-hidden /> Apagar dados locais
+                <Trash2 className="h-4 w-4" aria-hidden /> {t('home.backup.wipe')}
               </Button>
             </div>
           </div>

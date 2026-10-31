@@ -5,10 +5,12 @@ import { Download, Share, X } from 'lucide-react';
 import { isIos, isStandalone, useInstall } from '../state/install';
 import { isDemo } from '../license/demo';
 import { Button } from './ui';
+import { useI18n } from '../i18n/I18nProvider';
 
 const KEY = 'nexo.dica.instalar';
 
 export default function InstallHint() {
+  const { t } = useI18n();
   const { canPrompt, prompt } = useInstall();
   const [hidden, setHidden] = useState(() => {
     try {
@@ -35,23 +37,28 @@ export default function InstallHint() {
         {ios ? (
           <>
             <p>
-              <strong className="text-ink">Guarde seus dados com segurança no iPhone/iPad:</strong> no Safari, toque em <em>Compartilhar</em> → <em>Adicionar à Tela de Início</em>. Instalado, o app abre em tela cheia, funciona offline e
-              fica protegido da limpeza automática que o Safari faz em sites pouco abertos.
+              <strong className="text-ink">{t('install.ios.lead')}</strong>
+              {t('install.ios.a')}
+              <em>{t('install.ios.share')}</em>
+              {t('install.ios.arrow')}
+              <em>{t('install.ios.add')}</em>
+              {t('install.ios.b')}
             </p>
-            <p className="text-xs">Já tem projetos aqui? Baixe um backup antes de instalar e restaure no app: no iPhone, o app da Tela de Início pode guardar os dados separado do Safari.</p>
+            <p className="text-xs">{t('install.ios.note')}</p>
           </>
         ) : (
           <>
             <p>
-              <strong className="text-ink">Instale o app neste aparelho:</strong> abre em janela própria, funciona offline e seus dados ficam guardados aqui.
+              <strong className="text-ink">{t('install.other.lead')}</strong>
+              {t('install.other.rest')}
             </p>
             <Button size="sm" onClick={() => void prompt()}>
-              <Download className="h-4 w-4" aria-hidden /> Instalar o app
+              <Download className="h-4 w-4" aria-hidden /> {t('install.button')}
             </Button>
           </>
         )}
       </div>
-      <button type="button" aria-label="Dispensar dica de instalação" onClick={close} className="-mr-1 -mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:text-ink">
+      <button type="button" aria-label={t('install.dismiss')} onClick={close} className="-mr-1 -mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:text-ink">
         <X className="h-4 w-4" aria-hidden />
       </button>
     </div>

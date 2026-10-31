@@ -5,10 +5,12 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { PageSkeleton } from '../components/ui';
+import { useI18n } from '../i18n/I18nProvider';
 import { clearToken, currentLicense, LICENSE, renew, TOKEN_KEY } from './config';
 import { DEMO_KEY, isDemo } from './demo';
 
 export default function LicenseGate() {
+  const { t } = useI18n();
   const loc = useLocation();
   const nav = useNavigate();
   const [state, setState] = useState<'checking' | 'ok' | 'denied'>(LICENSE.required ? 'checking' : 'ok');
@@ -53,7 +55,7 @@ export default function LicenseGate() {
     };
   }, [nav]);
 
-  if (state === 'checking') return <PageSkeleton label="Conferindo o acesso…" />;
+  if (state === 'checking') return <PageSkeleton label={t('gate.checking')} />;
   if (state === 'denied') return <Navigate to={`/entrar?volta=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   return <Outlet />;
 }
