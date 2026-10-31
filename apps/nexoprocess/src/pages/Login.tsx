@@ -11,11 +11,14 @@ import { activate, currentLicense, LICENSE } from '../license/config';
 import { endDemo, startDemo } from '../license/demo';
 import { openDemo } from '../state/actions';
 import { SupportLink } from '../components/SupportLink';
+import { useI18n } from '../i18n/I18nProvider';
+import LoginEn from './LoginEn';
 
 /** Só volta para rotas internas do app (evita redirecionamento aberto). */
 const safeReturn = (v: string | null) => (v && /^\/app(\/|$|\?)/.test(v) && !v.startsWith('//') ? v : '/app');
 
 export default function Login() {
+  const { locale } = useI18n();
   const nav = useNavigate();
   const [params] = useSearchParams();
   const volta = safeReturn(params.get('volta'));
@@ -58,6 +61,8 @@ export default function Login() {
 
   // Build aberto (sem cobrança): não há o que ativar nem demonstração; o app inteiro está liberado.
   if (!LICENSE.required) return <Navigate to={volta} replace />;
+  // Inglês (?lang=en ou preferência salva): compra na Gumroad, com license key.
+  if (locale === 'en') return <LoginEn volta={volta} motivo={params.get('motivo')} onDemo={tryDemo} />;
 
   return (
     <div className="min-h-screen">
