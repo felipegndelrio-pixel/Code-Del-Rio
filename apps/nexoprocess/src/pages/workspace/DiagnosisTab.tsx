@@ -9,15 +9,18 @@ import { fmtBRL, fmtHours, fmtNum, fmtPct, nowIso } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
 import { demoBlocked } from '../../license/demo';
 
-const UNIT_OF: Record<BottleneckCriterion, string> = {
-  duration: 'horas de trabalho ativo por ocorrência',
-  effort: 'pessoa-hora',
-  cost: 'R$ no período',
-  wait: 'horas de espera',
-  rework: 'pessoa-hora em retrabalho',
-};
+import { useI18n } from '../../i18n/I18nProvider';
+import { lazyLabels } from '../../i18n';
+const UNIT_OF: Record<BottleneckCriterion, string> = lazyLabels({
+  duration: 'd.unit.duration',
+  effort: 'd.unit.effort',
+  cost: 'd.unit.cost',
+  wait: 'd.unit.wait',
+  rework: 'd.unit.rework',
+});
 
 export default function DiagnosisTab() {
+  const { t } = useI18n();
   const { w, update, metrics: m } = useWorkspace();
   const nav = useNavigate();
   const p = w.asIs;
@@ -40,75 +43,68 @@ export default function DiagnosisTab() {
       {/* Atalho do relatório executivo: Diagnóstico → este botão → impressão (2 toques no celular). */}
       <div className="no-print flex flex-col gap-3 rounded-2xl border border-brand/30 bg-brand/5 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="report-shortcut">
         <div>
-          <p className="font-semibold text-ink">Relatório executivo em PDF</p>
-          <p className="text-sm text-ink2">Resumo, gráficos, mapas do processo e plano de ação em um documento para a diretoria.</p>
+          <p className="font-semibold text-ink">{t('ws.diag.001')}</p>
+          <p className="text-sm text-ink2">{t('ws.diag.002')}</p>
         </div>
         <Button className="shrink-0" onClick={() => !demoBlocked('exportar') && nav(`/app/p/${w.id}/relatorio?imprimir=1`)}>
-          <FileDown className="h-4 w-4" aria-hidden /> Baixar Relatório Executivo
-        </Button>
+          <FileDown className="h-4 w-4" aria-hidden />{t('ws.diag.003')}</Button>
       </div>
-      <Card title="Resumo do processo atual" subtitle="Diagnóstico — tudo calculado a partir dos seus dados">
+      <Card title={t('ws.diag.004')} subtitle={t('ws.diag.005')}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Atividades identificadas" value={m.counts.tasks + m.counts.decisions} sub={`${m.counts.tasks} tarefas · ${m.counts.decisions} decisões`} basis="informado" />
-          <Stat label="Classificadas (Lean)" value={`${m.counts.classified}/${m.counts.classified + m.counts.unclassified}`} sub={m.counts.unclassified ? `${m.counts.unclassified} sem classificação` : 'todas classificadas'} basis="informado" term="lean" />
+          <Stat label={t('ws.diag.006')} value={m.counts.tasks + m.counts.decisions} sub={t('ws.diag.007', { tasks: m.counts.tasks, decisions: m.counts.decisions })} basis="informado" />
+          <Stat label={t('ws.diag.008')} value={`${m.counts.classified}/${m.counts.classified + m.counts.unclassified}`} sub={m.counts.unclassified ? t('ws.diag.009', { unclassified: m.counts.unclassified }) : t('ws.diag.010')} basis="informado" term="lean" />
           <Stat
-            label="Soma das durações registradas"
+            label={t('ws.diag.011')}
             value={fmtHours(m.activeSumH.value)}
-            sub={`${m.activeSumH.coverage.used}/${m.activeSumH.coverage.total} atividades com duração · não é tempo decorrido`}
+            sub={t('ws.diag.012', { used: m.activeSumH.coverage.used, total: m.activeSumH.coverage.total })}
             basis="calculado"
-            missing={m.activeSumH.value === null ? 'Adicione a duração das atividades para calcular.' : undefined}
+            missing={m.activeSumH.value === null ? t('ws.diag.013') : undefined}
             term="active"
           />
           <Stat
-            label="Tempo decorrido estimado"
+            label={t('ws.diag.014')}
             value={m.elapsed.status === 'ok' ? fmtHours(m.elapsed.hours) : ''}
-            sub={m.elapsed.status === 'ok' ? (m.elapsed.basis === 'sequencia_unica' ? 'sequência única, inclui esperas informadas' : 'caminho mais longo, sem retrabalho; inclui esperas informadas') : undefined}
+            sub={m.elapsed.status === 'ok' ? (m.elapsed.basis === 'sequencia_unica' ? t('ws.diag.015') : t('ws.diag.016')) : undefined}
             basis="estimado"
-            missing={m.elapsed.status !== 'ok' ? `Não calculado com os dados atuais: ${m.elapsed.reasons.join(' ')}` : undefined}
+            missing={m.elapsed.status !== 'ok' ? t('ws.diag.017', { p0: m.elapsed.reasons.join(' ') }) : undefined}
             term="lead"
           />
           <Stat
-            label="Esforço por execução"
-            value={m.effortExecH.value !== null ? `${fmtNum(m.effortExecH.value)} pessoa-h` : ''}
-            sub={m.effortExecH.coverage.missing.length ? `parcial: ${m.effortExecH.coverage.missing.length} atividade(s) sem pessoas/duração` : 'ponderado pela frequência'}
+            label={t('ws.diag.018')}
+            value={m.effortExecH.value !== null ? t('ws.diag.019', { p0: fmtNum(m.effortExecH.value) }) : ''}
+            sub={m.effortExecH.coverage.missing.length ? t('ws.diag.020', { length: m.effortExecH.coverage.missing.length }) : t('ws.diag.021')}
             basis="calculado"
-            missing={m.effortExecH.value === null ? 'Adicione duração e quantidade de pessoas para calcular.' : undefined}
+            missing={m.effortExecH.value === null ? t('ws.diag.022') : undefined}
             term="effort"
           />
-          <Stat label={`Esforço por ${per}`} value={m.effortPeriodH.value !== null ? `${fmtNum(m.effortPeriodH.value)} pessoa-h` : ''} sub={p.volume !== undefined ? `volume: ${fmtNum(p.volume)} execuções/${per}` : undefined} basis="estimado" missing={m.effortPeriodH.value === null ? m.effortPeriodH.reason : undefined} />
-          <Stat label={`Custo estimado por ${per}`} value={fmtBRL(m.totalCostPeriod.value)} sub={m.totalCostPeriod.overlapNote ?? (m.laborCostPeriod.coverage.missing.length ? 'parcial: há atividades sem custo-hora' : 'mão de obra alocada + custos variáveis')} basis="estimado" missing={m.totalCostPeriod.value === null ? (m.totalCostPeriod.reason ?? 'Adicione custo-hora para calcular.') : undefined} />
+          <Stat label={t('ws.diag.023', { per })} value={m.effortPeriodH.value !== null ? t('ws.diag.024', { p0: fmtNum(m.effortPeriodH.value) }) : ''} sub={p.volume !== undefined ? t('ws.diag.025', { p0: fmtNum(p.volume), per }) : undefined} basis="estimado" missing={m.effortPeriodH.value === null ? m.effortPeriodH.reason : undefined} />
+          <Stat label={t('ws.diag.026', { per })} value={fmtBRL(m.totalCostPeriod.value)} sub={m.totalCostPeriod.overlapNote ?? (m.laborCostPeriod.coverage.missing.length ? t('ws.diag.027') : t('ws.diag.028'))} basis="estimado" missing={m.totalCostPeriod.value === null ? (m.totalCostPeriod.reason ?? t('ws.diag.029')) : undefined} />
           <Stat
-            label={`Retrabalho por ${per}`}
-            value={m.rework.effortPeriodH !== null ? `${fmtNum(m.rework.effortPeriodH)} pessoa-h` : ''}
-            sub={`${m.counts.rework} atividade(s) de retrabalho · ${m.counts.loops} retorno(s) no fluxo`}
+            label={t('ws.diag.030', { per })}
+            value={m.rework.effortPeriodH !== null ? t('ws.diag.031', { p0: fmtNum(m.rework.effortPeriodH) }) : ''}
+            sub={t('ws.diag.032', { rework: m.counts.rework, loops: m.counts.loops })}
             basis="estimado"
             missing={
-              m.rework.effortPeriodH === null ? (m.counts.rework ? (m.rework.missingFrequency.length ? 'Informe a frequência (%) das atividades de retrabalho.' : 'Informe volume, duração e pessoas.') : 'Nenhuma atividade marcada como retrabalho.') : undefined
+              m.rework.effortPeriodH === null ? (m.counts.rework ? (m.rework.missingFrequency.length ? t('ws.diag.033') : t('ws.diag.034')) : t('ws.diag.035')) : undefined
             }
             term="rework"
           />
         </div>
         <HowCalc>
           <p>
-            <strong>Soma das durações</strong> = soma do tempo ativo de cada atividade, uma vez cada. Não considera paralelos nem caminhos alternativos — por isso não é o tempo decorrido.
-          </p>
+            <strong>{t('ws.diag.036')}</strong>{t('ws.diag.037')}</p>
           <p>
-            <strong>Tempo decorrido</strong> = caminho mais longo do início ao fim (trabalho + esperas informadas), ignorando retornos de retrabalho. Com decisões, é o pior caso entre os caminhos; com paralelos, o ramo mais demorado.
-          </p>
+            <strong>{t('ws.diag.038')}</strong>{t('ws.diag.039')}</p>
           <p>
-            <strong>Esforço</strong> = duração em horas × pessoas simultâneas. Por execução, cada atividade é ponderada pela frequência informada (sem frequência = 100%). Por período = esforço × execuções no período.
-          </p>
+            <strong>{t('ws.diag.040')}</strong>{t('ws.diag.041')}</p>
           <p>
-            <strong>Custo</strong> = esforço no período × custo-hora (atividade › função › padrão) + custo variável × execuções. Sem custo-hora, nenhum valor em R$ é mostrado.
-          </p>
-          <p>
-            Conversão: 1 dia = {p.hoursPerDay} h (premissa editável em Dados). Arredondamos só na exibição.
-          </p>
+            <strong>{t('ws.diag.042')}</strong>{t('ws.diag.043')}</p>
+          <p>{t('ws.diag.044')}{p.hoursPerDay}{t('ws.diag.045')}</p>
         </HowCalc>
       </Card>
 
       {m.assumptions.length > 0 && (
-        <Callout tone="warn" title="Premissas aplicadas nestes números">
+        <Callout tone="warn" title={t('ws.diag.046')}>
           <ul className="list-disc pl-4">
             {m.assumptions.map((a) => (
               <li key={a}>{a}</li>
@@ -117,9 +113,9 @@ export default function DiagnosisTab() {
         </Callout>
       )}
 
-      <Card title={<>Gargalos identificados <Term k="bottleneck" iconOnly /></>} subtitle="Regra transparente e configurável">
+      <Card title={<>{t('ws.diag.047')}<Term k="bottleneck" iconOnly /></>} subtitle={t('ws.diag.048')}>
         <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_200px]">
-          <Field label="Critério">
+          <Field label={t('ws.diag.049')}>
             {(f) => (
               <Select {...f} value={crit} onChange={(e) => update((d) => void (d.bottleneck.criterion = e.target.value as BottleneckCriterion))}>
                 {(Object.keys(CRITERION_LABEL) as BottleneckCriterion[]).map((k) => (
@@ -130,14 +126,14 @@ export default function DiagnosisTab() {
               </Select>
             )}
           </Field>
-          <Field label="Limiar de participação (%)" help="Destaca a partir deste percentual.">
+          <Field label={t('ws.diag.050')} help={t('ws.diag.051')}>
             {(f) => <NumberInput {...f} value={w.bottleneck.thresholdPct} onChange={(v) => v !== undefined && v > 0 && v <= 100 && update((d) => void (d.bottleneck.thresholdPct = v))} />}
           </Field>
         </div>
         {pr.total === null ? (
           <Callout tone="info">{pr.reason}</Callout>
         ) : bn.flagged.length === 0 ? (
-          <Callout tone="ok">Nenhuma atividade ultrapassa {w.bottleneck.thresholdPct}% em “{CRITERION_LABEL[crit]}”. A carga está distribuída por esse critério.</Callout>
+          <Callout tone="ok">{t('ws.diag.052')}{w.bottleneck.thresholdPct}{t('ws.diag.053')}{CRITERION_LABEL[crit]}{t('ws.diag.054')}</Callout>
         ) : (
           <ol className="space-y-2">
             {bn.flagged.map((b, i) => {
@@ -147,7 +143,7 @@ export default function DiagnosisTab() {
                   <Badge tone="bad">#{i + 1}</Badge>
                   <span className="font-semibold text-ink">{a.name}</span>
                   <span className="text-ink2">
-                    {a.stage} · {fmtPct(b.share, 1)} do total ({fmtNum(b.value)} {UNIT_OF[crit]})
+                    {a.stage} · {fmtPct(b.share, 1)}{t('ws.diag.055')}{fmtNum(b.value)} {UNIT_OF[crit]})
                   </span>
                   {a.owner && <span className="text-muted">· {a.owner}</span>}
                 </li>
@@ -155,7 +151,7 @@ export default function DiagnosisTab() {
             })}
           </ol>
         )}
-        <p className="mt-3 text-xs text-muted">Regra: participação ≥ {w.bottleneck.thresholdPct}% no critério escolhido, até 5 atividades. Concentração não prova causa-raiz — confirme observando o processo.</p>
+        <p className="mt-3 text-xs text-muted">{t('ws.diag.056')}{w.bottleneck.thresholdPct}{t('ws.diag.057')}</p>
         {pr.items.length > 0 && (
           <div className="mt-4">
             <ParetoChart data={pr.items.map((x) => ({ name: name(x.id), share: x.share, cumulative: x.cumulative, value: x.value }))} unitLabel={UNIT_OF[crit]} />
@@ -164,29 +160,27 @@ export default function DiagnosisTab() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title={<>Valor × desperdício <Term k="lean" iconOnly /></>} subtitle="Lean">
-          {m.lean.classifiedHours > 0 ? <LeanBar hours={m.lean.hours} pct={m.lean.pct} /> : <Callout tone="info">Classifique as atividades (agrega valor, necessário, desperdício) e informe a duração para ver a distribuição.</Callout>}
-          <p className="mt-3 text-xs text-muted">
-            Atividades: {m.lean.counts.VA} agregam valor · {m.lean.counts.NNVA} necessárias · {m.lean.counts.W} desperdício · {m.lean.counts.U} não classificadas.
-          </p>
+        <Card title={<>{t('ws.diag.058')}<Term k="lean" iconOnly /></>} subtitle={t('ws.diag.059')}>
+          {m.lean.classifiedHours > 0 ? <LeanBar hours={m.lean.hours} pct={m.lean.pct} /> : <Callout tone="info">{t('ws.diag.060')}</Callout>}
+          <p className="mt-3 text-xs text-muted">{t('ws.diag.061')}{m.lean.counts.VA}{t('ws.diag.062')}{m.lean.counts.NNVA}{t('ws.diag.063')}{m.lean.counts.W}{t('ws.diag.064')}{m.lean.counts.U}{t('ws.diag.065')}</p>
         </Card>
-        <Card title={<>Tempo por etapa <Term k="yamazumi" iconOnly /></>} subtitle="Carga por etapa">
-          {m.activeSumH.value ? <StackedLoad title="Horas de trabalho ativo por etapa, por classe Lean" data={stageLoad} unit="h" note="Soma da duração ativa (uma ocorrência por atividade)." /> : <Callout tone="info">Adicione a duração das atividades para ver o tempo por etapa.</Callout>}
+        <Card title={<>{t('ws.diag.066')}<Term k="yamazumi" iconOnly /></>} subtitle={t('ws.diag.067')}>
+          {m.activeSumH.value ? <StackedLoad title={t('ws.diag.068')} data={stageLoad} unit={t('ws.diag.069')} note={t('ws.diag.070')} /> : <Callout tone="info">{t('ws.diag.071')}</Callout>}
         </Card>
       </div>
 
       <LeanReview />
 
-      <Card title="Quem carrega o processo?" subtitle="Esforço por responsável">
+      <Card title={t('ws.diag.072')} subtitle={t('ws.diag.073')}>
         {ownerEffort.length ? (
-          <SimpleBars title="Pessoa-hora por execução, por responsável" data={ownerEffort} unit="pessoa-h/execução" note="Esforço ponderado pela frequência. Volume e custo por responsável aparecem quando há volume e custo-hora." />
+          <SimpleBars title={t('ws.diag.074')} data={ownerEffort} unit={t('ws.diag.075')} note={t('ws.diag.076')} />
         ) : (
-          <Callout tone="info">Informe responsável, duração e pessoas para ver a carga por responsável.</Callout>
+          <Callout tone="info">{t('ws.diag.077')}</Callout>
         )}
       </Card>
 
       {gaps.length > 0 && (
-        <Card title="Dados que faltam para desbloquear análises" subtitle="Qualidade de dados">
+        <Card title={t('ws.diag.078')} subtitle={t('ws.diag.079')}>
           <ul className="space-y-1 text-sm">
             {gaps.map((g) => (
               <li key={g.field}>
@@ -197,9 +191,7 @@ export default function DiagnosisTab() {
               </li>
             ))}
           </ul>
-          <Link to={`/app/p/${w.id}/dados`} className="mt-1 inline-flex min-h-[32px] items-center text-sm font-semibold text-brand hover:underline">
-            Completar dados
-          </Link>
+          <Link to={`/app/p/${w.id}/dados`} className="mt-1 inline-flex min-h-[32px] items-center text-sm font-semibold text-brand hover:underline">{t('ws.diag.080')}</Link>
         </Card>
       )}
     </div>
@@ -208,14 +200,15 @@ export default function DiagnosisTab() {
 
 /** Revisão da classificação Lean: separa desperdício de atividades exigidas. */
 function LeanReview() {
+  const { t } = useI18n();
   const { w, update } = useWorkspace();
   const tasks = w.asIs.activities.filter((a) => a.type === 'task');
   if (!tasks.length) return null;
   const groups: { key: string; title: string; hint: string; items: typeof tasks }[] = [
-    { key: 'W', title: 'Desperdício', hint: 'Candidatas a eliminar ou reduzir — confirme com quem executa.', items: tasks.filter((a) => a.lean === 'W') },
-    { key: 'req', title: 'Necessárias por exigência', hint: 'Regulatório, controle ou segurança: simplificar ou automatizar, nunca eliminar sem validação.', items: tasks.filter((a) => a.lean === 'NNVA' && a.leanReason && MANDATORY_REASONS.includes(a.leanReason)) },
-    { key: 'nnva', title: 'Necessárias — motivo a confirmar', hint: 'Informe por que são necessárias para separar exigência de hábito.', items: tasks.filter((a) => a.lean === 'NNVA' && !(a.leanReason && MANDATORY_REASONS.includes(a.leanReason))) },
-    { key: 'U', title: 'Não classificadas', hint: 'Sem classificação, a atividade não entra na análise Lean.', items: tasks.filter((a) => !a.lean) },
+    { key: 'W', title: t('ws.diag.081'), hint: t('ws.diag.082'), items: tasks.filter((a) => a.lean === 'W') },
+    { key: 'req', title: t('ws.diag.083'), hint: t('ws.diag.084'), items: tasks.filter((a) => a.lean === 'NNVA' && a.leanReason && MANDATORY_REASONS.includes(a.leanReason)) },
+    { key: 'nnva', title: t('ws.diag.085'), hint: t('ws.diag.086'), items: tasks.filter((a) => a.lean === 'NNVA' && !(a.leanReason && MANDATORY_REASONS.includes(a.leanReason))) },
+    { key: 'U', title: t('ws.diag.087'), hint: t('ws.diag.088'), items: tasks.filter((a) => !a.lean) },
   ];
   const setLean = (id: string, lean: LeanClass | undefined) =>
     update(
@@ -227,15 +220,13 @@ function LeanReview() {
           a.leanReasonNote = undefined;
         }
       },
-      { area: 'Diagnóstico', message: `Classificação Lean revisada: ${tasks.find((a) => a.id === id)?.name} → ${LEAN_LABEL[lean ?? 'U']}` },
+      { area: t('ws.diag.089'), message: t('ws.diag.090', { name: tasks.find((a) => a.id === id)?.name, p1: LEAN_LABEL[lean ?? 'U'] }) },
     );
   const setReason = (id: string, r: LeanReason | undefined) =>
-    update((d) => void (d.asIs.activities.find((x) => x.id === id)!.leanReason = r), { area: 'Diagnóstico', message: `Motivo da necessidade: ${tasks.find((a) => a.id === id)?.name} → ${r ? LEAN_REASON_LABEL[r] : 'não informado'}` });
+    update((d) => void (d.asIs.activities.find((x) => x.id === id)!.leanReason = r), { area: t('ws.diag.089'), message: t('ws.diag.092', { name: tasks.find((a) => a.id === id)?.name, p1: r ? LEAN_REASON_LABEL[r] : t('ws.diag.093') }) });
   return (
-    <Card title="Revisão da classificação Lean" subtitle="Exigência não é desperdício">
-      <p className="mb-3 max-w-3xl text-sm text-ink2">
-        Confira a classificação com quem executa o processo. Atividades exigidas por lei, controle interno ou segurança são <strong>necessárias</strong>: o objetivo é simplificá-las, não eliminá-las.
-      </p>
+    <Card title={t('ws.diag.094')} subtitle={t('ws.diag.095')}>
+      <p className="mb-3 max-w-3xl text-sm text-ink2">{t('ws.diag.096')}<strong>{t('ws.diag.097')}</strong>{t('ws.diag.098')}</p>
       <div className="grid gap-4 lg:grid-cols-2">
         {groups
           .filter((g) => g.items.length)
@@ -253,15 +244,15 @@ function LeanReview() {
                       <span className="block text-xs text-muted">{a.stage}{a.owner ? ` · ${a.owner}` : ''}</span>
                     </span>
                     <div className="flex flex-wrap gap-2">
-                      <Select aria-label={`Classificação Lean de ${a.name}`} className="sm:!w-auto" value={a.lean ?? ''} onChange={(e) => setLean(a.id, (e.target.value || undefined) as LeanClass | undefined)}>
-                        <option value="">Não classificada</option>
-                        <option value="VA">Agrega valor</option>
-                        <option value="NNVA">Necessária</option>
-                        <option value="W">Desperdício</option>
+                      <Select aria-label={t('ws.diag.099', { name: a.name })} className="sm:!w-auto" value={a.lean ?? ''} onChange={(e) => setLean(a.id, (e.target.value || undefined) as LeanClass | undefined)}>
+                        <option value="">{t('ws.diag.100')}</option>
+                        <option value="VA">{t('ws.diag.101')}</option>
+                        <option value="NNVA">{t('ws.diag.102')}</option>
+                        <option value="W">{t('ws.diag.081')}</option>
                       </Select>
                       {a.lean === 'NNVA' && (
-                        <Select aria-label={`Motivo de ${a.name} ser necessária`} className="sm:!w-auto" value={a.leanReason ?? ''} onChange={(e) => setReason(a.id, (e.target.value || undefined) as LeanReason | undefined)}>
-                          <option value="">Motivo: não sei</option>
+                        <Select aria-label={t('ws.diag.104', { name: a.name })} className="sm:!w-auto" value={a.leanReason ?? ''} onChange={(e) => setReason(a.id, (e.target.value || undefined) as LeanReason | undefined)}>
+                          <option value="">{t('ws.diag.105')}</option>
                           {Object.entries(LEAN_REASON_LABEL).map(([k, v]) => (
                             <option key={k} value={k}>
                               {v}
