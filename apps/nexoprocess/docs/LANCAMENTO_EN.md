@@ -16,7 +16,7 @@ Ordem: sem pular etapas. Cada etapa tem um "pronto quando" verificável.
 ## 1. Gumroad (o fundador já está fazendo)
 
 1. Conta com recebimento configurado (PayPal/conta).
-2. Produto de **pagamento único**, US$ 39. Em "Content" → ligar **"Generate a unique license key per sale"**.
+2. Produto de **pagamento único**, US$ 39, com **license key ligada** na aba Content (nome exato da opção: A VALIDAR na tela; a doc oficial cita o "license key block on the product's Content tab").
 3. Anotar o **product_id** do bloco de license key, na aba Content (formato `xxxx==`). Ele vai na variável `GUMROAD_PRODUCT_ID` exatamente como aparece.
 4. Mensagem de entrega ao comprador:
    `Open https://<seu-domínio>/entrar?lang=en and sign in with this email and your license key.`
