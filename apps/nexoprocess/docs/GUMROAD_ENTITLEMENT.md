@@ -231,12 +231,20 @@ Fonte: fundador ("OK" às recomendações), repassado pelo revisor em 31/10/2026
 | D5 | `test:true` só com `GUMROAD_ALLOW_TEST=1` (desligado por padrão) | `decide` → `compra_de_teste` |
 | D6 | Reembolso parcial mantém o acesso (o verify nem o mostra) | `decide` → `grant` |
 | D7 | `increment_uses_count=false` sempre; sem limite de ativações | `verifyGumroadLicense` (teste confere o corpo enviado) |
-| D8 | Não liberar a rede da sessão | ver "A VALIDAR antes do lançamento" abaixo |
+| D8 | Não liberar a rede da sessão | ver "A VALIDAR na primeira venda" abaixo |
 
-**A VALIDAR antes do lançamento (decorre de D8):** fazer uma compra de teste real (pelo fundador) e conferir:
-1. O formato real do `sale_id` e do `product_id` (base64url com `==`) e da `license_key`.
-2. A resposta completa do `verify` para essa compra, inclusive `price` em centavos e `currency`.
-3. A comparação de `/api/gumroad-license` contra essa resposta.
+**Atualização do fundador (31/10/2026): sem compra de teste real.** A primeira venda real será a validação. Fica **A VALIDAR na primeira venda**:
+1. O formato real do `sale_id`, do `product_id` (esperado: base64url com `==`) e da `license_key`.
+2. A resposta do `verify` para essa compra (`price` em centavos, `currency`, `email`).
+3. A ativação ponta a ponta por `/api/gumroad-license`.
+
+Se o formato não for o esperado:
+- A rota responde **422 `ativacao_manual`** com mensagem clara em EN (`message`) e PT (`message_pt`).
+- **Nada é gravado**: nenhum bloqueio, nada no e-mail.
+- O log sai mascarado e traz o motivo (`id_fora_do_formato` ou `sem_email`), sem a chave.
+- O fundador concede pelo runbook (§13) e o cliente tenta de novo. Com `id_fora_do_formato` a chave já foi validada pela Gumroad e o e-mail confere, então a rota libera pela concessão manual.
+
+`GUMROAD_ALLOW_TEST` continua desligado. O código e os testes já cobrem `GUMROAD_ALLOW_TEST=1`, caso o fundador mude de ideia: basta criar a variável e fazer uma compra própria.
 
 ### Condições da revisão da T1, atendidas na T2
 - **C1:** a disputa ganha decide pelo estado da compra no banco. RPC só de leitura `nexo_purchase_state(platform, transaction)`, com `SECURITY DEFINER`, `search_path=''` e `execute` só para `service_role`. `CHARGEBACK_REVERSED` só vai quando a compra está `charged_back`. G3 cobre "reembolsada → disputa ganha não reativa e não cria bloqueio" e as permissões (anon e authenticated negados).
@@ -256,3 +264,76 @@ Fonte: fundador ("OK" às recomendações), repassado pelo revisor em 31/10/2026
 - O limite de chamadas da API.
 - Se um vendedor pode trocar o e-mail da compra depois (geraria `transaction_email_conflict`, `schema-purchases.sql:361`).
 - Comportamento do `verify` para compra presenteada.
+
+## 13. Runbook de suporte (fundador, pelo painel do Supabase)
+
+Onde: painel do Supabase do projeto → **SQL Editor** → nova consulta. Nada de chave ou segredo neste repositório nem no chat. Validado em PostgreSQL 16 local e no G3 em 31/10/2026.
+
+**Formato dos valores**
+- E-mail sempre em minúsculas.
+- Ids da Gumroad **sem** o `==` final (ex.: `FO8TXN-dbxYaBdahG97Y-Q`).
+- Se o id tiver caracteres fora de `A-Z a-z 0-9 _ -`, use `order-<order_number>` (o número do pedido no recibo).
+
+### 13.1 Ver o motivo de um cliente sem acesso
+```sql
+-- Compras do cliente (qualquer plataforma)
+select platform, transaction_id, status, access_active, last_event, last_event_occurred_at
+  from public.nexo_purchases where email = 'cliente@exemplo.com' order by last_event_occurred_at desc;
+-- Bloqueios abertos (um bloqueio aberto corta TODO o acesso do e-mail)
+select id, platform, transaction_id, reason, event_type, created_at
+  from public.nexo_reconciliation_blocks where email = 'cliente@exemplo.com' and resolved_at is null;
+```
+- No log das funções (Cloudflare): `gumroad … → rejected (motivo)`, com o e-mail mascarado.
+- Motivos possíveis: `id_fora_do_formato`, `sem_email`, `email_diferente`, `outro_produto`, `compra_de_teste`, `assinatura`.
+
+### 13.2 Conceder manualmente (compra conferida no painel da Gumroad)
+```sql
+select public.nexo_grant_purchase(
+  'gumroad_manual',           -- plataforma da concessão manual (vale no acesso por e-mail)
+  'order-524459935',          -- id: sale_id sem "==" ou order-<número do pedido>
+  'cliente@exemplo.com',      -- e-mail da compra, minúsculo
+  '32-nPAicqbLj8B_WswVlMw',   -- product_id sem "=="
+  'GUMROAD_SALE_APPROVED',    -- precisa conter APPROVED
+  39, null, 'USD', null, null -- valor, reembolso, moeda, id do evento, data
+);
+```
+- Resultado esperado: `{"result": "active", "status": "active"}`.
+- O cliente então entra pela tela EN (e-mail + chave) ou pelo acesso por e-mail.
+- **Por que `gumroad_manual` e não `gumroad`:** compras `gumroad` não valem só por e-mail (D3). Se o problema for justamente o formato do id, a rota automática nunca as liberaria.
+
+### 13.3 Revogar manualmente (reembolso ou chargeback que não chegou)
+```sql
+select public.nexo_revoke_purchase('gumroad_manual', 'order-524459935', 'cliente@exemplo.com',
+  '32-nPAicqbLj8B_WswVlMw', 'GUMROAD_REFUNDED');   -- ou 'GUMROAD_DISPUTE'
+```
+- Para uma compra automática, troque `gumroad_manual` por `gumroad` e use o `transaction_id` da consulta 13.1.
+
+### 13.4 Resolver um bloqueio aberto (depois de corrigir a causa)
+```sql
+select public.nexo_resolve_reconciliation_block(<id da consulta 13.1>, 'motivo da resolução');
+```
+
+## 14. Ping na conta Gumroad (passo a passo para o iPhone)
+
+| # | Passo | Fonte |
+|---|---|---|
+| 1 | No Safari, entrar na conta Gumroad → **Settings** → **Advanced** | FATO [F1] rota `settings/advanced` (`config/routes.rb:785`). URL exata (gumroad.com/settings/advanced?): A VALIDAR |
+| 2 | Seção **Ping**, campo **"Ping endpoint"** | FATO [F1] `Settings/AdvancedPage/NotificationEndpointSection.tsx:126,135` |
+| 3 | Colar `https://<domínio de produção>/api/gumroad-ping?secret=<valor de GUMROAD_PING_SECRET>`. O valor é segredo e fica só no painel da Cloudflare e na Gumroad | código desta T2 |
+| 4 | Botão **"Send test ping to URL"**: envia a venda mais recente com `test=true`. Sem vendas, não envia | FATO [F1] `NotificationEndpointSection.tsx:139-142` e `user/ping_notification.rb` (`send_test_ping`) |
+
+**O que esse campo envia — FATO [F1] (`app/modules/user/ping_notification.rb`, `ping_notification_targets`):**
+- O endpoint das configurações só é usado quando `resource_name == "sale"`. Ou seja, **só vendas**; reembolso, disputa e disputa ganha **não** chegam por ele.
+- Esses eventos exigem **resource subscriptions** pela API: `PUT https://api.gumroad.com/v2/resource_subscriptions` com `access_token`, `resource_name` (`refund`, `dispute`, `dispute_won`) e `post_url`, uma chamada por recurso. FATO [F1] `ResourceSubscriptions.tsx`.
+- O `access_token` vem de uma **aplicação OAuth** criada em Settings → Advanced → **Applications** → "Create application" (campos "Application name", ícone e redirect URI). FATO [F1] `ApplicationsSection.tsx`, `ApplicationForm.tsx`.
+- A entrega só acontece enquanto houver um token **vivo** da aplicação (escopo `view_sales` ou `account`). FATO [F1] `ping_notification_deliverable?`.
+- Onde exatamente se gera o token na tela: A VALIDAR (a doc só diz "Generate access token").
+- Fazer o PUT pelo iPhone: INFERÊNCIA, pelo app Atalhos ("Obter conteúdo de URL", método PUT, corpo em formulário). A VALIDAR. O token é segredo: nunca no repositório ou no chat.
+- Testar sem dinheiro: existe "send a test event" por resource subscription. FATO [F1] `ResourceSubscriptions.tsx:161-163`.
+
+**Efeito prático e recomendação**
+- Só o campo de Settings = só vendas. Isso **não ajuda a revogar**.
+- Sem resource subscriptions, a revogação depende da reverificação na renovação: ≤ 24 h para quem fica online e ≤ `LICENSE_TTL_DAYS` (30) para quem fica offline.
+- Recomendação: lançar sem Ping e registrar refund/dispute/dispute_won por resource subscription numa etapa posterior.
+- Isso é decisão do fundador.
+
