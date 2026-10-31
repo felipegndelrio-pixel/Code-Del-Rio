@@ -9,16 +9,30 @@ import { compareScenarios } from '../../domain/compare';
 import type { RealizedResult, ResultMetric } from '../../domain/types';
 import { fmtBRL, fmtDate, fmtNum, fmtPct, nowIso, uid } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
+import { tr, type MessageKey } from '../../i18n';
 
+import { useI18n } from '../../i18n/I18nProvider';
+// Rótulos lidos na hora do uso (idioma ativo): o objeto é criado uma vez, os textos não.
+const metric = (labelKey: MessageKey, unitKey: MessageKey, key: string, lowerIsBetter: boolean) => ({
+  get label() {
+    return tr(labelKey);
+  },
+  get unit() {
+    return tr(unitKey);
+  },
+  key,
+  lowerIsBetter,
+});
 const METRICS: Record<Exclude<ResultMetric, 'custom'>, { label: string; unit: string; key: string; lowerIsBetter: boolean }> = {
-  effort_period: { label: 'Esforço por mês', unit: 'pessoa-h/mês', key: 'effortMonth', lowerIsBetter: true },
-  cost_period: { label: 'Custo comparável por mês', unit: 'R$/mês', key: 'costMonth', lowerIsBetter: true },
-  active_exec: { label: 'Tempo ativo por execução', unit: 'horas', key: 'active', lowerIsBetter: true },
-  elapsed_exec: { label: 'Tempo decorrido por execução', unit: 'horas', key: 'elapsed', lowerIsBetter: true },
-  volume: { label: 'Volume por mês', unit: 'execuções/mês', key: 'volume', lowerIsBetter: false },
+  effort_period: metric('ws.res.m1.label', 'ws.res.m1.unit', 'effortMonth', true),
+  cost_period: metric('ws.res.m2.label', 'ws.res.m2.unit', 'costMonth', true),
+  active_exec: metric('ws.res.m3.label', 'ws.res.m3.unit', 'active', true),
+  elapsed_exec: metric('ws.res.m4.label', 'ws.res.m4.unit', 'elapsed', true),
+  volume: metric('ws.res.m5.label', 'ws.res.m5.unit', 'volume', false),
 };
 
 export default function ResultsTab() {
+  const { t } = useI18n();
   const { w, update } = useWorkspace();
   const confirm = useConfirm();
   const sc = w.scenarios.find((s) => s.id === w.activeScenarioId) ?? w.scenarios[0];
@@ -47,7 +61,7 @@ export default function ResultsTab() {
       noData: form.noData,
       recordedAt: nowIso(),
     };
-    update((d) => void d.results.push(r), { area: 'Resultados', message: `Registrado ${form.noData ? 'período sem dados' : 'resultado real'} (${form.period})` });
+    update((d) => void d.results.push(r), { area: 'Resultados', message: t('ws.res.001', { p0: form.noData ? t('ws.res.002') : t('ws.res.003'), period: form.period }) });
     setForm({ ...form, value: undefined, note: '', noData: false });
   };
 
@@ -73,14 +87,13 @@ export default function ResultsTab() {
 
   return (
     <div className="space-y-4">
-      <Callout tone="info" title="Três níveis de benefício, nunca misturados">
-        <BasisTag basis="estimado" /> potencial calculado antes da mudança · <Badge tone="ok">Aprovado</Badge> meta decidida pela gestão · <BasisTag basis="realizado" /> medido depois da implantação, com período e fonte.
-      </Callout>
+      <Callout tone="info" title={t('ws.res.004')}>
+        <BasisTag basis="estimado" />{t('ws.res.005')}<Badge tone="ok">{t('ws.res.006')}</Badge>{t('ws.res.007')}<BasisTag basis="realizado" />{t('ws.res.008')}</Callout>
 
-      <Card title="Registrar resultado real" subtitle={sc ? `Cenário: ${sc.name}` : 'Sem cenário TO-BE'}>
+      <Card title={t('ws.res.009')} subtitle={sc ? t('ws.res.010', { name: sc.name }) : t('ws.res.011')}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <Field label="Período (mês)">{(f) => <Input {...f} type="month" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} />}</Field>
-          <Field label="Indicador" className="sm:col-span-2 xl:col-span-1">
+          <Field label={t('ws.res.012')}>{(f) => <Input {...f} type="month" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} />}</Field>
+          <Field label={t('ws.res.013')} className="sm:col-span-2 xl:col-span-1">
             {(f) => (
               <Select
                 {...f}
@@ -95,41 +108,38 @@ export default function ResultsTab() {
                     {v.label} ({v.unit})
                   </option>
                 ))}
-                <option value="custom">Outro indicador…</option>
+                <option value="custom">{t('ws.res.014')}</option>
               </Select>
             )}
           </Field>
           {form.metric === 'custom' && (
             <>
-              <Field label="Nome do indicador">{(f) => <Input {...f} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />}</Field>
-              <Field label="Unidade">{(f) => <Input {...f} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />}</Field>
+              <Field label={t('ws.res.015')}>{(f) => <Input {...f} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />}</Field>
+              <Field label={t('ws.res.016')}>{(f) => <Input {...f} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />}</Field>
             </>
           )}
-          <Field label={`Valor medido (${form.unit || 'unidade'})`}>{(f) => <NumberInput {...f} disabled={form.noData} value={form.value} onChange={(v) => setForm({ ...form, value: v })} />}</Field>
+          <Field label={t('ws.res.017', { p0: form.unit || t('ws.res.049') })}>{(f) => <NumberInput {...f} disabled={form.noData} value={form.value} onChange={(v) => setForm({ ...form, value: v })} />}</Field>
           <label className="flex min-h-[44px] items-center gap-2 self-end text-sm text-ink2">
-            <input type="checkbox" className="h-4 w-4" checked={form.noData} onChange={(e) => setForm({ ...form, noData: e.target.checked })} />
-            Ainda não há dados para este período
-          </label>
-          <Field label="Fonte" help="Ex.: relatório do ERP, apontamento de horas.">
+            <input type="checkbox" className="h-4 w-4" checked={form.noData} onChange={(e) => setForm({ ...form, noData: e.target.checked })} />{t('ws.res.018')}</label>
+          <Field label={t('ws.res.019')} help={t('ws.res.020')}>
             {(f) => <Input {...f} value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} />}
           </Field>
-          <Field label="Observação / explicação de desvios" className="sm:col-span-2 xl:col-span-3">
+          <Field label={t('ws.res.021')} className="sm:col-span-2 xl:col-span-3">
             {(f) => <Textarea {...f} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />}
           </Field>
         </div>
         <Button className="mt-3" onClick={add} disabled={!canAdd}>
-          <Plus className="h-4 w-4" /> Registrar
-        </Button>
+          <Plus className="h-4 w-4" />{t('ws.res.022')}</Button>
       </Card>
 
-      <Card title="Realizado × linha de base × previsão" subtitle="Último valor registrado por indicador">
+      <Card title={t('ws.res.023')} subtitle={t('ws.res.024')}>
         {!summary.length ? (
-          <Empty title="Nenhum resultado medido ainda">Depois de implantar as mudanças, registre aqui os valores reais de cada período. Use zero só quando o valor for zero de fato.</Empty>
+          <Empty title={t('ws.res.025')}>{t('ws.res.026')}</Empty>
         ) : (
-          <Table caption="Comparação de resultados">
+          <Table caption={t('ws.res.027')}>
             <thead>
               <tr>
-                {['Indicador', 'Linha de base (AS-IS)', 'Previsão (TO-BE)', 'Realizado', 'Desvio vs previsão', '% do ganho previsto'].map((h) => (
+                {['Indicador', t('ws.res.028'), t('ws.res.029'), 'Realizado', t('ws.res.030'), t('ws.res.031')].map((h) => (
                   <th key={h} className={th}>
                     {h}
                   </th>
@@ -142,7 +152,7 @@ export default function ResultsTab() {
                   <td className={clsx(td, 'text-ink')}>
                     {s.m.label}
                     <span className="block text-xs text-muted">
-                      {s.last.period} · {s.n} registro(s){s.last.source ? ` · fonte: ${s.last.source}` : ''}
+                      {s.last.period} · {s.n}{t('ws.res.032')}{s.last.source ? t('ws.res.033', { source: s.last.source }) : ''}
                     </span>
                   </td>
                   <td className={clsx(td, 'tabular')}>
@@ -162,18 +172,17 @@ export default function ResultsTab() {
           </Table>
         )}
         {summary.some((s) => s.k === 'cost_period' && s.achieved !== null) && (
-          <p className="mt-3 text-sm text-ink2">
-            Benefício financeiro <strong>realizado medido</strong> (custo base − custo realizado no último período): <strong className="text-ink">{fmtBRL(summary.find((s) => s.k === 'cost_period')!.achieved)}/mês</strong> <BasisTag basis="realizado" />
+          <p className="mt-3 text-sm text-ink2">{t('ws.res.034')}<strong>{t('ws.res.035')}</strong>{t('ws.res.036')}<strong className="text-ink">{fmtBRL(summary.find((s) => s.k === 'cost_period')!.achieved)}{t('ws.res.037')}</strong> <BasisTag basis="realizado" />
           </p>
         )}
         <HowCalc>
-          <p>Desvio = realizado − previsão. % do ganho previsto = (linha de base − realizado) ÷ (linha de base − previsão) × 100.</p>
-          <p>Benefício realizado só aparece quando você registra o custo efetivamente medido; horas liberadas nunca são convertidas em R$ automaticamente.</p>
+          <p>{t('ws.res.038')}</p>
+          <p>{t('ws.res.039')}</p>
         </HowCalc>
       </Card>
 
       {w.results.length > 0 && (
-        <Card title="Todos os registros" subtitle="Histórico">
+        <Card title={t('ws.res.040')} subtitle={t('ws.res.041')}>
           <ul className="divide-y divide-line/10 text-sm">
             {[...w.results]
               .sort((a, b) => b.period.localeCompare(a.period))
@@ -181,16 +190,16 @@ export default function ResultsTab() {
                 <li key={r.id} className="flex flex-wrap items-center gap-2 py-2">
                   <span className="tabular text-muted">{r.period}</span>
                   <span className="text-ink">{r.metric === 'custom' ? r.label : METRICS[r.metric as Exclude<ResultMetric, 'custom'>].label}</span>
-                  {r.noData ? <Badge tone="amber">sem dados ainda</Badge> : <span className="tabular text-ink2">{fmt(r.unit, r.value)}</span>}
-                  {r.source && <span className="text-xs text-muted">fonte: {r.source}</span>}
+                  {r.noData ? <Badge tone="amber">{t('ws.res.042')}</Badge> : <span className="tabular text-ink2">{fmt(r.unit, r.value)}</span>}
+                  {r.source && <span className="text-xs text-muted">{t('ws.res.043')}{r.source}</span>}
                   {r.note && <span className="text-xs text-ink2">“{r.note}”</span>}
-                  <span className="ml-auto text-xs text-muted">registrado {fmtDate(r.recordedAt)}</span>
+                  <span className="ml-auto text-xs text-muted">{t('ws.res.044')}{fmtDate(r.recordedAt)}</span>
                   <Button
                     size="sm"
                     variant="ghost"
-                    aria-label="Excluir registro"
+                    aria-label={t('ws.res.045')}
                     onClick={async () => {
-                      if (await confirm({ title: 'Excluir registro?', body: `${r.period}`, confirm: 'Excluir', danger: true })) update((d) => void (d.results = d.results.filter((x) => x.id !== r.id)), { area: 'Resultados', message: `Registro excluído (${r.period})` });
+                      if (await confirm({ title: t('ws.res.046'), body: `${r.period}`, confirm: t('ws.res.047'), danger: true })) update((d) => void (d.results = d.results.filter((x) => x.id !== r.id)), { area: 'Resultados', message: t('ws.res.048', { period: r.period }) });
                     }}
                   >
                     <Trash2 className="h-4 w-4" />

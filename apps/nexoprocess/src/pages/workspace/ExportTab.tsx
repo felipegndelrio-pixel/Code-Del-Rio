@@ -8,7 +8,9 @@ import { download, slug, XLSX_MIME } from '../../state/actions';
 import { useWorkspace } from '../../state/workspace';
 import { demoBlocked } from '../../license/demo';
 
+import { useI18n } from '../../i18n/I18nProvider';
 export default function ExportTab() {
+  const { t } = useI18n();
   const { w } = useWorkspace();
   const nav = useNavigate();
   const toast = useToast();
@@ -23,9 +25,9 @@ export default function ExportTab() {
     setBusy(key);
     try {
       await fn();
-      toast('ok', 'Pronto! Arquivo gerado.');
+      toast('ok', t('ws.exp.001'));
     } catch (e) {
-      toast('bad', `Não conseguimos exportar: ${e instanceof Error ? e.message : String(e)}`);
+      toast('bad', t('ws.exp.002', { p0: e instanceof Error ? e.message : String(e) }));
     } finally {
       setBusy(null);
     }
@@ -61,51 +63,46 @@ export default function ExportTab() {
 
   return (
     <div className="space-y-4">
-      <Card title="Exportar" subtitle="Arquivos gerados no seu aparelho">
-        <Field label="O que exportar" className="max-w-sm">
+      <Card title={t('ws.exp.004')} subtitle={t('ws.exp.005')}>
+        <Field label={t('ws.exp.006')} className="max-w-sm">
           {(f) => (
             <Select {...f} value={which} onChange={(e) => setWhich(e.target.value)}>
-              <option value="asis">AS-IS (processo atual)</option>
+              <option value="asis">{t('ws.exp.007')}</option>
               {w.scenarios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  TO-BE: {s.name}
+                <option key={s.id} value={s.id}>{t('ws.exp.008')}{s.name}
                 </option>
               ))}
             </Select>
           )}
         </Field>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <ExportBtn icon={<FileCode2 />} title="BPMN 2.0 XML" text="Abre em ferramentas compatíveis (ex.: bpmn.io, Camunda Modeler)." onClick={bpmnXml} busy={busy === 'xml'} />
-          <ExportBtn icon={<FileImage />} title="Mapas em SVG (ZIP)" text="Visão macro + uma imagem por etapa, vetorial." onClick={() => images('svg')} busy={busy === 'svg'} />
-          <ExportBtn icon={<FileImage />} title="Mapas em PNG (ZIP)" text="Mesmas imagens em PNG de alta resolução." onClick={() => images('png')} busy={busy === 'png'} />
-          <ExportBtn icon={<FileSpreadsheet />} title="Dados em XLSX" text="Mesmo formato do modelo oficial — pode ser reimportado." onClick={xlsx} busy={busy === 'xlsx'} />
-          <ExportBtn icon={<FileSpreadsheet />} title="Dados em CSV" text="Separador “;” e vírgula decimal (Excel pt-BR)." onClick={csv} busy={busy === 'csv'} />
-          <ExportBtn icon={<FileJson />} title="Backup deste processo" text="JSON completo (AS-IS, cenários, plano, resultados)." onClick={json} busy={busy === 'json'} />
+          <ExportBtn icon={<FileCode2 />} title="BPMN 2.0 XML" text={t('ws.exp.010')} onClick={bpmnXml} busy={busy === 'xml'} />
+          <ExportBtn icon={<FileImage />} title={t('ws.exp.011')} text={t('ws.exp.012')} onClick={() => images('svg')} busy={busy === 'svg'} />
+          <ExportBtn icon={<FileImage />} title={t('ws.exp.013')} text={t('ws.exp.014')} onClick={() => images('png')} busy={busy === 'png'} />
+          <ExportBtn icon={<FileSpreadsheet />} title={t('ws.exp.015')} text={t('ws.exp.016')} onClick={xlsx} busy={busy === 'xlsx'} />
+          <ExportBtn icon={<FileSpreadsheet />} title={t('ws.exp.017')} text={t('ws.exp.018')} onClick={csv} busy={busy === 'csv'} />
+          <ExportBtn icon={<FileJson />} title={t('ws.exp.019')} text={t('ws.exp.020')} onClick={json} busy={busy === 'json'} />
         </div>
       </Card>
-      <Card title="Relatório executivo" subtitle="PDF pela impressão do navegador">
-        <p className="text-sm text-ink2">Resumo, indicadores, mapa, gargalos, recomendações, comparação AS-IS × TO-BE, business case, premissas, riscos, plano de ação e resultados — com a distinção entre informado, calculado, estimado, a validar e realizado.</p>
+      <Card title={t('ws.exp.021')} subtitle={t('ws.exp.022')}>
+        <p className="text-sm text-ink2">{t('ws.exp.023')}</p>
         <Button className="mt-3" onClick={() => nav(`/app/p/${w.id}/relatorio`)}>
-          <FileText className="h-4 w-4" /> Abrir relatório
-        </Button>
+          <FileText className="h-4 w-4" />{t('ws.exp.024')}</Button>
       </Card>
-      <Callout tone="info">
-        O XML segue a estrutura BPMN 2.0 (validado pelo metamodelo do bpmn-moddle nos testes). Junções paralelas não são inferidas automaticamente; os dados originais ficam preservados no XLSX.
-      </Callout>
+      <Callout tone="info">{t('ws.exp.025')}</Callout>
     </div>
   );
 }
 
 function ExportBtn({ icon, title, text, onClick, busy }: { icon: React.ReactNode; title: string; text: string; onClick: () => void; busy: boolean }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col rounded-xl border border-line/15 bg-surface2/40 p-4">
       <div className="text-brand [&>svg]:h-6 [&>svg]:w-6">{icon}</div>
       <p className="mt-2 font-semibold text-ink">{title}</p>
       <p className="flex-1 text-xs text-ink2">{text}</p>
       {/* Nome acessível completo: com só "Baixar", o leitor de tela não diz o que cada botão baixa. */}
-      <Button className="mt-3" size="sm" variant="secondary" onClick={onClick} loading={busy} aria-label={`Baixar ${title}`}>
-        Baixar
-      </Button>
+      <Button className="mt-3" size="sm" variant="secondary" onClick={onClick} loading={busy} aria-label={t('ws.exp.026', { title })}>{t('ws.exp.027')}</Button>
     </div>
   );
 }

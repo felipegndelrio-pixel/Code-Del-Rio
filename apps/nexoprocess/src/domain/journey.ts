@@ -1,4 +1,5 @@
 // Jornada guiada: estado de cada etapa calculado a partir do workspace.
+import { lazyLabels, tr } from '../i18n';
 import { validateProcess } from './validation';
 import type { Workspace } from './types';
 
@@ -14,17 +15,17 @@ export interface JourneyStep {
   state: StepState;
 }
 
-const DEF: Omit<JourneyStep, 'state' | 'n'>[] = [
-  { key: 'iniciar', label: 'Iniciar', short: 'Início', why: 'Escolha como começar.' },
-  { key: 'asis', label: 'Informar o processo atual (AS-IS)', short: 'AS-IS', why: 'Precisamos das etapas e atividades como acontecem hoje.' },
-  { key: 'validar', label: 'Validar dados', short: 'Validar', why: 'Erros de dados levam a conclusões erradas.' },
-  { key: 'mapa', label: 'Ver o mapa', short: 'Mapa', why: 'Confirme se o fluxo desenhado representa a realidade.' },
-  { key: 'diagnostico', label: 'Diagnóstico', short: 'Diagnóstico', why: 'Onde estão o tempo, o esforço e o desperdício.' },
-  { key: 'recomendacoes', label: 'Avaliar recomendações', short: 'Recomendações', why: 'Decida o que vale testar.' },
-  { key: 'tobe', label: 'Construir o futuro (TO-BE)', short: 'TO-BE', why: 'Descreva como o processo vai funcionar após as mudanças.' },
-  { key: 'comparar', label: 'Comparar cenários', short: 'Comparar', why: 'Quanto muda em tempo, esforço, custo e capacidade.' },
-  { key: 'plano', label: 'Plano de ação', short: 'Plano', why: 'Quem faz o quê, até quando.' },
-  { key: 'resultados', label: 'Registrar resultados reais', short: 'Resultados', why: 'Compare o realizado com o estimado.' },
+const DEF = (): Omit<JourneyStep, 'state' | 'n'>[] => [
+  { key: 'iniciar', label: tr('d.journey.def.iniciar.label'), short: tr('journey.iniciar.short'), why: tr('d.journey.def.iniciar.why') },
+  { key: 'asis', label: tr('d.journey.def.asis.label'), short: tr('journey.asis.short'), why: tr('d.journey.def.asis.why') },
+  { key: 'validar', label: tr('d.journey.def.validar.label'), short: tr('journey.validar.short'), why: tr('d.journey.def.validar.why') },
+  { key: 'mapa', label: tr('d.journey.def.mapa.label'), short: tr('journey.mapa.short'), why: tr('d.journey.def.mapa.why') },
+  { key: 'diagnostico', label: tr('d.journey.def.diagnostico.label'), short: tr('journey.diagnostico.short'), why: tr('d.journey.def.diagnostico.why') },
+  { key: 'recomendacoes', label: tr('d.journey.def.recomendacoes.label'), short: tr('journey.recomendacoes.short'), why: tr('d.journey.def.recomendacoes.why') },
+  { key: 'tobe', label: tr('d.journey.def.tobe.label'), short: tr('journey.tobe.short'), why: tr('d.journey.def.tobe.why') },
+  { key: 'comparar', label: tr('d.journey.def.comparar.label'), short: tr('journey.comparar.short'), why: tr('d.journey.def.comparar.why') },
+  { key: 'plano', label: tr('d.journey.def.plano.label'), short: tr('journey.plano.short'), why: tr('d.journey.def.plano.why') },
+  { key: 'resultados', label: tr('d.journey.def.resultados.label'), short: tr('journey.resultados.short'), why: tr('d.journey.def.resultados.why') },
 ];
 
 export function journey(w: Workspace): { steps: JourneyStep[]; next: JourneyStep | undefined; blocked: boolean } {
@@ -45,7 +46,7 @@ export function journey(w: Workspace): { steps: JourneyStep[]; next: JourneyStep
   };
   const blocked = errors > 0;
   let currentSet = false;
-  const steps = DEF.map((d, i) => {
+  const steps = DEF().map((d, i) => {
     let state: StepState;
     if (done[d.key]) state = 'feito';
     else if (blocked && i > 2) state = 'bloqueado';
@@ -70,24 +71,24 @@ export interface Requirement {
   detail?: string;
 }
 
-export const STEP_OBJECTIVE: Record<StepKey, string> = {
-  iniciar: 'Escolher como começar o projeto.',
-  asis: 'Registrar como o processo funciona hoje: etapas, atividades, tempos e responsáveis.',
-  validar: 'Garantir que os dados estão coerentes antes de calcular qualquer indicador.',
-  mapa: 'Ver o fluxo desenhado a partir dos dados e confirmar se representa a realidade.',
-  diagnostico: 'Entender onde estão o tempo, o esforço, as esperas e o desperdício.',
-  recomendacoes: 'Decidir quais oportunidades de melhoria valem ser testadas.',
-  tobe: 'Descrever como o processo vai funcionar depois das mudanças, com hipóteses explícitas.',
-  comparar: 'Comparar hoje × futuro em tempo, esforço, capacidade e custo.',
-  plano: 'Transformar as mudanças em ações com responsável, prazo e critério de sucesso.',
-  resultados: 'Registrar o que realmente aconteceu e comparar com o previsto.',
-};
+export const STEP_OBJECTIVE: Record<StepKey, string> = lazyLabels({
+  iniciar: 'd.journey.obj.iniciar',
+  asis: 'd.journey.obj.asis',
+  validar: 'd.journey.obj.validar',
+  mapa: 'd.journey.obj.mapa',
+  diagnostico: 'd.journey.obj.diagnostico',
+  recomendacoes: 'd.journey.obj.recomendacoes',
+  tobe: 'd.journey.obj.tobe',
+  comparar: 'd.journey.obj.comparar',
+  plano: 'd.journey.obj.plano',
+  resultados: 'd.journey.obj.resultados',
+});
 
 export function stepRequirements(key: StepKey, w: Workspace): Requirement[] {
   const p = w.asIs;
   const tasks = p.activities.filter((a) => a.type === 'task');
   const share = (f: (a: (typeof tasks)[number]) => boolean) => (tasks.length ? tasks.filter(f).length / tasks.length : 0);
-  const pct = (x: number) => `${Math.round(x * 100)}% das atividades`;
+  const pct = (x: number) => tr('d.journey.001', { p0: Math.round(x * 100) });
   const errors = validateProcess(p).filter((i) => i.severity === 'error').length;
   const dur = share((a) => typeof a.duration === 'number');
   const ppl = share((a) => typeof a.people === 'number');
@@ -101,49 +102,49 @@ export function stepRequirements(key: StepKey, w: Workspace): Requirement[] {
       return [];
     case 'asis':
       return [
-        { label: 'Atividades cadastradas', kind: 'obrigatório', ok: tasks.length > 0, detail: `${tasks.length} atividade(s)` },
-        { label: 'Duração das atividades', kind: 'recomendado', ok: dur === 1, detail: pct(dur) },
-        { label: 'Responsáveis', kind: 'recomendado', ok: own === 1, detail: pct(own) },
-        { label: 'Pessoas por atividade', kind: 'recomendado', ok: ppl === 1, detail: pct(ppl) },
-        { label: 'Volume de execuções', kind: 'recomendado', ok: hasVolume },
-        { label: 'Custo-hora', kind: 'opcional', ok: hasCost },
+        { label: tr('d.journey.002'), kind: 'obrigatório', ok: tasks.length > 0, detail: tr('d.journey.003', { length: tasks.length }) },
+        { label: tr('d.journey.004'), kind: 'recomendado', ok: dur === 1, detail: pct(dur) },
+        { label: tr('d.journey.005'), kind: 'recomendado', ok: own === 1, detail: pct(own) },
+        { label: tr('d.journey.006'), kind: 'recomendado', ok: ppl === 1, detail: pct(ppl) },
+        { label: tr('d.journey.007'), kind: 'recomendado', ok: hasVolume },
+        { label: tr('d.journey.008'), kind: 'opcional', ok: hasCost },
       ];
     case 'validar':
-      return [{ label: 'Sem erros de dados', kind: 'obrigatório', ok: errors === 0, detail: errors ? `${errors} erro(s)` : undefined }];
+      return [{ label: tr('d.journey.009'), kind: 'obrigatório', ok: errors === 0, detail: errors ? tr('d.journey.010', { errors }) : undefined }];
     case 'mapa':
       return [
-        { label: 'Atividades cadastradas', kind: 'obrigatório', ok: tasks.length > 0 },
-        { label: 'Ligações entre atividades válidas', kind: 'recomendado', ok: errors === 0 },
+        { label: tr('d.journey.011'), kind: 'obrigatório', ok: tasks.length > 0 },
+        { label: tr('d.journey.012'), kind: 'recomendado', ok: errors === 0 },
       ];
     case 'diagnostico':
       return [
-        { label: 'Duração das atividades', kind: 'obrigatório', ok: dur > 0, detail: pct(dur) },
-        { label: 'Pessoas por atividade (esforço)', kind: 'recomendado', ok: ppl === 1, detail: pct(ppl) },
-        { label: 'Classificação Lean', kind: 'recomendado', ok: lean === 1, detail: pct(lean) },
-        { label: 'Volume (esforço por período)', kind: 'recomendado', ok: hasVolume },
-        { label: 'Custo-hora (custo estimado)', kind: 'opcional', ok: hasCost },
+        { label: tr('d.journey.013'), kind: 'obrigatório', ok: dur > 0, detail: pct(dur) },
+        { label: tr('d.journey.014'), kind: 'recomendado', ok: ppl === 1, detail: pct(ppl) },
+        { label: tr('d.journey.015'), kind: 'recomendado', ok: lean === 1, detail: pct(lean) },
+        { label: tr('d.journey.016'), kind: 'recomendado', ok: hasVolume },
+        { label: tr('d.journey.017'), kind: 'opcional', ok: hasCost },
       ];
     case 'recomendacoes':
       return [
-        { label: 'Diagnóstico com durações', kind: 'obrigatório', ok: dur > 0 },
-        { label: 'Classificação Lean', kind: 'recomendado', ok: lean === 1, detail: pct(lean) },
+        { label: tr('d.journey.018'), kind: 'obrigatório', ok: dur > 0 },
+        { label: tr('d.journey.019'), kind: 'recomendado', ok: lean === 1, detail: pct(lean) },
       ];
     case 'tobe':
       return [
-        { label: 'AS-IS sem erros', kind: 'obrigatório', ok: errors === 0 },
-        { label: 'Recomendações avaliadas', kind: 'recomendado', ok: Object.values(w.recDecisions).some((d) => d.status !== 'pending') },
+        { label: tr('d.journey.020'), kind: 'obrigatório', ok: errors === 0 },
+        { label: tr('d.journey.021'), kind: 'recomendado', ok: Object.values(w.recDecisions).some((d) => d.status !== 'pending') },
       ];
     case 'comparar':
       return [
-        { label: 'Cenário TO-BE criado', kind: 'obrigatório', ok: !!sc },
-        { label: 'Mudanças registradas no TO-BE', kind: 'recomendado', ok: !!sc && sc.changes.length > 0 },
-        { label: 'Volume (comparação mensal)', kind: 'recomendado', ok: hasVolume },
-        { label: 'Custo-hora (benefício financeiro)', kind: 'opcional', ok: hasCost },
-        { label: 'Investimento e custo recorrente (payback/ROI)', kind: 'opcional', ok: !!sc && typeof sc.investment === 'number' && typeof sc.recurringCostPerMonth === 'number' },
+        { label: tr('d.journey.022'), kind: 'obrigatório', ok: !!sc },
+        { label: tr('d.journey.023'), kind: 'recomendado', ok: !!sc && sc.changes.length > 0 },
+        { label: tr('d.journey.024'), kind: 'recomendado', ok: hasVolume },
+        { label: tr('d.journey.025'), kind: 'opcional', ok: hasCost },
+        { label: tr('d.journey.026'), kind: 'opcional', ok: !!sc && typeof sc.investment === 'number' && typeof sc.recurringCostPerMonth === 'number' },
       ];
     case 'plano':
-      return [{ label: 'Mudanças ou recomendações aceitas para virar ações', kind: 'recomendado', ok: (!!sc && sc.changes.length > 0) || Object.values(w.recDecisions).some((d) => d.status === 'accepted') }];
+      return [{ label: tr('d.journey.027'), kind: 'recomendado', ok: (!!sc && sc.changes.length > 0) || Object.values(w.recDecisions).some((d) => d.status === 'accepted') }];
     case 'resultados':
-      return [{ label: 'Ações implantadas', kind: 'recomendado', ok: w.actions.some((a) => a.status === 'concluida') }];
+      return [{ label: tr('d.journey.028'), kind: 'recomendado', ok: w.actions.some((a) => a.status === 'concluida') }];
   }
 }
