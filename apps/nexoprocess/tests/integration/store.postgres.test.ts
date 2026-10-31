@@ -375,6 +375,10 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     await s.revoke({ email: 'mixed@it.test', transaction: 'H2', event: 'PURCHASE_REFUNDED' });
     expect(await s.lookup('mixed@it.test')).toBe('revoked'); // a compra gumroad ativa não vale só por e-mail
     expect(await byEmail('mixed@it.test')).toBe(404);
+    // Runbook de suporte: concessão manual com platform 'gumroad_manual' vale no lookup.
+    await s.grant({ platform: 'gumroad_manual', email: 'manual@it.test', transaction: 'order-524459935', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' });
+    expect(await s.lookup('manual@it.test')).toBe('active');
+    expect(await openBlocks('manual@it.test')).toEqual([]);
   });
 
   it('nexo_purchase_state: service_role lê; anon e authenticated são negados', async () => {
