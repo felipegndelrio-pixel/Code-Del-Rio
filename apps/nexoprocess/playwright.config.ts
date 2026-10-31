@@ -58,6 +58,11 @@ export default defineConfig({
         VITE_LICENSE_PUBLIC_JWK: JSON.stringify(licenseKeys.publicJwk),
         VITE_HOTMART_CHECKOUT_URL: LICENSE_TEST_CHECKOUT,
         VITE_SUPPORT_EMAIL: LICENSE_TEST_SUPPORT,
+        // Entrada EN (Gumroad): valores SÓ DE TESTE.
+        VITE_GUMROAD_CHECKOUT_URL: 'https://example.gumroad.com/l/teste',
+        VITE_EN_TERMS_URL: '/en/terms/',
+        VITE_EN_PRIVACY_URL: '/en/privacy/',
+        VITE_EN_REFUND_URL: '/en/refund/',
         BUNDLE_REPORT: 'false',
       },
     },
