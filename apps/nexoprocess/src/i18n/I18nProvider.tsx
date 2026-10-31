@@ -2,7 +2,7 @@
 import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { setActiveLocale } from './active';
 import { formatters, type Formatters } from './format';
-import { translator, type MessageKey, type MessageVars } from './index';
+import { loadLocale, translator, type MessageKey, type MessageVars } from './index';
 import { DEFAULT_LOCALE, htmlLang, resolveLocale, saveLocale, type Locale } from './locale';
 
 export interface I18n {
@@ -34,7 +34,8 @@ export function I18nProvider({ children, locale: fixed }: { children: ReactNode;
   const [locale, setState] = useState<Locale>(() => fixed ?? initialLocale());
   const setLocale = useCallback((l: Locale) => {
     saveLocale(l, browserStorage());
-    setState(l);
+    // O dicionário EN é baixado sob demanda; só troca depois de carregado.
+    void loadLocale(l).then(() => setState(l));
   }, []);
   useEffect(() => {
     if (typeof document !== 'undefined') document.documentElement.lang = htmlLang(locale);

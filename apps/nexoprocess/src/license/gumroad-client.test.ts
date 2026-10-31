@@ -24,6 +24,7 @@ const KEY = '85DB562A-C11D4B06-A2335A6B-8C079166';
 
 async function load(env: Record<string, string> = {}) {
   vi.resetModules();
+  await (await import('../i18n')).loadLocale('en'); // o dicionário EN é carregado sob demanda
   vi.stubEnv('VITE_LICENSE_REQUIRED', 'true');
   vi.stubEnv('VITE_LICENSE_PUBLIC_JWK', JSON.stringify(pub));
   for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);

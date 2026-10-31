@@ -1,12 +1,15 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { loadLocale } from './index';
 import { I18nProvider, initialLocale, useI18n } from './I18nProvider';
 
 function Probe() {
   const { locale, t, fmt } = useI18n();
   return createElement('p', null, `${locale}|${t('nav.overview.label')}|${fmt.currency(39)}`);
 }
+
+beforeAll(() => loadLocale('en'));
 
 describe('I18nProvider', () => {
   it('sem Provider vale PT', () => {

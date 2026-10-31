@@ -1,5 +1,4 @@
 // Fundação de idiomas (EN-1): dicionário tipado PT/EN, sem biblioteca externa.
-import { en } from './messages/en';
 import { pt, type MessageKey } from './messages/pt';
 import { getActiveLocale } from './active';
 import type { Locale } from './locale';
@@ -8,7 +7,16 @@ export type { MessageKey } from './messages/pt';
 export * from './locale';
 export { formatters, type Formatters } from './format';
 
-const DICTS: Record<Locale, Record<MessageKey, string>> = { pt, en };
+type Dict = Record<MessageKey, string>;
+
+// O dicionário EN vem em um chunk à parte: quem usa PT não o baixa. Antes de renderizar em EN,
+// chame `await loadLocale('en')` (main.tsx e I18nProvider fazem isso). Sem ele carregado, cai no PT.
+let enDict: Dict | null = null;
+export async function loadLocale(locale: Locale): Promise<void> {
+  if (locale === 'en' && !enDict) enDict = (await import('./messages/en')).en;
+}
+export const isLocaleLoaded = (locale: Locale): boolean => locale === 'pt' || enDict !== null;
+const dictOf = (locale: Locale): Dict => (locale === 'en' && enDict ? enDict : pt);
 
 export type MessageVars = Record<string, string | number | boolean | null | undefined>;
 
@@ -19,7 +27,7 @@ export function interpolate(text: string, vars?: MessageVars): string {
 }
 
 export function translate(locale: Locale, key: MessageKey, vars?: MessageVars): string {
-  return interpolate(DICTS[locale][key] ?? pt[key], vars);
+  return interpolate(dictOf(locale)[key] ?? pt[key], vars);
 }
 
 /** t() preso a um idioma. */
@@ -29,7 +37,6 @@ export const translator = (locale: Locale) => (key: MessageKey, vars?: MessageVa
 export const tr = (key: MessageKey, vars?: MessageVars): string => translate(getActiveLocale(), key, vars);
 
 export { getActiveLocale, setActiveLocale } from './active';
-export const dictionaries = DICTS;
 
 /**
  * Tabela de rótulos lida na hora do uso: objetos de nível de módulo (Record<chave, texto>)

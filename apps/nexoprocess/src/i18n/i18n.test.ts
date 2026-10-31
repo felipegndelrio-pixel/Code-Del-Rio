@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fmtBRL, fmtDate, fmtDateTime, fmtNum, fmtPct } from '../domain/units';
-import { dictionaries, formatters, htmlLang, interpolate, LOCALE_STORAGE_KEY, parseLocale, resolveLocale, translate, type LocaleStorage } from './index';
+import { formatters, htmlLang, interpolate, LOCALE_STORAGE_KEY, parseLocale, resolveLocale, translate, type LocaleStorage } from './index';
 import { en } from './messages/en';
 import { pt, type MessageKey } from './messages/pt';
 
@@ -78,7 +78,6 @@ describe('dicionário', () => {
   });
   it('translate PT devolve o texto literal do PT', () => {
     for (const k of keys) expect(translate('pt', k)).toBe(pt[k]);
-    expect(dictionaries.pt).toBe(pt);
   });
   it('interpolate troca {x} e mantém variável ausente visível', () => {
     expect(interpolate('Olá, {nome}! {n} itens', { nome: 'Ana', n: 3 })).toBe('Olá, Ana! 3 itens');

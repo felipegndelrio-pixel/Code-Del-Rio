@@ -1,7 +1,8 @@
 // Prova de que o PT mostra exatamente os mesmos textos de antes da migração.
 // golden/nav-pt.json foi gerado de src/config/nav.ts na tag v2.5.0-rc1, ANTES de o
 // arquivo passar a ler o dicionário. Não regenere o golden para fazer o teste passar.
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { loadLocale } from './index';
 import { MOBILE_TABS, NAV, STEP_PATH } from '../config/nav';
 import golden from './golden/nav-pt.json';
 
@@ -19,6 +20,7 @@ describe('PT igual ao golden da v2.5.0-rc1', () => {
 });
 
 describe('navegação em EN', () => {
+  beforeAll(() => loadLocale('en'));
   it('mesma estrutura do PT, só os textos mudam, nenhum vazio', async () => {
     const { navFor } = await import('../config/nav');
     const e = navFor('en');

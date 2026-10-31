@@ -4,7 +4,8 @@ import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import { Providers } from './components/ui';
 import PwaUpdater from './components/PwaUpdater';
-import { I18nProvider } from './i18n/I18nProvider';
+import { I18nProvider, initialLocale } from './i18n/I18nProvider';
+import { loadLocale } from './i18n';
 import './state/install'; // captura o convite de instalação o quanto antes
 import '@fontsource/ibm-plex-sans/latin-400.css';
 import '@fontsource/ibm-plex-sans/latin-500.css';
@@ -20,7 +21,10 @@ const Router = import.meta.env.VITE_ROUTER === 'hash' ? HashRouter : BrowserRout
 const boot = window as Window & { __nexoIncompativel?: boolean; __nexoIniciado?: boolean };
 if (!boot.__nexoIncompativel) {
   boot.__nexoIniciado = true;
-  createRoot(document.getElementById('root')!).render(
+  // EN: baixa o dicionário antes do primeiro desenho (PT já vem no pacote inicial).
+  void loadLocale(initialLocale())
+    .catch(() => undefined) // sem o pacote EN, o app abre com os textos em PT
+    .then(() => createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <Router basename={import.meta.env.VITE_ROUTER === 'hash' ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
         <I18nProvider>
@@ -31,5 +35,5 @@ if (!boot.__nexoIncompativel) {
         </I18nProvider>
       </Router>
     </StrictMode>,
-  );
+  ));
 }
