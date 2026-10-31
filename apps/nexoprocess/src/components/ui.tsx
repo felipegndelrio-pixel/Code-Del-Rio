@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { AlertTriangle, CheckCircle2, ChevronDown, HelpCircle, Info, Loader2, X } from 'lucide-react';
 import { GLOSSARY, type GlossaryKey } from '../config/glossary';
+import type { MessageKey } from '../i18n';
 import type { Basis } from '../domain/compare';
 import { useHardwareBack } from '../state/backNav';
 
+import { tr } from '../i18n';
 export function Card({ title, subtitle, action, children, className, id, tone = 'default' }: {
   title?: ReactNode;
   subtitle?: ReactNode;
@@ -80,12 +82,21 @@ export function Badge({ tone = 'muted', children, className }: { tone?: Tone; ch
   return <span className={clsx('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ring-1', TONES[tone], className)}>{children}</span>;
 }
 
+const basisInfo = (key: string, tone: Tone) => ({
+  get label() {
+    return tr(`d.basis.${key}.label` as MessageKey);
+  },
+  tone,
+  get help() {
+    return tr(`d.basis.${key}.help` as MessageKey);
+  },
+});
 const BASIS: Record<Basis, { label: string; tone: Tone; help: string }> = {
-  informado: { label: 'Informado', tone: 'accent', help: 'Dado fornecido por você ou por fonte identificada.' },
-  calculado: { label: 'Calculado', tone: 'brand', help: 'Resultado de fórmula sobre dados informados.' },
-  estimado: { label: 'Estimado', tone: 'violet', help: 'Resultado condicionado a premissas.' },
-  a_validar: { label: 'A validar', tone: 'amber', help: 'Hipótese ainda não confirmada.' },
-  realizado: { label: 'Realizado', tone: 'ok', help: 'Resultado medido após a implantação e registrado.' },
+  informado: basisInfo('informado', 'accent'),
+  calculado: basisInfo('calculado', 'brand'),
+  estimado: basisInfo('estimado', 'violet'),
+  a_validar: basisInfo('a_validar', 'amber'),
+  realizado: basisInfo('realizado', 'ok'),
 };
 export function BasisTag({ basis }: { basis: Basis }) {
   const b = BASIS[basis];
@@ -141,7 +152,7 @@ export function Term({ k, children, iconOnly }: { k: GlossaryKey; children?: Rea
         aria-controls={id}
         onClick={() => setOpen((o) => !o)}
         className={clsx('inline-flex items-center gap-0.5 align-baseline', iconOnly ? 'relative ml-1 text-muted before:absolute before:-inset-[6px] before:content-[""] hover:text-brand' : 'border-b border-dotted border-brand/70 text-inherit hover:text-brand')}
-        aria-label={iconOnly ? `O que é ${g.term}?` : undefined}
+        aria-label={iconOnly ? tr('ui.003', { term: g.term }) : undefined}
       >
         {!iconOnly && (children ?? g.term)}
         {iconOnly && <HelpCircle className="h-3.5 w-3.5" aria-hidden />}
@@ -156,7 +167,7 @@ export function Term({ k, children, iconOnly }: { k: GlossaryKey; children?: Rea
   );
 }
 
-export function HowCalc({ children, title = 'Como calculamos' }: { children: ReactNode; title?: string }) {
+export function HowCalc({ children, title = tr('ui.004') }: { children: ReactNode; title?: string }) {
   return (
     <details className="group mt-3 rounded-xl border border-line/15 bg-surface2/50 text-sm">
       <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-2 px-3 py-2 font-semibold text-ink2 hover:text-ink">
@@ -345,7 +356,7 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
           <h2 id={id} className="text-base font-bold text-ink">
             {title}
           </h2>
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label={tr('ui.006')}>
             <X className="h-4 w-4" />
           </Button>
         </header>
@@ -378,7 +389,7 @@ export function Drawer({ open, onClose, title, children, footer }: { open: boole
           <h2 id={id} className="min-w-0 truncate text-base font-bold text-ink">
             {title}
           </h2>
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Fechar painel">
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label={tr('ui.007')}>
             <X className="h-4 w-4" />
           </Button>
         </header>
@@ -421,9 +432,7 @@ export function Providers({ children }: { children: ReactNode }) {
           title={confirm?.title}
           footer={
             <>
-              <Button variant="secondary" onClick={() => close(false)}>
-                Cancelar
-              </Button>
+              <Button variant="secondary" onClick={() => close(false)}>{tr('ui.008')}</Button>
               <Button variant={confirm?.danger ? 'danger' : 'primary'} onClick={() => close(true)} data-autofocus>
                 {confirm?.confirm ?? 'Confirmar'}
               </Button>
@@ -449,7 +458,7 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 }
 
-export function Spinner({ label = 'Carregando…' }: { label?: string }) {
+export function Spinner({ label = tr('ui.009') }: { label?: string }) {
   return (
     <div role="status" aria-live="polite" className="flex items-center gap-2 p-6 text-sm text-ink2">
       <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden />
@@ -463,7 +472,7 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 /** Esqueleto de página enquanto o conteúdo carrega (no lugar de tela em branco). */
-export function PageSkeleton({ label = 'Carregando…', variant = 'page' }: { label?: string; variant?: 'page' | 'tab' }) {
+export function PageSkeleton({ label = tr('ui.010'), variant = 'page' }: { label?: string; variant?: 'page' | 'tab' }) {
   return (
     <div role="status" aria-live="polite" className={clsx('w-full', variant === 'page' ? 'safe-x mx-auto max-w-5xl space-y-4 py-6' : 'space-y-4')} data-testid="skeleton">
       <span className="sr-only">{label}</span>

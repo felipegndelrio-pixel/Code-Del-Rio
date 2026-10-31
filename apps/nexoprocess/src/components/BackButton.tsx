@@ -2,9 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import clsx from 'clsx';
 import { hasAppHistory } from '../state/backNav';
+import { tr } from '../i18n';
 
 /** "← Voltar" das telas internas: volta à tela anterior do app ou, sem histórico, ao destino padrão. */
-export function BackButton({ fallback = '/app', label = 'Voltar', compact, className }: { fallback?: string; label?: string; compact?: boolean; className?: string }) {
+export function BackButton({ fallback = '/app', label = tr('ui.back'), compact, className }: { fallback?: string; label?: string; compact?: boolean; className?: string }) {
   const nav = useNavigate();
   return (
     <button
