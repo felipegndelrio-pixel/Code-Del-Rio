@@ -12,7 +12,9 @@
 //      NEXO_IT_PG_URL=postgresql://postgres@127.0.0.1:54329/postgres npm run nexo:test
 import { spawn } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
-import { handleWebhook } from '../../api/_lib/handlers';
+import { createHmac } from 'node:crypto';
+import { handleGumroadLicense } from '../../api/_lib/gumroad';
+import { handleLicense, handleWebhook } from '../../api/_lib/handlers';
 import { supabaseStore } from '../../api/_lib/store';
 import { assertIntegrationConfig, assertPostgrestUsesTestDatabase, assertSafeTestTargets } from './db-target';
 
@@ -273,6 +275,126 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     migrate();
     const after = await fetch(`${REST}/nexo_reconciliation_blocks?email=eq.${encodeURIComponent(email)}&resolved_at=is.null&select=id`, { headers: auth() });
     expect(await after.json()).toEqual([]);
+    await reset();
+  });
+
+  // ---------------------------------------------------------------- Gumroad (T2)
+  const GUM_PRODUCT = '32-nPAicqbLj8B_WswVlMw==';
+  const GUM_PRODUCT_DB = '32-nPAicqbLj8B_WswVlMw';
+  const GUM_KEY = '85DB562A-C11D4B06-A2335A6B-8C079166';
+  const gumPurchase = (email: string, sale: string, over: Record<string, unknown> = {}) => ({
+    product_id: GUM_PRODUCT, email, price: 3900, currency: 'usd', sale_id: sale, sale_timestamp: '2026-10-01T10:00:00Z',
+    refunded: false, disputed: false, dispute_won: false, chargebacked: false, ...over,
+  });
+  /** Gumroad simulada: nenhuma chamada real. */
+  const fakeGumroad = (purchase: Record<string, unknown>) =>
+    (async () => new Response(JSON.stringify({ success: true, uses: 0, purchase }), { status: 200 })) as unknown as typeof fetch;
+  let gumJwk: JsonWebKey | null = null;
+  const gumDeps = async (purchase: Record<string, unknown>) => {
+    if (!gumJwk) {
+      const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+      gumJwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    }
+    return { store: supabaseStore(REST!, JWT!, viaGateway), privateJwk: gumJwk, productId: GUM_PRODUCT, fetchImpl: fakeGumroad(purchase) };
+  };
+  const activate = async (email: string, purchase: Record<string, unknown>) =>
+    handleGumroadLicense(new Request('https://x.test/api/gumroad-license', { method: 'POST', body: JSON.stringify({ email, license_key: GUM_KEY }) }), await gumDeps(purchase));
+  const openBlocks = async (email: string) => {
+    const r = await fetch(`${REST}/nexo_reconciliation_blocks?email=eq.${encodeURIComponent(email)}&resolved_at=is.null&select=reason`, { headers: auth() });
+    return (await r.json()) as { reason: string }[];
+  };
+  const raw = () => supabaseStore(REST!, JWT!, viaGateway);
+
+  it('gumroad: id normalizado concede; id cru com "=" é bloqueado pelo schema', async () => {
+    await reset();
+    expect(await raw().grant({ platform: 'gumroad', email: 'g-norm@it.test', transaction: 'FO8TXN-dbxYaBdahG97Y-Q', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' })).toEqual({ result: 'active', status: 'active' });
+    expect(await raw().grant({ platform: 'gumroad', email: 'g-raw@it.test', transaction: 'FO8TXN-dbxYaBdahG97Y-Q==', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' })).toEqual({ result: 'blocked', status: 'revoked' });
+    expect(await openBlocks('g-raw@it.test')).toEqual([{ reason: 'transaction_invalid' }]);
+  });
+
+  it('gumroad: ativação pela rota grava platform gumroad com ids normalizados; reembolso revoga e não reativa', async () => {
+    await reset();
+    const e = 'g-route@it.test';
+    expect((await activate(e, gumPurchase(e, 'AAAAbbbbCCCCdddd-_12Qw=='))).status).toBe(200);
+    expect(await purchases(e)).toEqual([{ platform: 'gumroad', transaction_id: 'AAAAbbbbCCCCdddd-_12Qw', status: 'active', access_active: true, refunded_amount: 0 }]);
+    expect((await activate(e, gumPurchase(e, 'AAAAbbbbCCCCdddd-_12Qw==', { refunded: true }))).status).toBe(404);
+    expect(await purchases(e)).toEqual([expect.objectContaining({ status: 'refunded', access_active: false })]);
+    expect((await activate(e, gumPurchase(e, 'AAAAbbbbCCCCdddd-_12Qw=='))).status).toBe(404); // concessão antiga não ressuscita
+    expect(await openBlocks(e)).toEqual([]);
+  });
+
+  it('gumroad: disputa → charged_back; disputa ganha pela rota restaura; nome DISPUTE_WON cairia em charged_back (armadilha)', async () => {
+    await reset();
+    const e = 'g-dispute@it.test';
+    const sale = 'DDDDeeeeFFFFgggg-_34Qw==';
+    expect((await activate(e, gumPurchase(e, sale))).status).toBe(200);
+    expect((await activate(e, gumPurchase(e, sale, { disputed: true }))).status).toBe(404);
+    expect(await raw().purchaseState!('gumroad', 'DDDDeeeeFFFFgggg-_34Qw')).toEqual({ status: 'charged_back', access_active: false });
+    expect((await activate(e, gumPurchase(e, sale, { disputed: true, dispute_won: true }))).status).toBe(200);
+    expect(await raw().purchaseState!('gumroad', 'DDDDeeeeFFFFgggg-_34Qw')).toEqual({ status: 'active', access_active: true });
+    expect(await openBlocks(e)).toEqual([]);
+    // Documenta a armadilha: o nome errado é classificado como chargeback.
+    const t = 'g-trap@it.test';
+    await raw().grant({ platform: 'gumroad', email: t, transaction: 'TRAP1', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' });
+    await raw().revoke({ platform: 'gumroad', email: t, transaction: 'TRAP1', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_DISPUTE_WON' });
+    expect(await raw().purchaseState!('gumroad', 'TRAP1')).toEqual({ status: 'charged_back', access_active: false });
+  });
+
+  it('gumroad C1: compra reembolsada + verify com disputa ganha → continua revogada e sem bloqueio de conciliação', async () => {
+    await reset();
+    const e = 'g-c1@it.test';
+    const sale = 'HHHHiiiiJJJJkkkk-_56Qw==';
+    await activate(e, gumPurchase(e, sale));
+    await activate(e, gumPurchase(e, sale, { refunded: true }));
+    expect((await activate(e, gumPurchase(e, sale, { disputed: true, dispute_won: true }))).status).toBe(404);
+    expect(await raw().purchaseState!('gumroad', 'HHHHiiiiJJJJkkkk-_56Qw')).toEqual({ status: 'refunded', access_active: false });
+    expect(await openBlocks(e)).toEqual([]);
+    // Disputa ganha sem registro anterior: concessão normal, sem bloqueio.
+    const n = 'g-c1-new@it.test';
+    expect((await activate(n, gumPurchase(n, 'LLLLmmmmNNNNoooo-_78Qw==', { disputed: true, dispute_won: true }))).status).toBe(200);
+    expect(await openBlocks(n)).toEqual([]);
+  });
+
+  it('D3: /api/license {email} não concede por compra gumroad; Hotmart igual a antes; misto segue só o Hotmart', async () => {
+    await reset();
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    const byEmail = async (email: string) => (await handleLicense(new Request('https://x.test/api/license', { method: 'POST', body: JSON.stringify({ email }) }), { store: store(), privateJwk: jwk })).status;
+    const s = store();
+    await s.grant({ platform: 'gumroad', email: 'only-gum@it.test', transaction: 'G1', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' });
+    expect(await s.lookup('only-gum@it.test')).toBeNull();
+    expect(await byEmail('only-gum@it.test')).toBe(404);
+    await s.grant({ email: 'only-hot@it.test', transaction: 'H1', event: 'PURCHASE_APPROVED' });
+    expect(await s.lookup('only-hot@it.test')).toBe('active');
+    expect(await byEmail('only-hot@it.test')).toBe(200);
+    await s.revoke({ email: 'only-hot@it.test', transaction: 'H1', event: 'PURCHASE_REFUNDED' });
+    expect(await s.lookup('only-hot@it.test')).toBe('revoked');
+    await s.grant({ email: 'mixed@it.test', transaction: 'H2', event: 'PURCHASE_APPROVED' });
+    await s.grant({ platform: 'gumroad', email: 'mixed@it.test', transaction: 'G2', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' });
+    expect(await byEmail('mixed@it.test')).toBe(200);
+    await s.revoke({ email: 'mixed@it.test', transaction: 'H2', event: 'PURCHASE_REFUNDED' });
+    expect(await s.lookup('mixed@it.test')).toBe('revoked'); // a compra gumroad ativa não vale só por e-mail
+    expect(await byEmail('mixed@it.test')).toBe(404);
+  });
+
+  it('nexo_purchase_state: service_role lê; anon e authenticated são negados', async () => {
+    await reset();
+    await raw().grant({ platform: 'gumroad', email: 'g-perm@it.test', transaction: 'PERM1', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' });
+    const call = (headers: Record<string, string>) =>
+      fetch(`${REST}/rpc/nexo_purchase_state`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_platform: 'gumroad', p_transaction: 'PERM1' }) });
+    const ok = await call(auth());
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ status: 'active', access_active: true });
+    const secret = process.env.PGRST_JWT_SECRET;
+    expect(secret, 'PGRST_JWT_SECRET é necessário para o teste de permissão').toBeTruthy();
+    const b64 = (x: unknown) => Buffer.from(JSON.stringify(x)).toString('base64url');
+    const body = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 600 })}`;
+    const authed = `${body}.${createHmac('sha256', secret!).update(body).digest('base64url')}`;
+    for (const headers of [{}, { Authorization: `Bearer ${authed}` }] as Record<string, string>[]) {
+      const r = await call(headers);
+      expect([401, 403]).toContain(r.status);
+      expect(((await r.json()) as { code?: string }).code).toBe('42501');
+    }
     await reset();
   });
 });
