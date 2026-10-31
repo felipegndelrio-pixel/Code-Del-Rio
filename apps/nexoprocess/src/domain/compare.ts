@@ -4,6 +4,7 @@ import { computeMetrics, costOf, isWork, type ProcessMetrics } from './metrics';
 import type { ProcessModel, Scenario, Sensitivity } from './types';
 import { isNum, reductionPct } from './units';
 
+import { lazyLabels, tr } from '../i18n';
 export type Basis = 'informado' | 'calculado' | 'estimado' | 'a_validar' | 'realizado';
 
 export interface Figures {
@@ -79,6 +80,13 @@ export interface CompareRow {
   lowerIsBetter: boolean;
 }
 
+/** Rótulo exibido do nível de confiança (o valor interno continua sendo alta/média/baixa). */
+export const CONFIDENCE_LABEL: Record<'baixa' | 'média' | 'alta', string> = lazyLabels({
+  baixa: 'd.conf.baixa',
+  média: 'd.conf.média',
+  alta: 'd.conf.alta',
+});
+
 export interface BusinessCase {
   volumeDiffers: boolean;
   normalized: boolean;
@@ -122,41 +130,41 @@ export function compareScenarios(asIsP: ProcessModel, sc: Scenario): Comparison 
   const toBeCostMonthNorm = volumeDiffers && toBe.costPerExec !== null && asIs.volumeMonth !== null ? toBe.costPerExec * asIs.volumeMonth : toBe.costMonth;
 
   const rows: CompareRow[] = [
-    row('activities', 'Atividades (tarefas)', 'atividades', asIs.activities, toBe.activities, 'calculado'),
-    row('active', 'Tempo de trabalho ativo por execução', 'horas', asIs.activeExecH, toBe.activeExecH, 'calculado', 'Ponderado pela frequência de cada atividade.'),
-    row('wait', 'Tempo de espera por execução', 'horas', asIs.waitExecH, toBe.waitExecH, 'calculado', 'Somente esperas informadas.'),
-    row('elapsed', 'Tempo decorrido (caminho mais longo)', 'horas', asIs.elapsedH, toBe.elapsedH, 'calculado', 'Pior caso entre caminhos alternativos, sem retrabalho.'),
-    row('effortExec', 'Esforço por execução', 'pessoa-hora', asIs.effortExecH, toBe.effortExecH, 'calculado'),
-    row('volume', 'Volume por mês', 'execuções', asIs.volumeMonth, toBe.volumeMonth, 'informado', undefined, false),
-    row('effortMonth', 'Esforço por mês', 'pessoa-hora/mês', asIs.effortMonthH, toBeEffortMonthNorm, 'estimado', volumeDiffers ? 'TO-BE normalizado para o volume do AS-IS.' : undefined),
-    row('costMonth', 'Custo comparável por mês', 'R$/mês', asIs.costMonth, toBeCostMonthNorm, 'estimado', volumeDiffers ? 'TO-BE normalizado para o volume do AS-IS.' : undefined),
-    row('reworkMonth', 'Esforço em retrabalho por mês', 'pessoa-hora/mês', asIs.reworkMonthH, toBe.reworkMonthH, 'estimado', 'Somente retrabalho marcado e com frequência informada.'),
+    row('activities', tr('d.compare.001'), 'atividades', asIs.activities, toBe.activities, 'calculado'),
+    row('active', tr('d.compare.002'), 'horas', asIs.activeExecH, toBe.activeExecH, 'calculado', tr('d.compare.003')),
+    row('wait', tr('d.compare.004'), 'horas', asIs.waitExecH, toBe.waitExecH, 'calculado', tr('d.compare.005')),
+    row('elapsed', tr('d.compare.006'), 'horas', asIs.elapsedH, toBe.elapsedH, 'calculado', tr('d.compare.007')),
+    row('effortExec', tr('d.compare.008'), 'pessoa-hora', asIs.effortExecH, toBe.effortExecH, 'calculado'),
+    row('volume', tr('d.compare.009'), tr('d.compare.010'), asIs.volumeMonth, toBe.volumeMonth, 'informado', undefined, false),
+    row('effortMonth', tr('d.compare.011'), tr('d.compare.012'), asIs.effortMonthH, toBeEffortMonthNorm, 'estimado', volumeDiffers ? tr('d.compare.013') : undefined),
+    row('costMonth', tr('d.compare.014'), tr('d.compare.015'), asIs.costMonth, toBeCostMonthNorm, 'estimado', volumeDiffers ? tr('d.compare.013') : undefined),
+    row('reworkMonth', tr('d.compare.017'), tr('d.compare.012'), asIs.reworkMonthH, toBe.reworkMonthH, 'estimado', tr('d.compare.019')),
   ];
 
   const freedHoursMonth = asIs.effortMonthH !== null && toBeEffortMonthNorm !== null ? asIs.effortMonthH - toBeEffortMonthNorm : null;
-  if (freedHoursMonth === null) reasons.freed = 'Informe volume, duração e pessoas nos dois cenários.';
+  if (freedHoursMonth === null) reasons.freed = tr('d.compare.020');
   const capacityExtraExecMonth = freedHoursMonth !== null && freedHoursMonth > 0 && toBe.effortExecH ? freedHoursMonth / toBe.effortExecH : null;
 
   const grossBenefitMonth = asIs.costMonth !== null && toBeCostMonthNorm !== null ? asIs.costMonth - toBeCostMonthNorm : null;
-  if (grossBenefitMonth === null) reasons.gross = asIs.metrics.totalCostPeriod.reason ?? 'Informe custo-hora e volume nos dois cenários.';
-  if (asIs.metrics.monthFactor === null) reasons.gross = reasons.freed = 'Informe os dias de operação por mês para converter o volume diário.';
+  if (grossBenefitMonth === null) reasons.gross = asIs.metrics.totalCostPeriod.reason ?? tr('d.compare.021');
+  if (asIs.metrics.monthFactor === null) reasons.gross = reasons.freed = tr('d.compare.022');
 
   const recurring = isNum(sc.recurringCostPerMonth) ? sc.recurringCostPerMonth : null;
   let netBenefitMonth: number | null = null;
   if (grossBenefitMonth !== null && recurring !== null) netBenefitMonth = grossBenefitMonth - recurring;
-  else if (grossBenefitMonth !== null) reasons.net = 'Informe o custo recorrente do cenário futuro (pode ser 0).';
+  else if (grossBenefitMonth !== null) reasons.net = tr('d.compare.023');
   else reasons.net = reasons.gross;
 
   const investment = isNum(sc.investment) ? sc.investment : null;
   let paybackMonths: number | null = null;
   let roiPct: number | null = null;
-  if (investment === null) reasons.payback = reasons.roi = 'Informe o investimento inicial (pode ser 0).';
+  if (investment === null) reasons.payback = reasons.roi = tr('d.compare.024');
   else if (netBenefitMonth === null) reasons.payback = reasons.roi = reasons.net;
-  else if (netBenefitMonth <= 0) reasons.payback = reasons.roi = 'Benefício líquido mensal não é positivo: não há retorno do investimento com estas premissas.';
+  else if (netBenefitMonth <= 0) reasons.payback = reasons.roi = tr('d.compare.025');
   else {
     paybackMonths = investment / netBenefitMonth;
     if (investment > 0) roiPct = ((netBenefitMonth * sc.horizonMonths - investment) / investment) * 100;
-    else reasons.roi = 'Investimento igual a zero: ROI não se aplica (divisão por zero).';
+    else reasons.roi = tr('d.compare.026');
   }
 
   // Faixa otimista/pessimista apenas com mínimos/máximos informados no TO-BE.
@@ -169,14 +177,14 @@ export function compareScenarios(asIsP: ProcessModel, sc: Scenario): Comparison 
 
   const confReasons: string[] = [];
   const cov = Math.min(asIs.coverage.duration, toBe.coverage.duration, asIs.coverage.people, toBe.coverage.people);
-  if (cov < 1) confReasons.push(`Duração/pessoas cobrem ${Math.round(cov * 100)}% das atividades.`);
-  if (grossBenefitMonth !== null && Math.min(asIs.coverage.cost, toBe.coverage.cost) < 1) confReasons.push('Custo-hora não cobre todas as atividades.');
+  if (cov < 1) confReasons.push(tr('d.compare.027', { p0: Math.round(cov * 100) }));
+  if (grossBenefitMonth !== null && Math.min(asIs.coverage.cost, toBe.coverage.cost) < 1) confReasons.push(tr('d.compare.028'));
   const pending = sc.assumptions.filter((a) => a.status === 'a_validar').length;
-  if (pending) confReasons.push(`${pending} premissa(s) do TO-BE ainda a validar.`);
-  if (!sc.changes.length) confReasons.push('Nenhuma mudança registrada no TO-BE.');
-  if (volumeDiffers) confReasons.push('Volumes diferentes entre cenários (comparação normalizada).');
+  if (pending) confReasons.push(tr('d.compare.029', { pending }));
+  if (!sc.changes.length) confReasons.push(tr('d.compare.030'));
+  if (volumeDiffers) confReasons.push(tr('d.compare.031'));
   const level: BusinessCase['confidence']['level'] = cov < 0.7 || pending > 2 ? 'baixa' : cov < 1 || pending > 0 || volumeDiffers ? 'média' : 'alta';
-  if (!confReasons.length) confReasons.push('Dados completos e premissas validadas. Ainda assim é uma estimativa.');
+  if (!confReasons.length) confReasons.push(tr('d.compare.033'));
 
   const asIds = new Map(asIsP.activities.map((a) => [a.id, a]));
   const toIds = new Map(sc.process.activities.map((a) => [a.id, a]));
@@ -226,7 +234,7 @@ export const DEFAULT_SENSITIVITY: Sensitivity = {
 };
 
 export type CaseKey = 'conservative' | 'base' | 'optimistic';
-export const CASE_LABEL: Record<CaseKey, string> = { conservative: 'Conservador', base: 'Base', optimistic: 'Otimista' };
+export const CASE_LABEL: Record<CaseKey, string> = lazyLabels({ conservative: 'd.case.conservative', base: 'd.case.base', optimistic: 'd.case.optimistic' });
 export interface CaseFigures {
   key: CaseKey;
   realizationPct: number;
@@ -251,13 +259,13 @@ export function businessCases(b: BusinessCase, sens: Sensitivity = DEFAULT_SENSI
     let payback: number | null = null;
     let roi: number | null = null;
     let reason: string | undefined;
-    if (inv === null) reason = b.reasons.payback ?? 'Informe o investimento inicial (pode ser 0).';
-    else if (net === null) reason = b.reasons.net ?? 'Informe custo-hora, volume e custo recorrente.';
-    else if (net <= 0) reason = 'Benefício líquido não é positivo neste caso: sem payback.';
+    if (inv === null) reason = b.reasons.payback ?? tr('d.compare.024');
+    else if (net === null) reason = b.reasons.net ?? tr('d.compare.035');
+    else if (net <= 0) reason = tr('d.compare.036');
     else {
       payback = inv / net;
       roi = inv > 0 ? ((net * b.horizonMonths - inv) / inv) * 100 : null;
-      if (inv === 0) reason = 'Investimento zero: ROI não se aplica.';
+      if (inv === 0) reason = tr('d.compare.037');
     }
     return { key, realizationPct, investmentPct, freedHoursMonth: freed, grossBenefitMonth: gross, netBenefitMonth: net, investment: inv, paybackMonths: payback, roiPct: roi, reason };
   };

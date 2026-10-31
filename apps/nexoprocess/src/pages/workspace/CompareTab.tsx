@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { CompareBars } from '../../components/charts';
 import { Badge, BasisTag, Button, Callout, Card, Empty, Field, HowCalc, Input, NumberInput, Select, Stat, Table, td, Term, th } from '../../components/ui';
-import { businessCases, CASE_LABEL, compareScenarios, DEFAULT_SENSITIVITY, responsibilityChanges, roleLoads, type CompareRow } from '../../domain/compare';
+import { businessCases, CASE_LABEL, compareScenarios, CONFIDENCE_LABEL, DEFAULT_SENSITIVITY, responsibilityChanges, roleLoads, type CompareRow } from '../../domain/compare';
 import type { Scenario, SensitivityCase } from '../../domain/types';
 import { fmtBRL, fmtDateTime, fmtHours, fmtNum, fmtPct, nowIso } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
@@ -56,7 +56,7 @@ export default function CompareTab() {
           )}
           <p className="text-sm text-ink2">
             <strong className="text-ink">{sc.name}</strong>{t('ws.cmp.007')}{fmtDateTime(sc.updatedAt)} · {sc.changes.length}{t('ws.cmp.008')}{' '}
-            <Badge tone={b.confidence.level === 'alta' ? 'ok' : b.confidence.level === 'média' ? 'amber' : 'bad'}>{b.confidence.level}</Badge>
+            <Badge tone={b.confidence.level === 'alta' ? 'ok' : b.confidence.level === 'média' ? 'amber' : 'bad'}>{CONFIDENCE_LABEL[b.confidence.level]}</Badge>
           </p>
         </div>
         <ul className="mt-2 list-disc pl-5 text-xs text-muted">

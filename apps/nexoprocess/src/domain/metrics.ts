@@ -6,6 +6,7 @@ import { buildGraph, longestPath, type ProcessGraph } from './graph';
 import type { Activity, BottleneckCriterion, LeanClass, ProcessModel } from './types';
 import { isNum, isPos, periodToMonthFactor, safeDiv, toHours } from './units';
 
+import { lazyLabels, tr } from '../i18n';
 export interface Coverage {
   used: number;
   total: number;
@@ -172,7 +173,7 @@ export function computeMetrics(p: ProcessModel): ProcessMetrics {
   const work = acts.filter(isWork);
   const assumptions: string[] = [];
   const hasDays = work.some((a) => a.unit === 'd');
-  if (hasDays) assumptions.push(`Durações em dias foram convertidas com 1 dia = ${p.hoursPerDay} h de trabalho (premissa editável).`);
+  if (hasDays) assumptions.push(tr('d.metrics.001', { hoursPerDay: p.hoursPerDay }));
 
   // Decisões sem duração são pontos de roteamento (contam 0, por regra) e não entram na
   // cobertura; decisões com duração informada (tempo para decidir) entram normalmente.
@@ -186,16 +187,16 @@ export function computeMetrics(p: ProcessModel): ProcessMetrics {
   const assumed100 = timed.filter((a) => per.get(a.id)!.weightSource === 'premissa_100');
   if (work.length && assumed100.length && (graphHasBranches(graph) || work.some((a) => a.rework))) {
     assumptions.push(
-      `${assumed100.length} atividade(s) sem frequência informada foram consideradas em 100% das execuções. Em processos com decisões ou retrabalho isso pode superestimar o esforço — informe a frequência (%) para refinar.`,
+      tr('d.metrics.002', { length: assumed100.length }),
     );
   }
 
   const effortPeriodH = sumBy(timed, (a) => per.get(a.id)!.effortPeriodH);
-  const effortPeriodReason = !isNum(p.volume) && !work.some((a) => isNum(a.volume)) ? 'Informe o volume de execuções por período para calcular.' : effortPeriodH.value === null ? 'Informe duração e pessoas para calcular.' : undefined;
+  const effortPeriodReason = !isNum(p.volume) && !work.some((a) => isNum(a.volume)) ? tr('d.metrics.003') : effortPeriodH.value === null ? tr('d.metrics.004') : undefined;
 
   const withEffortPeriod = timed.filter((a) => per.get(a.id)!.effortPeriodH !== null);
   const laborCostPeriod = sumBy(withEffortPeriod, (a) => per.get(a.id)!.laborCostPeriod);
-  const laborReason = !withEffortPeriod.length ? effortPeriodReason ?? 'Sem esforço por período calculável.' : laborCostPeriod.value === null ? 'Informe o custo-hora (padrão, por função ou por atividade) para calcular.' : undefined;
+  const laborReason = !withEffortPeriod.length ? effortPeriodReason ?? tr('d.metrics.005') : laborCostPeriod.value === null ? tr('d.metrics.006') : undefined;
   const withVarCost = work.filter((a) => isNum(a.variableCost));
   const variableCostPeriod = sumBy(withVarCost, (a) => per.get(a.id)!.variableCostPeriod);
 
@@ -203,16 +204,16 @@ export function computeMetrics(p: ProcessModel): ProcessMetrics {
   if (p.variableCostIncludesLabor) {
     totalCostPeriod = {
       value: variableCostPeriod.value ?? laborCostPeriod.value,
-      overlapNote: 'Custo variável declarado como já incluindo mão de obra: o custo de mão de obra NÃO foi somado ao total para evitar dupla contagem.',
+      overlapNote: tr('d.metrics.007'),
       reason: variableCostPeriod.value === null && laborCostPeriod.value === null ? laborReason : undefined,
     };
   } else if (laborCostPeriod.value === null && variableCostPeriod.value === null) {
-    totalCostPeriod = { value: null, reason: laborReason ?? 'Sem dados de custo.' };
+    totalCostPeriod = { value: null, reason: laborReason ?? tr('d.metrics.008') };
   } else {
     totalCostPeriod = { value: (laborCostPeriod.value ?? 0) + (variableCostPeriod.value ?? 0) };
   }
   if (laborCostPeriod.value !== null && laborCostPeriod.coverage.missing.length)
-    assumptions.push(`Custo de mão de obra parcial: ${laborCostPeriod.coverage.missing.length} atividade(s) com esforço não têm custo-hora.`);
+    assumptions.push(tr('d.metrics.009', { length: laborCostPeriod.coverage.missing.length }));
 
   // Lean — base: duração ativa (não quantidade de atividades).
   const leanHours = emptyLean();
@@ -230,12 +231,12 @@ export function computeMetrics(p: ProcessModel): ProcessMetrics {
     W: pctOf(leanHours.W, classifiedHours),
   };
 
-  const byStage = group(p, work, per, (a) => a.stage || 'Sem etapa', p.stageOrder).filter((g) => g.count > 0);
-  const byOwner = group(p, work, per, (a) => a.owner?.trim() || 'Sem responsável').sort((x, y) => y.effortExecH - x.effortExecH);
+  const byStage = group(p, work, per, (a) => a.stage || tr('d.metrics.010'), p.stageOrder).filter((g) => g.count > 0);
+  const byOwner = group(p, work, per, (a) => a.owner?.trim() || tr('d.metrics.011')).sort((x, y) => y.effortExecH - x.effortExecH);
 
   const elapsed = computeElapsed(p, graph, per);
   if (elapsed.status === 'ok' && elapsed.waitsMissing > 0)
-    assumptions.push(`Tempo decorrido: ${elapsed.waitsMissing} atividade(s) no caminho sem tempo de espera informado — esperas ausentes não foram somadas (o tempo real pode ser maior).`);
+    assumptions.push(tr('d.metrics.012', { waitsMissing: elapsed.waitsMissing }));
 
   const reworkActs = work.filter((a) => a.rework);
   const missingFrequency = reworkActs.filter((a) => per.get(a.id)!.weightSource === 'premissa_100').map((a) => a.id);
@@ -287,11 +288,11 @@ function pctOf(part: number, total: number): number | null {
 
 function computeElapsed(p: ProcessModel, g: ProcessGraph, per: Map<string, ActivityMetrics>): ElapsedResult {
   const reasons: string[] = [];
-  if (!g.byId.size) return { status: 'nao_calculado', reasons: ['Processo sem atividades.'] };
-  if (g.dangling.length) reasons.push(`${g.dangling.length} ligação(ões) apontam para atividades inexistentes.`);
-  if (g.unreachable.length) reasons.push(`${g.unreachable.length} atividade(s) não são alcançáveis a partir do início.`);
+  if (!g.byId.size) return { status: 'nao_calculado', reasons: [tr('d.metrics.013')] };
+  if (g.dangling.length) reasons.push(tr('d.metrics.014', { length: g.dangling.length }));
+  if (g.unreachable.length) reasons.push(tr('d.metrics.015', { length: g.unreachable.length }));
   const missingDur = [...g.byId.values()].filter((a) => a.type === 'task' && per.get(a.id)!.activeH === null);
-  if (missingDur.length) reasons.push(`${missingDur.length} atividade(s) sem duração.`);
+  if (missingDur.length) reasons.push(tr('d.metrics.016', { length: missingDur.length }));
   if (reasons.length) return { status: 'nao_calculado', reasons };
 
   // Regra explícita: início, fim e decisões sem duração contam 0 (pontos de roteamento).
@@ -307,13 +308,13 @@ function computeElapsed(p: ProcessModel, g: ProcessGraph, per: Map<string, Activ
 // ---------------------------------------------------------------------------
 // Gargalos e Pareto
 
-export const CRITERION_LABEL: Record<BottleneckCriterion, string> = {
-  duration: 'Duração ativa por execução',
-  effort: 'Esforço (pessoa-hora) no período',
-  cost: 'Custo estimado no período',
-  wait: 'Tempo de espera',
-  rework: 'Esforço em retrabalho',
-};
+export const CRITERION_LABEL: Record<BottleneckCriterion, string> = lazyLabels({
+  duration: 'd.crit.duration',
+  effort: 'd.crit.effort',
+  cost: 'd.crit.cost',
+  wait: 'd.crit.wait',
+  rework: 'd.crit.rework',
+});
 
 export interface RankedItem {
   id: string;
@@ -349,14 +350,14 @@ export function pareto(p: ProcessModel, m: ProcessMetrics, c: BottleneckCriterio
   if (!vals.length || total <= 0) {
     const reason =
       c === 'cost'
-        ? 'Adicione custo-hora e volume para calcular.'
+        ? tr('d.metrics.017')
         : c === 'effort'
-          ? 'Adicione duração e quantidade de pessoas para calcular.'
+          ? tr('d.metrics.018')
           : c === 'wait'
-            ? 'Adicione o tempo de espera das atividades para calcular.'
+            ? tr('d.metrics.019')
             : c === 'rework'
-              ? 'Marque as atividades de retrabalho (com duração e pessoas) para calcular.'
-              : 'Adicione a duração das atividades para calcular.';
+              ? tr('d.metrics.020')
+              : tr('d.metrics.021');
     return { items: [], total: null, reason };
   }
   let cum = 0;
@@ -390,19 +391,19 @@ export function dataGaps(p: ProcessModel, m: ProcessMetrics): DataGap[] {
   const w = m.workItems;
   const tasks = w.filter((a) => a.type === 'task');
   const gaps: DataGap[] = [
-    { field: 'duracao', label: 'Duração', missing: tasks.filter((a) => !isNum(a.duration)).length, total: tasks.length, unlocks: 'tempo por etapa, gargalos e tempo decorrido' },
-    { field: 'quantidade_pessoas', label: 'Quantidade de pessoas', missing: tasks.filter((a) => !isNum(a.people)).length, total: tasks.length, unlocks: 'esforço em pessoa-hora' },
-    { field: 'responsavel', label: 'Responsável', missing: tasks.filter((a) => !a.owner?.trim()).length, total: tasks.length, unlocks: 'carga por responsável e matriz RACI' },
-    { field: 'classificacao_lean', label: 'Classificação Lean', missing: tasks.filter((a) => !a.lean).length, total: tasks.length, unlocks: 'distribuição de valor e desperdício' },
-    { field: 'tempo_espera', label: 'Tempo de espera', missing: tasks.filter((a) => !isNum(a.wait)).length, total: tasks.length, unlocks: 'tempo decorrido mais realista e gargalos de espera' },
-    { field: 'duracao_minima/maxima', label: 'Duração mínima e máxima', missing: tasks.filter((a) => !isNum(a.minDuration) || !isNum(a.maxDuration)).length, total: tasks.length, unlocks: 'simulação de incerteza de prazo' },
+    { field: 'duracao', label: tr('d.metrics.022'), missing: tasks.filter((a) => !isNum(a.duration)).length, total: tasks.length, unlocks: tr('d.metrics.023') },
+    { field: 'quantidade_pessoas', label: tr('d.metrics.024'), missing: tasks.filter((a) => !isNum(a.people)).length, total: tasks.length, unlocks: tr('d.metrics.025') },
+    { field: 'responsavel', label: tr('d.metrics.026'), missing: tasks.filter((a) => !a.owner?.trim()).length, total: tasks.length, unlocks: tr('d.metrics.027') },
+    { field: 'classificacao_lean', label: tr('d.metrics.028'), missing: tasks.filter((a) => !a.lean).length, total: tasks.length, unlocks: tr('d.metrics.029') },
+    { field: 'tempo_espera', label: tr('d.metrics.030'), missing: tasks.filter((a) => !isNum(a.wait)).length, total: tasks.length, unlocks: tr('d.metrics.031') },
+    { field: 'duracao_minima/maxima', label: tr('d.metrics.032'), missing: tasks.filter((a) => !isNum(a.minDuration) || !isNum(a.maxDuration)).length, total: tasks.length, unlocks: tr('d.metrics.033') },
   ];
   if (!isNum(p.volume) && !w.some((a) => isNum(a.volume)))
-    gaps.push({ field: 'volume', label: 'Volume de execuções por período', missing: 1, total: 1, unlocks: 'esforço e custo por período, capacidade e business case' });
+    gaps.push({ field: 'volume', label: tr('d.metrics.034'), missing: 1, total: 1, unlocks: tr('d.metrics.035') });
   const noCost = tasks.filter((a) => m.per.get(a.id)!.costPerHour === null).length;
-  gaps.push({ field: 'custo_hora', label: 'Custo-hora carregado', missing: noCost, total: tasks.length, unlocks: 'custo estimado e benefício financeiro' });
+  gaps.push({ field: 'custo_hora', label: tr('d.metrics.036'), missing: noCost, total: tasks.length, unlocks: tr('d.metrics.037') });
   if (p.volumePeriod === 'dia' && !isPos(p.operatingDaysPerMonth))
-    gaps.push({ field: 'dias_operacao_mes', label: 'Dias de operação por mês', missing: 1, total: 1, unlocks: 'conversão do volume diário para mês' });
+    gaps.push({ field: 'dias_operacao_mes', label: tr('d.metrics.038'), missing: 1, total: 1, unlocks: tr('d.metrics.039') });
   return gaps.filter((g) => g.missing > 0);
 }
 

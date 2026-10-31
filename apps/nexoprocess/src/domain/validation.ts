@@ -5,6 +5,7 @@ import { buildGraph, sortedActivities } from './graph';
 import type { Activity, ProcessModel } from './types';
 import { isNum } from './units';
 
+import { tr } from '../i18n';
 export type Severity = 'error' | 'warning' | 'info';
 export interface Issue {
   id: string;
@@ -19,20 +20,20 @@ export interface Issue {
 }
 
 const clone = (p: ProcessModel): ProcessModel => structuredClone(p);
-const where = (a: Activity) => (a.sourceRow ? ` (linha ${a.sourceRow})` : '');
+const where = (a: Activity) => (a.sourceRow ? tr('d.validation.001', { sourceRow: a.sourceRow }) : '');
 
 export function validateProcess(p: ProcessModel): Issue[] {
   const issues: Issue[] = [];
   const push = (i: Omit<Issue, 'id'>) => issues.push({ ...i, id: `${i.code}:${i.activityId ?? ''}:${issues.length}` });
 
   if (!p.activities.length) {
-    push({ severity: 'error', code: 'empty', message: 'O processo não tem atividades.', why: 'Sem atividades não há mapa nem análise.', fix: 'Adicione pelo menos uma atividade.' });
+    push({ severity: 'error', code: 'empty', message: tr('d.validation.002'), why: tr('d.validation.003'), fix: tr('d.validation.004') });
     return issues;
   }
   if (!isNum(p.hoursPerDay) || p.hoursPerDay <= 0 || p.hoursPerDay > 24)
-    push({ severity: 'error', code: 'hours_per_day', message: 'Horas de trabalho por dia inválidas.', why: 'É a premissa usada para converter dias em horas.', fix: 'Informe um valor entre 1 e 24 (ex.: 8).' });
+    push({ severity: 'error', code: 'hours_per_day', message: tr('d.validation.005'), why: tr('d.validation.006'), fix: tr('d.validation.007') });
   if (isNum(p.volume) && p.volume < 0)
-    push({ severity: 'error', code: 'volume_negative', message: 'Volume de execuções negativo.', why: 'Volume negativo não tem significado.', fix: 'Informe zero ou um valor positivo.' });
+    push({ severity: 'error', code: 'volume_negative', message: tr('d.validation.008'), why: tr('d.validation.009'), fix: tr('d.validation.010') });
 
   // IDs duplicados
   const seen = new Map<string, Activity>();
@@ -43,9 +44,9 @@ export function validateProcess(p: ProcessModel): Issue[] {
         code: 'duplicate_id',
         activityId: a.id,
         row: a.sourceRow,
-        message: `O código "${a.id}" aparece mais de uma vez${where(a)}.`,
-        why: 'As ligações entre atividades usam o código; duplicados tornam o fluxo ambíguo.',
-        fix: 'Dê um código único para cada atividade.',
+        message: tr('d.validation.011', { id: a.id, p1: where(a) }),
+        why: tr('d.validation.012'),
+        fix: tr('d.validation.013'),
       });
     else seen.set(a.id, a);
   }
@@ -53,17 +54,17 @@ export function validateProcess(p: ProcessModel): Issue[] {
   const ordered = sortedActivities(p);
   for (const a of p.activities) {
     if (!a.name?.trim())
-      push({ severity: 'error', code: 'no_name', activityId: a.id, row: a.sourceRow, message: `Atividade sem nome${where(a)}.`, why: 'O nome aparece no mapa e no relatório.', fix: 'Escreva o que acontece nessa atividade.' });
+      push({ severity: 'error', code: 'no_name', activityId: a.id, row: a.sourceRow, message: tr('d.validation.014', { p0: where(a) }), why: tr('d.validation.015'), fix: tr('d.validation.016') });
     if (!a.stage?.trim())
-      push({ severity: 'warning', code: 'no_stage', activityId: a.id, row: a.sourceRow, message: `"${a.name}" não tem etapa macro${where(a)}.`, why: 'A etapa agrupa atividades na visão macro.', fix: 'Informe a etapa (ex.: "Recebimento").' });
+      push({ severity: 'warning', code: 'no_stage', activityId: a.id, row: a.sourceRow, message: tr('d.validation.017', { name: a.name, p1: where(a) }), why: tr('d.validation.018'), fix: tr('d.validation.019') });
     for (const [field, label] of [
-      ['duration', 'Duração'],
-      ['wait', 'Tempo de espera'],
-      ['minDuration', 'Duração mínima'],
-      ['maxDuration', 'Duração máxima'],
-      ['people', 'Quantidade de pessoas'],
+      ['duration', tr('d.validation.020')],
+      ['wait', tr('d.validation.021')],
+      ['minDuration', tr('d.validation.022')],
+      ['maxDuration', tr('d.validation.023')],
+      ['people', tr('d.validation.024')],
       ['costPerHour', 'Custo-hora'],
-      ['variableCost', 'Custo variável'],
+      ['variableCost', tr('d.validation.025')],
       ['volume', 'Volume'],
     ] as const) {
       const v = a[field];
@@ -73,25 +74,25 @@ export function validateProcess(p: ProcessModel): Issue[] {
           code: `invalid_${field}`,
           activityId: a.id,
           row: a.sourceRow,
-          message: `${label} inválido(a) em "${a.name}"${where(a)}.`,
-          why: 'Valores não numéricos ou negativos distorcem os cálculos.',
-          fix: 'Use apenas números positivos (ex.: 30 ou 1,5).',
+          message: tr('d.validation.026', { label, name: a.name, p2: where(a) }),
+          why: tr('d.validation.027'),
+          fix: tr('d.validation.028'),
         });
     }
     if (isNum(a.frequencyPct) && (a.frequencyPct < 0 || a.frequencyPct > 100))
-      push({ severity: 'error', code: 'invalid_frequency', activityId: a.id, row: a.sourceRow, message: `Frequência fora de 0–100% em "${a.name}"${where(a)}.`, why: 'Frequência é o percentual de execuções que passam pela atividade.', fix: 'Informe um percentual entre 0 e 100.' });
+      push({ severity: 'error', code: 'invalid_frequency', activityId: a.id, row: a.sourceRow, message: tr('d.validation.029', { name: a.name, p1: where(a) }), why: tr('d.validation.030'), fix: tr('d.validation.031') });
     if (a.type === 'task' && !isNum(a.duration))
-      push({ severity: 'warning', code: 'no_duration', activityId: a.id, row: a.sourceRow, message: `"${a.name}" está sem duração${where(a)}.`, why: 'Sem duração, tempo, esforço e gargalos ficam incompletos.', fix: 'Informe o tempo estimado de trabalho.' });
+      push({ severity: 'warning', code: 'no_duration', activityId: a.id, row: a.sourceRow, message: tr('d.validation.032', { name: a.name, p1: where(a) }), why: tr('d.validation.033'), fix: tr('d.validation.034') });
     if (a.type === 'task' && isNum(a.people) && a.people === 0)
-      push({ severity: 'warning', code: 'zero_people', activityId: a.id, row: a.sourceRow, message: `"${a.name}" tem 0 pessoas${where(a)}.`, why: 'Atividade sem pessoas resulta em esforço zero — correto apenas se for 100% automática.', fix: 'Confirme ou informe quantas pessoas executam.' });
+      push({ severity: 'warning', code: 'zero_people', activityId: a.id, row: a.sourceRow, message: tr('d.validation.035', { name: a.name, p1: where(a) }), why: tr('d.validation.036'), fix: tr('d.validation.037') });
     if (isNum(a.duration) && ((isNum(a.minDuration) && a.minDuration > a.duration) || (isNum(a.maxDuration) && a.maxDuration < a.duration)))
-      push({ severity: 'warning', code: 'min_max', activityId: a.id, row: a.sourceRow, message: `Mínimo/máximo incoerentes com a duração em "${a.name}"${where(a)}.`, why: 'A simulação exige mínimo ≤ mais provável ≤ máximo.', fix: 'Ajuste os valores mínimo e máximo.' });
+      push({ severity: 'warning', code: 'min_max', activityId: a.id, row: a.sourceRow, message: tr('d.validation.038', { name: a.name, p1: where(a) }), why: tr('d.validation.039'), fix: tr('d.validation.040') });
     if (a.type === 'decision') {
       const paths = [a.nextYes, a.nextNo, ...a.next].filter(Boolean);
       if (!paths.length)
-        push({ severity: 'error', code: 'decision_no_path', activityId: a.id, row: a.sourceRow, message: `A decisão "${a.name}" não tem caminhos${where(a)}.`, why: 'Uma decisão precisa indicar para onde segue em cada resposta.', fix: 'Preencha "próxima se sim" e "próxima se não".' });
+        push({ severity: 'error', code: 'decision_no_path', activityId: a.id, row: a.sourceRow, message: tr('d.validation.041', { name: a.name, p1: where(a) }), why: tr('d.validation.042'), fix: tr('d.validation.043') });
       else if (!a.nextYes || !a.nextNo)
-        push({ severity: 'warning', code: 'decision_one_path', activityId: a.id, row: a.sourceRow, message: `A decisão "${a.name}" tem só um caminho${where(a)}.`, why: 'Decisões normalmente têm ao menos duas saídas.', fix: 'Complete o caminho que falta ou transforme em atividade.' });
+        push({ severity: 'warning', code: 'decision_one_path', activityId: a.id, row: a.sourceRow, message: tr('d.validation.044', { name: a.name, p1: where(a) }), why: tr('d.validation.045'), fix: tr('d.validation.046') });
     }
   }
 
@@ -103,11 +104,11 @@ export function validateProcess(p: ProcessModel): Issue[] {
       code: 'dangling',
       activityId: a.id,
       row: a.sourceRow,
-      message: `"${a.name}" aponta para "${d.to}", que não existe${where(a)}.`,
-      why: 'Ligações para atividades inexistentes quebram o fluxo.',
-      fix: 'Corrija o código da próxima atividade ou remova a ligação.',
+      message: tr('d.validation.047', { name: a.name, to: d.to, p2: where(a) }),
+      why: tr('d.validation.048'),
+      fix: tr('d.validation.049'),
       autofix: {
-        label: `Remover a ligação para "${d.to}"`,
+        label: tr('d.validation.050', { to: d.to }),
         apply: (pp) => {
           const c = clone(pp);
           const x = c.activities.find((y) => y.id === a.id)!;
@@ -121,7 +122,7 @@ export function validateProcess(p: ProcessModel): Issue[] {
   }
   for (const id of g.unreachable) {
     const a = g.byId.get(id)!;
-    push({ severity: 'warning', code: 'unreachable', activityId: id, row: a.sourceRow, message: `"${a.name}" não é alcançada a partir do início${where(a)}.`, why: 'Atividades soltas não entram no tempo decorrido.', fix: 'Ligue uma atividade anterior a ela.' });
+    push({ severity: 'warning', code: 'unreachable', activityId: id, row: a.sourceRow, message: tr('d.validation.051', { name: a.name, p1: where(a) }), why: tr('d.validation.052'), fix: tr('d.validation.053') });
   }
   // Atividades que terminam o fluxo sem ser "fim"
   const idx = new Map(ordered.map((a, i) => [a.id, i]));
@@ -136,12 +137,12 @@ export function validateProcess(p: ProcessModel): Issue[] {
       code: 'dead_end',
       activityId: a.id,
       row: a.sourceRow,
-      message: `"${a.name}" não indica a próxima atividade${where(a)}.`,
-      why: 'O fluxo termina aqui; se não for o fim do processo, o mapa e o tempo decorrido ficam incorretos.',
-      fix: 'Informe a próxima atividade, ou confirme que o processo termina aqui.',
+      message: tr('d.validation.054', { name: a.name, p1: where(a) }),
+      why: tr('d.validation.055'),
+      fix: tr('d.validation.056'),
       autofix: nextByOrder
         ? {
-            label: `Ligar a "${nextByOrder.name}" (próxima pela ordem)`,
+            label: tr('d.validation.057', { name: nextByOrder.name }),
             apply: (pp) => {
               const c = clone(pp);
               c.activities.find((y) => y.id === a.id)!.next = [nextByOrder.id];
@@ -178,15 +179,15 @@ export function validateProcess(p: ProcessModel): Issue[] {
   for (const e of g.backEdges) {
     const a = g.byId.get(e.from)!;
     if (e.kind === 'seq' && !cycleHasDecision(e.from, e.to))
-      push({ severity: 'warning', code: 'loop_no_decision', activityId: a.id, row: a.sourceRow, message: `Retorno sem decisão de "${a.name}" para "${g.byId.get(e.to)!.name}".`, why: 'Um retorno incondicional cria um ciclo sem saída.', fix: 'Use uma decisão (ex.: "Aprovado?") para controlar o retorno.' });
+      push({ severity: 'warning', code: 'loop_no_decision', activityId: a.id, row: a.sourceRow, message: tr('d.validation.058', { name: a.name, p1: g.byId.get(e.to)!.name }), why: tr('d.validation.059'), fix: tr('d.validation.060') });
   }
   if (!p.activities.some((a) => a.type === 'start'))
-    push({ severity: 'info', code: 'no_start', message: 'Nenhum evento de início informado.', why: 'O mapa mostra um início implícito antes da primeira atividade.', fix: 'Opcional: adicione uma linha do tipo "início".' });
+    push({ severity: 'info', code: 'no_start', message: tr('d.validation.061'), why: tr('d.validation.062'), fix: tr('d.validation.063') });
   if (!p.activities.some((a) => a.type === 'end'))
-    push({ severity: 'info', code: 'no_end', message: 'Nenhum evento de fim informado.', why: 'O mapa mostra um fim implícito após as últimas atividades.', fix: 'Opcional: adicione uma linha do tipo "fim".' });
+    push({ severity: 'info', code: 'no_end', message: tr('d.validation.064'), why: tr('d.validation.065'), fix: tr('d.validation.066') });
   const inferred = p.activities.filter((a) => a.flowInferred).length;
   if (inferred)
-    push({ severity: 'info', code: 'flow_inferred', message: `${inferred} conexão(ões) foram inferidas pela ordem das linhas.`, why: 'A planilha não tinha coluna de próxima atividade; o fluxo foi montado em sequência.', fix: 'Revise o mapa; ajuste conexões na edição de dados se houver decisões ou paralelos.' });
+    push({ severity: 'info', code: 'flow_inferred', message: tr('d.validation.067', { inferred }), why: tr('d.validation.068'), fix: tr('d.validation.069') });
   return issues;
 }
 

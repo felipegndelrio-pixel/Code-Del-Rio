@@ -5,7 +5,7 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import { BRAND } from '../../config/brand';
 import { buildBpmn } from '../../bpmn/model';
 import { Badge, BasisTag, Button, Field, Select } from '../../components/ui';
-import { businessCases, CASE_LABEL, compareScenarios, responsibilityChanges } from '../../domain/compare';
+import { CONFIDENCE_LABEL, businessCases, CASE_LABEL, compareScenarios, responsibilityChanges } from '../../domain/compare';
 import { relatedProblemOf } from '../../domain/plan';
 import { bottlenecks, CRITERION_LABEL, dataGaps, pareto } from '../../domain/metrics';
 import { GROUP_LABEL } from '../../domain/recommendations';
@@ -463,7 +463,7 @@ export default function ReportPage() {
                 <Row k="Investimento inicial" v={cmp.business.investment === null ? 'não informado' : fmtBRL(cmp.business.investment)} b="informado" />
                 <Row k="Payback" v={cmp.business.paybackMonths === null ? `não calculado: ${cmp.business.reasons.payback}` : cmp.business.paybackMonths === 0 ? 'imediato' : `${fmtNum(cmp.business.paybackMonths, 1)} meses`} b="estimado" />
                 <Row k={`ROI em ${cmp.business.horizonMonths} meses`} v={cmp.business.roiPct === null ? `não calculado: ${cmp.business.reasons.roi}` : fmtPct(cmp.business.roiPct)} b="estimado" />
-                <Row k="Confiança qualitativa" v={`${cmp.business.confidence.level} — ${cmp.business.confidence.reasons.join(' ')}`} />
+                <Row k="Confiança qualitativa" v={`${CONFIDENCE_LABEL[cmp.business.confidence.level]} — ${cmp.business.confidence.reasons.join(' ')}`} />
                 {sc.approvedTarget && <Row k="Meta aprovada" v={`${sc.approvedTarget.description}${sc.approvedTarget.value !== undefined ? `: ${fmtNum(sc.approvedTarget.value)} ${sc.approvedTarget.unit ?? ''}` : ''} (por ${sc.approvedTarget.approvedBy ?? '—'}, ${fmtDate(sc.approvedTarget.approvedAt)})`} />}
               </tbody>
             </table>
