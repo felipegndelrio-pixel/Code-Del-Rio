@@ -10,6 +10,7 @@ import type { Activity, ProcessModel } from '../domain/types';
 import { fmtDuration } from '../domain/units';
 import { layoutGraph, type LEdge, type LNode, type Layout, type NodeKind } from './layout';
 
+import { tr } from '../i18n';
 export interface PlaneSpec {
   id: string;
   /** Elemento BPMN dono do plano (processo ou subprocesso). */
@@ -83,7 +84,7 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
   }
   const macroEdges: PlaneSpec['edges'] = [];
   const addMacro = (from: string, to: string, e?: Edge) => {
-    const label = e?.kind === 'yes' ? 'Sim' : e?.kind === 'no' ? 'Não' : undefined;
+    const label = e?.kind === 'yes' ? tr('d.bpmn.yes') : e?.kind === 'no' ? tr('d.bpmn.no') : undefined;
     const existing = macroEdges.find((x) => x.from === from && x.to === to);
     if (existing) {
       if (existing.label && label && !existing.label.includes(label)) existing.label = `${existing.label}/${label}`;
@@ -133,7 +134,7 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
         id: mkId('Flow', `${from}_${to}`),
         from,
         to,
-        label: e?.kind === 'yes' ? 'Sim' : e?.kind === 'no' ? 'Não' : undefined,
+        label: e?.kind === 'yes' ? tr('d.bpmn.yes') : e?.kind === 'no' ? tr('d.bpmn.no') : undefined,
         kind: e?.kind,
         rework: e ? e.back || !!g.byId.get(e.to)?.rework : false,
         inferred: e?.inferred,

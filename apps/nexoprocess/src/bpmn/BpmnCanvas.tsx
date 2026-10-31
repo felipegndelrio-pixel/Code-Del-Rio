@@ -9,6 +9,7 @@ import type { Theme } from '../state/theme';
 import { createViewer } from './render';
 import type { BpmnBuild } from './model';
 
+import { useI18n } from '../i18n/I18nProvider';
 export interface Decoration {
   classes: string[];
   badges: { text: string; tone: 'bad' | 'amber' }[];
@@ -31,6 +32,7 @@ interface Props {
 }
 
 const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ build, theme, stage, onStageChange, selected, onSelect, decorations, height = 'min(68vh, 640px)' }, ref) {
+  const { t } = useI18n();
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null);
   const macroRoot = useRef<any>(null);
@@ -198,7 +200,7 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-line/15 bg-surface2/30">
-      <div ref={host} className="np-canvas w-full" style={{ height }} role="region" aria-label={stage ? `Mapa detalhado da etapa ${stage}` : 'Mapa macro do processo'} data-testid="bpmn-canvas" />
+      <div ref={host} className="np-canvas w-full" style={{ height }} role="region" aria-label={stage ? t('ui.bpmn.002', { stage }) : t('ui.bpmn.003')} data-testid="bpmn-canvas" />
       {/* Abaixo de 768 px (zoom travado, diagrama ancorado no topo) os controles ficam numa
           barra abaixo do quadro: não cobrem o diagrama nem a marca do bpmn.io (canto inferior
           direito, exigida pela licença). A partir de md, sobrepostos aos cantos superiores. */}
@@ -206,28 +208,25 @@ const BpmnCanvas = forwardRef<BpmnCanvasHandle, Props>(function BpmnCanvas({ bui
         <div className="flex flex-wrap gap-1 md:absolute md:left-2 md:top-2 md:z-10">
           {stage && (
             <button type="button" onClick={() => onStageChange(null)} className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-line/20 bg-surface px-3 text-sm font-semibold text-ink shadow-card hover:border-brand/60">
-              <ChevronLeft className="h-4 w-4" aria-hidden /> Visão macro
-            </button>
+              <ChevronLeft className="h-4 w-4" aria-hidden />{t('ui.bpmn.004')}</button>
           )}
         </div>
         <div className="flex gap-1 md:absolute md:right-2 md:top-2 md:z-10">
-          <CtrlBtn label="Aproximar" onClick={() => zoom(1.25)}>
+          <CtrlBtn label={t('ui.bpmn.005')} onClick={() => zoom(1.25)}>
             <Plus className="h-4 w-4" />
           </CtrlBtn>
-          <CtrlBtn label="Afastar" onClick={() => zoom(0.8)}>
+          <CtrlBtn label={t('ui.bpmn.006')} onClick={() => zoom(0.8)}>
             <Minus className="h-4 w-4" />
           </CtrlBtn>
-          <CtrlBtn label="Ajustar à tela" onClick={() => zoom('fit')}>
+          <CtrlBtn label={t('ui.bpmn.007')} onClick={() => zoom('fit')}>
             <Maximize2 className="h-4 w-4" />
           </CtrlBtn>
         </div>
       </div>
-      <p className="no-print border-t border-line/10 px-3 py-1.5 text-xs text-muted">Arraste para mover · roda do mouse, pinça ou + / − para zoom · “Ajustar à tela” mostra tudo.</p>
-      {!ready && !error && <p className="absolute inset-0 flex items-center justify-center text-sm text-muted">Desenhando o mapa…</p>}
+      <p className="no-print border-t border-line/10 px-3 py-1.5 text-xs text-muted">{t('ui.bpmn.008')}</p>
+      {!ready && !error && <p className="absolute inset-0 flex items-center justify-center text-sm text-muted">{t('ui.bpmn.009')}</p>}
       {error && (
-        <p role="alert" className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-bad">
-          Não foi possível desenhar o mapa: {error}. Os dados continuam disponíveis nas listas e tabelas.
-        </p>
+        <p role="alert" className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-bad">{t('ui.bpmn.010')}{error}{t('ui.bpmn.011')}</p>
       )}
     </div>
   );

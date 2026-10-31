@@ -8,6 +8,7 @@ import { fmtNum, fmtPct } from '../domain/units';
 import { chartColors, useTheme } from '../state/theme';
 import { Table, td, th } from './ui';
 
+import { tr } from '../i18n';
 export function ChartFrame({ title, children, table, note }: { title: ReactNode; children: ReactNode; table: ReactNode; note?: ReactNode }) {
   const [asTable, setAsTable] = useState(false);
   return (
@@ -16,7 +17,7 @@ export function ChartFrame({ title, children, table, note }: { title: ReactNode;
         <figcaption className="text-sm font-semibold text-ink">{title}</figcaption>
         <button type="button" onClick={() => setAsTable((t) => !t)} className="no-print inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2 text-xs font-semibold text-ink2 hover:text-ink" aria-pressed={asTable}>
           {asTable ? <BarChart3 className="h-4 w-4" aria-hidden /> : <TableIcon className="h-4 w-4" aria-hidden />}
-          {asTable ? 'Ver gráfico' : 'Ver tabela'}
+          {asTable ? tr('ui.chart.001') : tr('ui.chart.002')}
         </button>
       </div>
       {asTable ? table : children}
@@ -39,16 +40,16 @@ export function ParetoChart({ data, unitLabel }: { data: { name: string; share: 
   const rows = data.slice(0, 12);
   return (
     <ChartFrame
-      title="Pareto — participação de cada atividade (%)"
-      note={`Base: ${unitLabel}. Linha = participação acumulada. Mostra concentração, não causa.`}
+      title={tr('ui.chart.004')}
+      note={tr('ui.chart.005', { unitLabel })}
       table={
-        <Table caption="Pareto">
+        <Table caption={tr('ui.chart.006')}>
           <thead>
             <tr>
-              <th className={th}>Atividade</th>
-              <th className={th}>Valor</th>
-              <th className={th}>Participação</th>
-              <th className={th}>Acumulado</th>
+              <th className={th}>{tr('ui.chart.007')}</th>
+              <th className={th}>{tr('ui.chart.008')}</th>
+              <th className={th}>{tr('ui.chart.009')}</th>
+              <th className={th}>{tr('ui.chart.010')}</th>
             </tr>
           </thead>
           <tbody>
@@ -70,8 +71,8 @@ export function ParetoChart({ data, unitLabel }: { data: { name: string; share: 
             <CartesianGrid vertical={false} stroke={c.grid} />
             <XAxis dataKey="name" tick={{ fill: c.axis, fontSize: 11 }} interval={0} angle={-25} textAnchor="end" height={70} tickFormatter={(v: string) => (v.length > 18 ? v.slice(0, 17) + '…' : v)} />
             <YAxis domain={[0, 100]} tick={{ fill: c.axis, fontSize: 11 }} tickFormatter={(v) => `${v}%`} width={44} />
-            <Tooltip {...tooltipStyle(c)} formatter={(v, n) => [fmtPct(Number(v), 1), n === 'share' ? 'Participação' : 'Acumulado']} />
-            <Legend formatter={(v) => (v === 'share' ? 'Participação' : 'Acumulado')} wrapperStyle={{ fontSize: 12, color: c.axis }} />
+            <Tooltip {...tooltipStyle(c)} formatter={(v, n) => [fmtPct(Number(v), 1), n === 'share' ? tr('ui.chart.009') : tr('ui.chart.010')]} />
+            <Legend formatter={(v) => (v === 'share' ? tr('ui.chart.009') : tr('ui.chart.010'))} wrapperStyle={{ fontSize: 12, color: c.axis }} />
             <Bar isAnimationActive={false} dataKey="share" fill={c.series[0]} radius={[4, 4, 0, 0]} maxBarSize={40} />
             <Line isAnimationActive={false} dataKey="cumulative" stroke={c.series[1]} strokeWidth={2} dot={{ r: 4 }} />
           </ComposedChart>
@@ -88,15 +89,15 @@ export function LeanBar({ hours, pct }: { hours: Record<LeanClass | 'U', number>
   const keys: LeanClass[] = ['VA', 'NNVA', 'W'];
   return (
     <ChartFrame
-      title="Distribuição Lean do tempo classificado"
-      note={`Base: duração ativa das atividades classificadas. Não classificadas: ${fmtNum(hours.U)} h (fora do percentual).`}
+      title={tr('ui.chart.018')}
+      note={tr('ui.chart.019', { p0: fmtNum(hours.U) })}
       table={
-        <Table caption="Distribuição Lean">
+        <Table caption={tr('ui.chart.020')}>
           <thead>
             <tr>
-              <th className={th}>Classe</th>
-              <th className={th}>Horas</th>
-              <th className={th}>% do classificado</th>
+              <th className={th}>{tr('ui.chart.021')}</th>
+              <th className={th}>{tr('ui.chart.022')}</th>
+              <th className={th}>{tr('ui.chart.023')}</th>
             </tr>
           </thead>
           <tbody>
@@ -124,8 +125,7 @@ export function LeanBar({ hours, pct }: { hours: Record<LeanClass | 'U', number>
         {keys.map((k) => (
           <li key={k} className="flex items-center gap-1.5">
             <span className="inline-block h-3 w-3 rounded-sm" style={{ background: c.lean[k] }} />
-            {LEAN_LABEL[k]}: <strong className="text-ink">{fmtPct(pct[k])}</strong> ({fmtNum(hours[k])} h)
-          </li>
+            {LEAN_LABEL[k]}: <strong className="text-ink">{fmtPct(pct[k])}</strong> ({fmtNum(hours[k])}{tr('ui.chart.027')}</li>
         ))}
       </ul>
     </ChartFrame>
@@ -145,13 +145,13 @@ export function StackedLoad({ title, data, unit, note }: { title: string; data: 
         <Table caption={title}>
           <thead>
             <tr>
-              <th className={th}>Grupo</th>
+              <th className={th}>{tr('ui.chart.031')}</th>
               {ks.map((k) => (
                 <th key={k} className={th}>
                   {LEAN_LABEL[k]}
                 </th>
               ))}
-              <th className={th}>Total ({unit})</th>
+              <th className={th}>{tr('ui.chart.032')}{unit})</th>
             </tr>
           </thead>
           <tbody>
@@ -200,7 +200,7 @@ export function SimpleBars({ title, data, unit, note, color }: { title: string; 
         <Table caption={title}>
           <thead>
             <tr>
-              <th className={th}>Item</th>
+              <th className={th}>{tr('ui.chart.033')}</th>
               <th className={th}>{unit}</th>
             </tr>
           </thead>
@@ -244,9 +244,9 @@ export function CompareBars({ title, data, unit }: { title: string; data: { key:
         <Table caption={title}>
           <thead>
             <tr>
-              <th className={th}>Indicador</th>
-              <th className={th}>AS-IS</th>
-              <th className={th}>TO-BE</th>
+              <th className={th}>{tr('ui.chart.034')}</th>
+              <th className={th}>{tr('ui.chart.035')}</th>
+              <th className={th}>{tr('ui.chart.036')}</th>
             </tr>
           </thead>
           <tbody>
@@ -268,7 +268,7 @@ export function CompareBars({ title, data, unit }: { title: string; data: { key:
             <XAxis dataKey="key" tick={{ fill: c.axis, fontSize: 11 }} />
             <YAxis tick={{ fill: c.axis, fontSize: 11 }} tickFormatter={(v) => fmtNum(Number(v))} width={52} />
             <Tooltip {...tooltipStyle(c)} formatter={(v, n) => [`${fmtNum(Number(v))} ${unit}`, n === 'asIs' ? 'AS-IS' : 'TO-BE']} />
-            <Legend formatter={(v) => (v === 'asIs' ? 'AS-IS (hoje)' : 'TO-BE (estimado)')} wrapperStyle={{ fontSize: 12, color: c.axis }} />
+            <Legend formatter={(v) => (v === 'asIs' ? tr('ui.chart.039') : tr('ui.chart.040'))} wrapperStyle={{ fontSize: 12, color: c.axis }} />
             <Bar isAnimationActive={false} dataKey="asIs" fill={c.asIs} radius={[4, 4, 0, 0]} maxBarSize={48}>
               <LabelList dataKey="asIs" position="top" formatter={(v: unknown) => fmtNum(Number(v))} style={{ fill: c.ink, fontSize: 11 }} />
             </Bar>
@@ -289,14 +289,14 @@ export function Histogram({ bins, markers }: { bins: { from: number; to: number;
   const data = bins.map((b) => ({ key: `${fmtNum(b.from)}–${fmtNum(b.to)}`, count: b.count, mid: (b.from + b.to) / 2 }));
   return (
     <ChartFrame
-      title="Distribuição simulada do tempo decorrido (horas)"
-      note={`Marcadores: ${markers.map((m) => `${m.label} = ${fmtNum(m.value)} h`).join(' · ')}`}
+      title={tr('ui.chart.041')}
+      note={tr('ui.chart.042', { p0: markers.map((m) => tr('ui.chart.043', { label: m.label, p1: fmtNum(m.value) })).join(' · ') })}
       table={
-        <Table caption="Histograma">
+        <Table caption={tr('ui.chart.044')}>
           <thead>
             <tr>
-              <th className={th}>Faixa (h)</th>
-              <th className={th}>Iterações</th>
+              <th className={th}>{tr('ui.chart.045')}</th>
+              <th className={th}>{tr('ui.chart.046')}</th>
             </tr>
           </thead>
           <tbody>
@@ -316,7 +316,7 @@ export function Histogram({ bins, markers }: { bins: { from: number; to: number;
             <CartesianGrid vertical={false} stroke={c.grid} />
             <XAxis dataKey="key" tick={{ fill: c.axis, fontSize: 10 }} interval={1} />
             <YAxis tick={{ fill: c.axis, fontSize: 11 }} width={40} />
-            <Tooltip {...tooltipStyle(c)} formatter={(v) => [`${v} iterações`, '']} />
+            <Tooltip {...tooltipStyle(c)} formatter={(v) => [tr('ui.chart.047', { v: String(v) }), '']} />
             <Bar isAnimationActive={false} dataKey="count" radius={[4, 4, 0, 0]}>
               {data.map((_, i) => (
                 <Cell key={i} fill={markers.some((m) => m.value >= bins[i].from && m.value < bins[i].to) ? c.series[1] : c.series[0]} />
