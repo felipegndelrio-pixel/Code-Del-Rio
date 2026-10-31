@@ -17,3 +17,20 @@ describe('PT igual ao golden da v2.5.0-rc1', () => {
     expect(STEP_PATH).toEqual(golden.stepPath);
   });
 });
+
+describe('navegação em EN', () => {
+  it('mesma estrutura do PT, só os textos mudam, nenhum vazio', async () => {
+    const { navFor } = await import('../config/nav');
+    const e = navFor('en');
+    const strip = (n: typeof NAV) => n.map((g) => g.items.map((i) => [i.path, i.step ?? null, i.icon, i.objective === '']));
+    expect(strip(e)).toEqual(strip(NAV));
+    for (const g of e) {
+      expect(g.label).not.toBe('');
+      for (const i of g.items) {
+        expect(i.label).not.toBe('');
+        expect(i.short).not.toBe('');
+      }
+    }
+    expect(e[0].items[0].label).toBe('Overview');
+  });
+});
