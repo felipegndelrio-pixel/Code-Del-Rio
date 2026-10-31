@@ -1,4 +1,6 @@
-// Dicionário PT: fonte da verdade. Cada valor é o texto exato que o app já mostra.
+// Dicionário PT: fonte da verdade. Textos migrados (nav.*) são idênticos aos de antes
+// (teste golden). login.* e license.error.* servem ao fluxo Gumroad (EN); a entrada PT
+// (Hotmart) continua com os textos próprios, inalterados.
 // Chaves com "{nome}" recebem variáveis em t(). Ao migrar um texto, copie-o daqui
 // sem alterar uma vírgula: o teste de equivalência compara com o golden.
 export const pt = {
@@ -48,6 +50,37 @@ export const pt = {
   'nav.report.label': 'Relatório executivo',
   'nav.report.short': 'Relatório',
   'nav.report.objective': 'Documento para apresentar e imprimir em PDF.',
+
+  'login.title': 'Entrar no {brand}',
+  'login.gumroad.intro': 'Use o e-mail da compra na Gumroad e a license key do recibo. Na primeira vez é preciso estar conectado; depois o app funciona offline.',
+  'login.email.label': 'E-mail da compra',
+  'login.key.label': 'License key',
+  'login.key.hint': 'Está no e-mail de recibo da Gumroad e na sua biblioteca da Gumroad.',
+  'login.submit': 'Entrar',
+  'login.signedOut.title': 'Você saiu deste aparelho',
+  'login.signedOut.body': 'Seus projetos continuam salvos aqui. Para voltar, entre com o e-mail e a license key da compra.',
+  'login.revoked.title': 'Acesso encerrado neste aparelho',
+  'login.revoked.body': 'Esta compra não está mais ativa (por exemplo, após reembolso). Se for um engano, fale com o suporte.',
+  'login.buy.prompt': 'Ainda não comprou?',
+  'login.buy.gumroad': 'Comprar na Gumroad',
+  'login.noAccess.prompt': 'Ainda não tem acesso?',
+  'login.demo.title': 'Ainda está decidindo?',
+  'login.demo.body': 'Navegue por um processo de exemplo completo — mapa, diagnóstico e plano de ação. Na demonstração nada é salvo nem exportado.',
+  'login.demo.button': 'Experimentar a versão Demo',
+  'login.privacy.note': 'Só o e-mail e a license key são conferidos no servidor. Suas planilhas e processos ficam salvos apenas neste aparelho.',
+  'login.support.prefix': 'Problemas para entrar? Escreva para',
+  'login.legal.prefix': 'Ao entrar, você concorda com:',
+  'login.legal.terms': 'Termos de Uso',
+  'login.legal.privacy': 'Política de Privacidade',
+  'login.legal.refund': 'Política de Reembolso',
+  'license.error.offline': 'Sem conexão. Conecte-se à internet para ativar; depois o app funciona offline.',
+  'license.error.notFound': 'Não encontramos uma compra ativa para este e-mail e license key.',
+  'license.error.invalidEmail': 'Informe um e-mail válido.',
+  'license.error.invalidKey': 'Informe a license key do recibo da Gumroad.',
+  'license.error.notConfigured': 'A ativação está indisponível no momento. Fale com o suporte.',
+  'license.error.manual': 'Encontramos sua compra na Gumroad, mas não conseguimos ativá-la automaticamente. Fale com o suporte para ativarmos para você.',
+  'license.error.unavailable': 'Não foi possível conferir agora. Tente de novo em instantes.',
+  'license.error.device': 'O acesso foi confirmado, mas este aparelho não conseguiu validá-lo. Fale com o suporte.',
 
   'lang.switch.toEnglish': 'English',
   'lang.switch.toPortuguese': 'Português',

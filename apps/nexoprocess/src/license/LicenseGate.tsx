@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { PageSkeleton } from '../components/ui';
-import { activate, clearToken, currentLicense, LICENSE, TOKEN_KEY } from './config';
+import { clearToken, currentLicense, LICENSE, renew, TOKEN_KEY } from './config';
 import { DEMO_KEY, isDemo } from './demo';
 
 export default function LicenseGate() {
@@ -30,7 +30,7 @@ export default function LicenseGate() {
       }
       setState('ok');
       if (refresh && navigator.onLine && Date.now() / 1000 - lic.payload.iat > LICENSE.refreshAfterSec) {
-        const r = await activate({ token: lic.token });
+        const r = await renew(lic.token);
         if (alive && !r.ok && r.reason === 'nao_encontrado') {
           clearToken();
           nav('/entrar?motivo=revogado', { replace: true });

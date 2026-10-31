@@ -12,4 +12,10 @@ interface ImportMetaEnv {
   readonly VITE_HOTMART_CHECKOUT_URL?: string;
   /** E-mail de suporte exibido ao comprador (entrada, ajuda, erros, rodapé). */
   readonly VITE_SUPPORT_EMAIL?: string;
+  /** Link de compra na Gumroad (entrada EN). */
+  readonly VITE_GUMROAD_CHECKOUT_URL?: string;
+  /** Páginas legais EN (landing EN). Vazio = link não aparece. */
+  readonly VITE_EN_TERMS_URL?: string;
+  readonly VITE_EN_PRIVACY_URL?: string;
+  readonly VITE_EN_REFUND_URL?: string;
 }
