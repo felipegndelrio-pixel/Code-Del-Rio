@@ -337,3 +337,21 @@ select public.nexo_resolve_reconciliation_block(<id da consulta 13.1>, 'motivo d
 - Recomendação: lançar sem Ping e registrar refund/dispute/dispute_won por resource subscription numa etapa posterior.
 - Isso é decisão do fundador.
 
+
+## 15. Estado de verificação da entrada EN (T4, 31/10/2026)
+
+| Item | Estado |
+|---|---|
+| Entrada EN (`/entrar?lang=en`): ativação, chave errada, 422, reembolso na renovação, Gumroad fora (D1) | FATO: e2e 8/8 no **Chromium** (desktop e viewport de 390 px), com a Gumroad simulada e o handler real |
+| Acessibilidade (axe WCAG 2.1 AA, temas claro/escuro) e sem rolagem lateral a 390 px | FATO: só Chromium |
+| Entrada PT inalterada | FATO: golden HTML (gerado da v2.5.0-rc1) e e2e "licenca" 30/32; as 2 falhas também acontecem na tag |
+| **Safari do iPhone** | **NÃO VERIFICADO** |
+| **Android (Chrome)** | **NÃO VERIFICADO** |
+| Gumroad real, Pages Functions reais | NÃO VERIFICADO (proibido nesta fase) |
+| Textos EN | Rascunho, sem revisão nativa |
+
+**Pendências que dependem do fundador**
+- **Escopo mínimo EN da v1:** quais telas internas entram em inglês.
+- **Links legais EN e "Buy on Gumroad":** dependem das variáveis `VITE_EN_*` e `VITE_GUMROAD_CHECKOUT_URL`. Sem elas, os links não aparecem. A publicação segue bloqueada.
+- **Modo demo no PT** (2 e2e falhando desde a rc1): decidir entre abrir a Home ou o exemplo.
+  - Causa: o commit `31f0ed5` reescreveu os testes, mas `Login.tsx` (tryDemo) e `Landing.tsx` continuam chamando `openDemo()`.
