@@ -193,11 +193,31 @@ declare
 begin
   if v_email is null or strpos(v_email, '@') = 0 then return null; end if;
   select exists (select 1 from public.nexo_reconciliation_blocks b where b.email = v_email and b.resolved_at is null) into v_blocked;
-  select exists (select 1 from public.nexo_purchases p where p.email = v_email and p.access_active) into v_active;
-  select exists (select 1 from public.nexo_purchases p where p.email = v_email) into v_any;
+  -- Acesso só por e-mail (/api/license) não vale para compras 'gumroad': elas exigem a
+  -- license key verificada na Gumroad (/api/gumroad-license). Demais plataformas: inalterado.
+  select exists (select 1 from public.nexo_purchases p where p.email = v_email and p.access_active and p.platform <> 'gumroad') into v_active;
+  select exists (select 1 from public.nexo_purchases p where p.email = v_email and p.platform <> 'gumroad') into v_any;
   if v_active and not v_blocked then return jsonb_build_object('status', 'active'); end if;
   if v_blocked or v_any then return jsonb_build_object('status', 'revoked'); end if;
   return null;
+end
+$$;
+
+-- Leitura do estado de UMA compra (sem e-mail na resposta). Usada pela Gumroad para decidir
+-- se "disputa ganha" pode virar chargeback_reverse (só se a compra estiver charged_back).
+create or replace function public.nexo_purchase_state(p_platform text, p_transaction text)
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_status text;
+  v_active boolean;
+begin
+  select p.status, p.access_active into v_status, v_active
+    from public.nexo_purchases p
+   where p.platform = lower(btrim(p_platform)) and p.transaction_id = btrim(p_transaction);
+  if not found then return null; end if;
+  return jsonb_build_object('status', v_status, 'access_active', v_active);
 end
 $$;
 
@@ -560,6 +580,7 @@ revoke all on table public.nexo_purchase_events from public;
 revoke all on table public.nexo_reconciliation_blocks from public;
 revoke all on function public.nexo_refresh_license_access(text) from public;
 revoke all on function public.nexo_lookup_license(text) from public;
+revoke all on function public.nexo_purchase_state(text, text) from public;
 revoke all on function public.nexo_add_reconciliation_block(text, text, text, text, text, text, timestamptz) from public;
 revoke all on function public.nexo_apply_purchase_event(text, text, text, text, text, text, numeric, numeric, text, text, timestamptz) from public;
 revoke all on function public.nexo_grant_purchase(text, text, text, text, text, numeric, numeric, text, text, timestamptz) from public;
@@ -583,6 +604,7 @@ begin
       execute pg_catalog.format('revoke all on table public.nexo_reconciliation_blocks from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_refresh_license_access(text) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_lookup_license(text) from %I', r);
+      execute pg_catalog.format('revoke all on function public.nexo_purchase_state(text, text) from %I', r);
       if pg_catalog.to_regprocedure('public.nexo_grant_license(text,text,text,text)') is not null then
         execute pg_catalog.format('revoke all on function public.nexo_grant_license(text, text, text, text) from %I', r);
       end if;
@@ -602,6 +624,7 @@ begin
     grant select on table public.nexo_purchase_events to service_role;
     grant select on table public.nexo_reconciliation_blocks to service_role;
     grant execute on function public.nexo_lookup_license(text) to service_role;
+    grant execute on function public.nexo_purchase_state(text, text) to service_role;
     grant execute on function public.nexo_grant_purchase(text, text, text, text, text, numeric, numeric, text, text, timestamptz) to service_role;
     grant execute on function public.nexo_revoke_purchase(text, text, text, text, text, numeric, numeric, text, text, timestamptz) to service_role;
     grant execute on function public.nexo_resolve_reconciliation_block(bigint, text) to service_role;
