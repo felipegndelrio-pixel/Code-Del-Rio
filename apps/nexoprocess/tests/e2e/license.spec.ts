@@ -173,11 +173,8 @@ test('modo demo: navega no exemplo, mas salvar e exportar mostram o convite de c
   await api(page, {});
   await page.goto('/');
   await page.getByRole('button', { name: 'Experimentar a versão Demo' }).first().click(); // direto da landing
-  await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole('heading', { name: /Entenda seu processo/ })).toBeVisible();
+  // O botão cria o exemplo e abre o projeto direto (comportamento do código; decisão do fundador).
   expect(await page.evaluate(() => localStorage.getItem('nexo.demo'))).toBe('1');
-  expect(await readWorkspaces(page)).toEqual([]); // nenhuma demonstração fictícia foi criada automaticamente
-  await page.getByRole('button', { name: 'Abrir demonstração' }).click();
   await expect(page).toHaveURL(/\/app\/p\/[^/]+\/visao-geral$/);
   await expect(page.getByText('Versão de demonstração.')).toBeVisible();
   expect(await stored(page)).toBeNull(); // demo não cria acesso
@@ -207,15 +204,13 @@ test('modo demo: navega no exemplo, mas salvar e exportar mostram o convite de c
   expect(errors).toEqual([]);
 });
 
-test('CTA de demo na entrada abre a Home sem criar o exemplo automaticamente', async ({ page }) => {
+test('CTA de demo na entrada cria o exemplo e abre o projeto', async ({ page }) => {
   await prepare(page);
   await api(page, {});
   await page.goto('/entrar');
   await page.getByRole('button', { name: 'Experimentar a versão Demo' }).click();
-  await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole('heading', { name: /Entenda seu processo/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/p\/[^/]+\/visao-geral$/);
   expect(await page.evaluate(() => localStorage.getItem('nexo.demo'))).toBe('1');
-  expect(await readWorkspaces(page)).toEqual([]);
 });
 
 // LGPD: Política de Privacidade e Termos de Uso públicos (sem compra), linkados na
