@@ -79,3 +79,7 @@ Também em EN (v2): Formulário completo, Assistente de criação (inclui texto 
 ## 11. Build de venda desta branch (decisão do revisor, 01/11/2026)
 - `scripts/check-sale-env.mjs` agora EXIGE `VITE_GUMROAD_CHECKOUT_URL`, `VITE_EN_TERMS_URL`, `VITE_EN_PRIVACY_URL` e `VITE_EN_REFUND_URL` (https, sem marcador `<>[]{}`/INSIRA/SEU/YOUR). Teste: `tests/api/check-sale-env.test.ts`.
 - Qualquer build de venda a partir desta branch (PT ou EN) precisa das 4 variáveis. A troca PT de sábado não é afetada: a folha de execução (v2.1, Passo Zero Z3) usa um clone limpo da TAG `v2.5.0-rc1` com conferência do SHA (FATO informado pelo revisor; não verificado por esta sessão).
+
+## 12. Limitação conhecida: moeda segue o idioma (decisão do revisor, 01/11/2026)
+- A moeda exibida segue o idioma: BRL em PT, USD em EN (`fmtBRL` → `formatters(locale).currency`). Os valores guardados no projeto são números sem moeda e **não são convertidos**.
+- Consequência: um projeto criado em PT (valores em reais) e aberto em EN mostra os mesmos números com "$". Não corrigir agora; registrado para decisão futura (ex.: guardar a moeda no projeto).
