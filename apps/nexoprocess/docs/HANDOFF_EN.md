@@ -1,6 +1,6 @@
 # HANDOFF EN — próxima sessão
 
-Versão 1, 01/11/2026. Branch `wip/en-foundation`. Autor: sessão de engenharia EN (Sonnet).
+Versão 2, 01/11/2026 (v1 no mesmo dia; v2 acrescenta Formulário, Assistente e Relatório/PDF). Branch `wip/en-foundation`. Autor: sessão de engenharia EN (Sonnet).
 
 ## 1. Estado da branch
 - HEAD: ver `git log -1`. Último G3 verde confirmado no GitHub: run #19 em `b16a6b9`. Commits posteriores (revert do demo, testes e2e do demo, CLAUDE.md, rascunho legal, este arquivo) só mexem em 2 telas PT revertidas ao comportamento original, testes e docs; G3 deles A VALIDAR no Actions.
@@ -10,14 +10,12 @@ Versão 1, 01/11/2026. Branch `wip/en-foundation`. Autor: sessão de engenharia 
 
 ## 2. O que já está em EN
 Entrada e licença (e-mail + license key), cabeçalho/shell, gate, faixa de demo, Home, moldura do projeto, jornada, 16 abas (Visão geral, Dados, Validar, Mapa, Diagnóstico, Recomendações, TO-BE, Comparar, Plano, Resultados, Riscos, RACI, Simulação, Automação, Exportar), domínio (métricas, validação, comparar, recomendações, TO-BE, tipos, glossário), gráficos e mapa BPMN, Landing, Importar planilha, marca/textos comerciais, fábrica de projeto (exemplo).
-Dicionário: 2086 chaves (`ws.` 1075, `d.` 625, `pg.` 116, `home.` 84, `ui.` 49, `nav.` 45, demais 92).
+Também em EN (v2): Formulário completo, Assistente de criação (inclui texto livre em inglês), aviso de rascunho desatualizado, Relatório executivo/PDF. Dicionário na v1: 2086 chaves (agora ~2700) (`ws.` 1075, `d.` 625, `pg.` 116, `home.` 84, `ui.` 49, `nav.` 45, demais 92).
 
 ## 3. O que falta (contagens da ferramenta; são candidatos, não textos finais)
 | Item | Candidatos | Observação |
 |---|---|---|
-| Assistente (`Assistant.tsx`) | ~209 (189 únicos novos) | usa `t` como identificador → `TNAME=tx` |
-| Formulário (`Wizard.tsx`) | ~126 | |
-| Relatório/PDF (`ReportPage`) | ~216 | |
+| Assistente, Formulário, Relatório/PDF | FEITO (v2) | chaves `as.*`, `wz.*`, `stale.*`, `rp.*`, `bpmn.*` |
 | Ajuda (`Help.tsx`) | ~93 | |
 | Mensagens de banco/rascunho/ações | não contado | `db`, `draftCommit`, `actions` |
 | Templates XLSX/CSV e cabeçalhos | não contado | `io/fields.ts`, `workbook.ts`, `planCsv.ts`, `toProcess.ts` continuam PT; CSV usa `;` e vírgula decimal |
@@ -65,3 +63,10 @@ Dicionário: 2086 chaves (`ws.` 1075, `d.` 625, `pg.` 116, `home.` 84, `ui.` 49,
 
 ## 8. Documentos relacionados
 `docs/GUMROAD_ENTITLEMENT.md` (decisões D1–D8, runbook), `docs/LANCAMENTO_EN.md` (runbook do fundador), `docs/legal-en/` (rascunho legal), `docs/DEPLOY_CLOUDFLARE.md`.
+
+## 9. Estado após a v2 (01/11/2026)
+- Golden PT: 57 estados (25 originais + Formulário 11 + Assistente 20 + Relatório de projeto sem TO-BE 1), idênticos. Cobertura EN (`en-coverage.spec.ts`): zero sobras no Formulário, Assistente e Relatório (demo e projeto do Assistente).
+- PDF: `report-print.spec.ts` (Chromium) confere o título do arquivo (`Executive report - …`), `window.print` e o PDF em mídia de impressão (10 páginas, mesmas quebras do PT). `NEXO_PDF_OUT=<pasta>` grava os PDFs. **Safari/iPhone e Android reais: NÃO verificados.**
+- A VALIDAR: `CompareTab.tsx` compara `r.unit === 'R$/mês'` (texto PT); em EN a unidade é `$/month`, então custos podem sair sem formatação de moeda e a coluna de unidade mostra códigos em PT. O Relatório já usa `isCostUnit()`; a aba Comparar não foi alterada (fora do escopo desta sessão).
+- Ajuda (~93), XLSX/CSV e mensagens de banco/ações continuam pendentes. Páginas `ajuda`, `privacidade` e `termos` seguem em PT no EN (decisão legal: não traduzir no app).
+- Texto livre do Assistente: o EN aceita `by`, `owner:`, `then`, unidades em inglês; no PT as expressões são as de sempre (teste `assistant.test.ts`).
