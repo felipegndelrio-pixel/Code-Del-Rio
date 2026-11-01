@@ -180,4 +180,10 @@ test('PT golden: assistente — roteiro completo', async ({ page }) => {
   await page.getByRole('button', { name: 'Criar meu projeto' }).click();
   await expect(page.getByTestId('assistant-success')).toBeVisible();
   await check('asst-sucesso', page);
+  // Relatório de um projeto sem cenário TO-BE, sem ações e sem resultados.
+  await page.getByRole('button', { name: 'Revisar os dados' }).click();
+  await expect(page).toHaveURL(/\/validar$/);
+  await page.goto(page.url().replace(/\/validar$/, '/relatorio'));
+  await expect(page.getByText('Desenhando mapas…')).toHaveCount(0);
+  await check('asst-relatorio', page);
 });
