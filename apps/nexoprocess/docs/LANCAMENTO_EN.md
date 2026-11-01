@@ -83,7 +83,7 @@ Em Settings → Variables and Secrets → Production. São só nomes; os valores
 ### 4.1 Build e deploy: comandos prontos (caminho RECOMENDADO: wrangler com `nexo:build:venda`)
 **Por quê:** (1) a produção atual foi publicada por upload direto, e a Cloudflare documenta que um projeto de Direct Upload **não pode ser conectado ao Git depois** (FATO: docs da Cloudflare, páginas "Git integration" e "C3", lidas em 01/11/2026); a integração exigiria um projeto novo. (2) O `nexo:build` da integração **não roda** o `check-sale-env`; só o `nexo:build:venda` roda, e é ele que barra o build sem as 7 variáveis.
 
-Windows, PowerShell, **uma sessão só** (as variáveis vivem só nela; nada vai para arquivo). Rode depois do merge em `main` (etapa 4.1) e com o G3 verde.
+Windows, PowerShell, **uma sessão só** (as variáveis vivem só nela; nada vai para arquivo). Rode depois do merge em `main` (etapa 4, item 1) e com o G3 verde.
 ```powershell
 # 1) Clone limpo, em pasta nova
 cd $env:USERPROFILE
