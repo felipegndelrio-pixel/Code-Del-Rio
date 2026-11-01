@@ -74,9 +74,9 @@ export function nextActivityId(p: ProcessModel): string {
  */
 export function normalizeWorkspace(raw: unknown): Workspace {
   const r = (raw ?? {}) as Partial<Workspace> & Record<string, unknown>;
-  if (typeof r.id !== 'string' || !r.id) throw new Error('um dos projetos não tem identificador.');
+  if (typeof r.id !== 'string' || !r.id) throw new Error(tr('d.fac.noId'));
   const asIs = normalizeProcess(r.asIs);
-  if (!asIs) throw new Error(`o projeto “${r.id}” não tem o processo atual (AS-IS).`);
+  if (!asIs) throw new Error(tr('d.fac.noAsIs', { id: r.id }));
   const at = nowIso();
   const base = newWorkspace(asIs, { kind: 'backup' });
   const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);

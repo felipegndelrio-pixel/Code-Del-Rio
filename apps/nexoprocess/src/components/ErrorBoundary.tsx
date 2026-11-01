@@ -4,6 +4,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { SupportLink } from './SupportLink';
+import { tr } from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -22,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Falha de renderização', error, info.componentStack);
+    console.error(tr('eb.log'), error, info.componentStack);
   }
 
   componentDidUpdate(prev: Props) {
@@ -36,17 +37,17 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-bad" aria-hidden />
           <div>
-            <h2 className="text-lg font-semibold text-ink">Não foi possível mostrar esta tela</h2>
+            <h2 className="text-lg font-semibold text-ink">{tr('eb.title')}</h2>
             <p className="mt-1 text-sm text-ink2">
-              Seus dados continuam salvos neste aparelho. Volte à lista de projetos e tente abrir de novo. Se o problema continuar, faça um backup pela tela inicial e avise o suporte.
+              {tr('eb.body')}
             </p>
             <p className="mt-1 text-sm text-ink2">
-              <SupportLink prefix="Suporte:" />
+              <SupportLink prefix={tr('eb.support')} />
             </p>
           </div>
         </div>
         <Link to="/app" className="inline-flex min-h-[44px] items-center font-semibold text-accent underline underline-offset-2">
-          Voltar aos meus projetos
+          {tr('eb.back')}
         </Link>
       </div>
     );

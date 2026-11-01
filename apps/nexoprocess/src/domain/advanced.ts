@@ -63,7 +63,7 @@ const quantile = (sorted: number[], q: number) => {
 
 export function simulate(p: ProcessModel, iterations = 1500, seed = 20261019): SimulationResult {
   const ready = simulationReadiness(p);
-  if (!ready.ready) throw new Error('Dados insuficientes para simular.');
+  if (!ready.ready) throw new Error(tr('d.adv.notReady'));
   const g = buildGraph(p);
   const rand = rng(seed);
   const tasks = [...g.byId.values()].filter((a) => a.type === 'task');

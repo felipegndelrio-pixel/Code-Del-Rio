@@ -3106,6 +3106,64 @@ export const pt = {
   'st.file.maps': 'mapas',
 
   'st.undoDefault': 'Edição de campos',
+
+  'app.404.title': 'Essa página não existe',
+  'app.404.back': 'Voltar ao início',
+  'app.404.body': 'Talvez o endereço tenha sido digitado errado. Vamos voltar ao início?',
+
+  'eb.log': 'Falha de renderização',
+  'eb.title': 'Não foi possível mostrar esta tela',
+  'eb.body': 'Seus dados continuam salvos neste aparelho. Volte à lista de projetos e tente abrir de novo. Se o problema continuar, faça um backup pela tela inicial e avise o suporte.',
+  'eb.support': 'Suporte:',
+  'eb.back': 'Voltar aos meus projetos',
+
+  'pwa.new': 'Nova versão disponível. Seus dados continuam salvos neste aparelho.',
+  'pwa.later': 'Depois',
+  'pwa.update': 'Atualizar',
+
+  'support.default': 'Precisa de ajuda? Escreva para',
+
+  'tour.close': 'Fechar dicas',
+  'tour.count': 'Dica {n} de {total}',
+  'tour.skip': 'Pular',
+  'tour.got': 'Entendi',
+  'tour.next': 'Próxima',
+
+  'pg.land.demoFail': 'Não conseguimos abrir a demonstração neste navegador. Tente recarregar a página.',
+
+  'pg.imp.readFail': 'Não foi possível ler o arquivo.',
+  'pg.imp.readFail.fix': 'Tente salvar a planilha novamente ou use o modelo oficial.',
+
+
+  'ws.cmp.runsMonth': '{v} execuções/mês',
+
+
+  'd.tobe.err.noAct': 'Atividade {id} não existe no cenário.',
+
+  'd.plan.needResult': 'Registre o resultado observado para concluir a ação.',
+  'd.plan.needDate': 'Informe a data de conclusão.',
+
+  'd.adv.notReady': 'Dados insuficientes para simular.',
+
+  'd.fac.noId': 'um dos projetos não tem identificador.',
+  'd.fac.noAsIs': 'o projeto “{id}” não tem o processo atual (AS-IS).',
+
+
+
+  'ws.map.k.active': 'Duração ativa',
+  'ws.map.k.waitBefore': 'Espera antes',
+  'ws.map.k.effortRun': 'Esforço por ocorrência',
+  'ws.map.k.effortPeriod': 'Esforço no período',
+
+  'bpmn.doc.owner': 'Responsável: {v}',
+  'bpmn.doc.duration': 'Duração: {v}',
+  'bpmn.doc.people': 'Pessoas: {v}',
+  'bpmn.doc.wait': 'Espera: {v}',
+  'bpmn.doc.rework': 'Retrabalho',
+  'bpmn.doc.critical': 'Crítica',
+
+  'd.tobe.err.noRemove': 'Decisões e eventos de início não podem ser removidos automaticamente — edite os caminhos.',
+  'd.tobe.err.noMerge': 'Atividade a combinar não existe.',
 } as const;
 
 export type MessageKey = keyof typeof pt;

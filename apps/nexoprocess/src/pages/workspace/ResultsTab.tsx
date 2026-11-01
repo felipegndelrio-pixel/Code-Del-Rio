@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { Plus, Trash2 } from 'lucide-react';
 import { Badge, BasisTag, Button, Callout, Card, Empty, Field, HowCalc, Input, NumberInput, Select, Table, td, Textarea, th, useConfirm } from '../../components/ui';
-import { compareScenarios } from '../../domain/compare';
+import { compareScenarios, isCostUnit } from '../../domain/compare';
 import type { RealizedResult, ResultMetric } from '../../domain/types';
 import { fmtBRL, fmtDate, fmtNum, fmtPct, nowIso, uid } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
@@ -83,7 +83,7 @@ export default function ResultsTab() {
     })
     .filter(Boolean) as { k: string; m: (typeof METRICS)['effort_period']; last: RealizedResult; base: number | null; fc: number | null; achieved: number | null; pctOfExpected: number | null; deviation: number | null; n: number }[];
 
-  const fmt = (unit: string, v: number | null) => (v === null ? '—' : unit === 'R$/mês' ? fmtBRL(v) : `${fmtNum(v)} ${unit}`);
+  const fmt = (unit: string, v: number | null) => (v === null ? '—' : isCostUnit(unit) ? fmtBRL(v) : `${fmtNum(v)} ${unit}`);
 
   return (
     <div className="space-y-4">

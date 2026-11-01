@@ -188,16 +188,16 @@ export default function MapTab() {
                 <strong className="text-ink">{t('ws.map.055')}</strong>{t('ws.map.056')}{fmtPct(bn.flagged[selRank].share)}{t('ws.map.057')}{CRITERION_LABEL[w.bottleneck.criterion]}{t('ws.map.058')}{w.bottleneck.thresholdPct}{t('ws.map.059')}</p>
             )}
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-              <Dt k="Etapa" v={sel.stage} />
-              <Dt k="Código" v={sel.id} />
-              <Dt k="Responsável" v={sel.owner ?? t('ws.map.060')} />
-              <Dt k="Pessoas" v={sel.people ?? t('ws.map.061')} />
-              <Dt k="Duração ativa" v={sel.type === 'task' ? fmtDuration(sel.duration, sel.unit) : '—'} />
-              <Dt k="Espera antes" v={fmtDuration(sel.wait, sel.unit)} />
-              <Dt k="Esforço por ocorrência" v={selM.effortH !== null ? t('ws.map.062', { p0: fmtNum(selM.effortH) }) : t('ws.map.063')} />
-              <Dt k="Esforço no período" v={selM.effortPeriodH !== null ? t('ws.map.064', { p0: fmtNum(selM.effortPeriodH) }) : t('ws.map.065')} />
-              <Dt k="Frequência" v={sel.frequencyPct !== undefined ? fmtPct(sel.frequencyPct) : t('ws.map.066')} />
-              <Dt k="Classificação Lean" v={sel.type === 'task' || sel.type === 'decision' ? LEAN_LABEL[sel.lean ?? 'U'] : '—'} />
+              <Dt k={t('d.field.stage')} v={sel.stage} />
+              <Dt k={t('io.f.id_atividade.label')} v={sel.id} />
+              <Dt k={t('io.f.responsavel.label')} v={sel.owner ?? t('ws.map.060')} />
+              <Dt k={t('io.lbl.people')} v={sel.people ?? t('ws.map.061')} />
+              <Dt k={t('ws.map.k.active')} v={sel.type === 'task' ? fmtDuration(sel.duration, sel.unit) : '—'} />
+              <Dt k={t('ws.map.k.waitBefore')} v={fmtDuration(sel.wait, sel.unit)} />
+              <Dt k={t('ws.map.k.effortRun')} v={selM.effortH !== null ? t('ws.map.062', { p0: fmtNum(selM.effortH) }) : t('ws.map.063')} />
+              <Dt k={t('ws.map.k.effortPeriod')} v={selM.effortPeriodH !== null ? t('ws.map.064', { p0: fmtNum(selM.effortPeriodH) }) : t('ws.map.065')} />
+              <Dt k={t('io.lbl.freq')} v={sel.frequencyPct !== undefined ? fmtPct(sel.frequencyPct) : t('ws.map.066')} />
+              <Dt k={t('io.f.classificacao_lean.label')} v={sel.type === 'task' || sel.type === 'decision' ? LEAN_LABEL[sel.lean ?? 'U'] : '—'} />
             </dl>
             {sel.notes && (
               <p className="text-ink2">

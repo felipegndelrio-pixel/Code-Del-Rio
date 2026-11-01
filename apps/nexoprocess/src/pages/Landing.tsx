@@ -33,7 +33,7 @@ export default function Landing() {
       const w = await openDemo();
       nav(`/app/p/${w.id}/visao-geral`);
     } catch {
-      toast('bad', 'Não conseguimos abrir a demonstração neste navegador. Tente recarregar a página.');
+      toast('bad', t('pg.land.demoFail'));
     }
   };
   return (

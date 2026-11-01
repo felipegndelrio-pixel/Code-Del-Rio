@@ -10,7 +10,7 @@ const GOLDEN = JSON.parse(readFileSync(new URL('./golden/pt-screens.json', impor
 const REPORT = process.env.NEXO_EN_REPORT;
 const COMPLETE: string[] = (process.env.NEXO_EN_COMPLETE ?? '').split(',').filter(Boolean);
 
-const ALLOWED = /\b(AS-IS|TO-BE|BPMN|XML|SVG|PNG|ZIP|XLSX|CSV|JSON|PDF|FMEA|RPN|RACI|Lean|NexoProcess|IndexedDB|Excel|Safari|iPhone|iPad|Camunda|bpmn\.io|bpmn-moddle|ERP|IA|AI|LGPD|P\d+|R|A|C|I|OK|Item|Volume|min|h|Payback|ROI|Pareto)\b/g;
+const ALLOWED = /\b(Powered by bpmn\.io|AS-IS|TO-BE|BPMN|XML|SVG|PNG|ZIP|XLSX|CSV|JSON|PDF|FMEA|RPN|RACI|Lean|NexoProcess|IndexedDB|Excel|Safari|iPhone|iPad|Camunda|bpmn\.io|bpmn-moddle|ERP|IA|AI|LGPD|P\d+|R|A|C|I|OK|Item|Volume|min|h|Payback|ROI|Pareto)\b/g;
 const hasWords = (line: string) => /[A-Za-zÀ-ÿ]{2,}/.test(line.replace(ALLOWED, ' ').replace(/[\d.,:;·×÷≥≤→—–%$/()#+\-_=<>"“”]+/g, ' '));
 
 async function capture(page: Page): Promise<string> {
@@ -200,4 +200,18 @@ test('EN cobertura: assistente — roteiro completo', async ({ page }) => {
   await page.goto(page.url().replace(/\/validar$/, '/relatorio'));
   await expect(page.getByText('Drawing maps…')).toHaveCount(0);
   await check('asst-relatorio', page);
+});
+
+test('EN cobertura: mapa — detalhes da atividade', async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => localStorage.setItem('nexo-ui.lang', 'en'));
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Open the demo' }).click();
+  await expect(page).toHaveURL(/\/visao-geral$/);
+  await page.goto(page.url().replace(/\/visao-geral$/, '/mapa'));
+  await page.waitForSelector('.djs-element[data-element-id^="Stage_"]');
+  await page.getByRole('navigation', { name: 'Process stages' }).getByRole('button').nth(1).click();
+  await page.locator('tbody tr').first().getByRole('button').first().click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await check('map-detalhe', page);
 });

@@ -50,7 +50,7 @@ function entry(kind: ChangeKind, summary: string, meta: ChangeMeta, act?: Activi
 export function updateActivity(sc: Scenario, id: string, patch: Partial<Activity>, kind: ChangeKind, meta: ChangeMeta): Scenario | null {
   const next = structuredClone(sc);
   const act = next.process.activities.find((a) => a.id === id);
-  if (!act) throw new Error(`Atividade ${id} não existe no cenário.`);
+  if (!act) throw new Error(tr('d.tobe.err.noAct', { id }));
   const before = structuredClone(act);
   Object.assign(act, patch);
   const d = diffActivity(before, act);
@@ -70,8 +70,8 @@ export function removeActivity(sc: Scenario, id: string, meta: ChangeMeta): Scen
   const next = structuredClone(sc);
   const acts = next.process.activities;
   const victim = acts.find((a) => a.id === id);
-  if (!victim) throw new Error(`Atividade ${id} não existe no cenário.`);
-  if (victim.type === 'decision' || victim.type === 'start') throw new Error('Decisões e eventos de início não podem ser removidos automaticamente — edite os caminhos.');
+  if (!victim) throw new Error(tr('d.tobe.err.noAct', { id }));
+  if (victim.type === 'decision' || victim.type === 'start') throw new Error(tr('d.tobe.err.noRemove'));
   const successors = victim.type === 'end' ? [] : victim.next.filter((n) => n !== id);
   for (const a of acts) {
     if (a.id === id) continue;
@@ -89,7 +89,7 @@ export function removeActivity(sc: Scenario, id: string, meta: ChangeMeta): Scen
 /** Combina B em A: A assume o nome/duração informados; B é removida e religada. */
 export function combineActivities(sc: Scenario, keepId: string, mergeId: string, patch: Partial<Activity>, meta: ChangeMeta): Scenario {
   const merged = sc.process.activities.find((a) => a.id === mergeId);
-  if (!merged) throw new Error('Atividade a combinar não existe.');
+  if (!merged) throw new Error(tr('d.tobe.err.noMerge'));
   let next = removeActivity(sc, mergeId, meta);
   next.changes.pop();
   const updated = updateActivity(next, keepId, patch, 'combine', meta);

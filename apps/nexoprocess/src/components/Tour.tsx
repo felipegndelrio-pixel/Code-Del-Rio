@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Lightbulb, X } from 'lucide-react';
 import { Button } from './ui';
+import { useI18n } from '../i18n/I18nProvider';
 
 /** Primeiro elemento visível do seletor (o plano tem tabela no desktop e cartões no celular). */
 const visible = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].find((el) => el.getClientRects().length > 0) ?? null;
@@ -22,6 +23,7 @@ const seen = (key: string) => {
 };
 
 export function Tour({ storageKey, steps }: { storageKey: string; steps: TourStep[] }) {
+  const { t } = useI18n();
   const [i, setI] = useState<number | null>(null);
   const [avail, setAvail] = useState<TourStep[]>([]);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -103,22 +105,22 @@ export function Tour({ storageKey, steps }: { storageKey: string; steps: TourSte
               {step.body}
             </p>
           </div>
-          <button type="button" aria-label="Fechar dicas" onClick={finish} className="-mr-1 -mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:text-ink">
+          <button type="button" aria-label={t('tour.close')} onClick={finish} className="-mr-1 -mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:text-ink">
             <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">
           <span className="text-xs text-muted">
-            Dica {i + 1} de {avail.length}
+            {t('tour.count', { n: i + 1, total: avail.length })}
           </span>
           <span className="flex gap-2">
             {!last && (
               <Button size="sm" variant="ghost" onClick={finish}>
-                Pular
+                {t('tour.skip')}
               </Button>
             )}
             <Button size="sm" data-autofocus onClick={() => (last ? finish() : setI(i + 1))}>
-              {last ? 'Entendi' : 'Próxima'}
+              {last ? t('tour.got') : t('tour.next')}
             </Button>
           </span>
         </div>

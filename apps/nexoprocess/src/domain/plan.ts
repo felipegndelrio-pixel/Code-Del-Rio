@@ -2,11 +2,12 @@
 import type { Recommendation } from './recommendations';
 import type { ActionItem, Workspace } from './types';
 import { nowIso, uid } from './units';
+import { tr } from '../i18n';
 
 export function completionIssue(a: ActionItem): string | null {
   if (a.status !== 'concluida') return null;
-  if (!a.observedResult?.trim()) return 'Registre o resultado observado para concluir a ação.';
-  if (!a.completedAt) return 'Informe a data de conclusão.';
+  if (!a.observedResult?.trim()) return tr('d.plan.needResult');
+  if (!a.completedAt) return tr('d.plan.needDate');
   return null;
 }
 

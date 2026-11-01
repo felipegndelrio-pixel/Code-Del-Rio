@@ -3105,4 +3105,62 @@ export const en: Record<MessageKey, string> = {
   'st.file.maps': 'maps',
 
   'st.undoDefault': 'Field edit',
+
+  'app.404.title': 'This page does not exist',
+  'app.404.back': 'Back to the start',
+  'app.404.body': 'The address may have been typed wrong. Shall we go back to the start?',
+
+  'eb.log': 'Rendering failure',
+  'eb.title': 'This screen could not be shown',
+  'eb.body': 'Your data is still saved on this device. Go back to the project list and try opening it again. If the problem continues, make a backup from the home screen and contact support.',
+  'eb.support': 'Support:',
+  'eb.back': 'Back to my projects',
+
+  'pwa.new': 'New version available. Your data is still saved on this device.',
+  'pwa.later': 'Later',
+  'pwa.update': 'Update',
+
+  'support.default': 'Need help? Write to',
+
+  'tour.close': 'Close tips',
+  'tour.count': 'Tip {n} of {total}',
+  'tour.skip': 'Skip',
+  'tour.got': 'Got it',
+  'tour.next': 'Next',
+
+  'pg.land.demoFail': 'We could not open the demo in this browser. Try reloading the page.',
+
+  'pg.imp.readFail': 'Could not read the file.',
+  'pg.imp.readFail.fix': 'Try saving the spreadsheet again or use the official template.',
+
+
+  'ws.cmp.runsMonth': '{v} runs/month',
+
+
+  'd.tobe.err.noAct': 'Activity {id} does not exist in the scenario.',
+
+  'd.plan.needResult': 'Record the observed result to complete the action.',
+  'd.plan.needDate': 'Enter the completion date.',
+
+  'd.adv.notReady': 'Not enough data to simulate.',
+
+  'd.fac.noId': 'one of the projects has no identifier.',
+  'd.fac.noAsIs': 'project “{id}” has no current process (AS-IS).',
+
+
+
+  'ws.map.k.active': 'Active duration',
+  'ws.map.k.waitBefore': 'Wait before',
+  'ws.map.k.effortRun': 'Effort per occurrence',
+  'ws.map.k.effortPeriod': 'Effort in the period',
+
+  'bpmn.doc.owner': 'Owner: {v}',
+  'bpmn.doc.duration': 'Duration: {v}',
+  'bpmn.doc.people': 'People: {v}',
+  'bpmn.doc.wait': 'Wait: {v}',
+  'bpmn.doc.rework': 'Rework',
+  'bpmn.doc.critical': 'Critical',
+
+  'd.tobe.err.noRemove': 'Decisions and start events cannot be removed automatically — edit the paths.',
+  'd.tobe.err.noMerge': 'The activity to combine does not exist.',
 };

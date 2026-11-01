@@ -61,7 +61,7 @@ export default function ImportPage() {
       setAck(false);
       setStep(1);
     } catch (e) {
-      setErr(e instanceof ImportError ? e : new ImportError('Não foi possível ler o arquivo.', String((e as Error)?.message ?? e), 'Tente salvar a planilha novamente ou use o modelo oficial.'));
+      setErr(e instanceof ImportError ? e : new ImportError(t('pg.imp.readFail'), String((e as Error)?.message ?? e), t('pg.imp.readFail.fix')));
     } finally {
       setReading(false);
     }

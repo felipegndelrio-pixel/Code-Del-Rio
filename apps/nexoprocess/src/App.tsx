@@ -5,6 +5,7 @@ import Landing from './pages/Landing';
 import Home from './pages/Home';
 import AppShell from './components/AppShell';
 import LicenseGate from './license/LicenseGate';
+import { useI18n } from './i18n/I18nProvider';
 
 const Wizard = lazy(() => import('./pages/Wizard'));
 const Assistant = lazy(() => import('./pages/Assistant'));
@@ -14,6 +15,17 @@ const Help = lazy(() => import('./pages/Help'));
 const Login = lazy(() => import('./pages/Login'));
 const Privacy = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Privacy })));
 const Terms = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Terms })));
+
+function NotFound() {
+  const { t } = useI18n();
+  return (
+    <div className="mx-auto max-w-xl p-6">
+      <Empty title={t('app.404.title')} action={<Link className="font-semibold text-brand underline" to="/app">{t('app.404.back')}</Link>}>
+        {t('app.404.body')}
+      </Empty>
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -36,13 +48,7 @@ export default function App() {
           </Route>
           <Route
             path="*"
-            element={
-              <div className="mx-auto max-w-xl p-6">
-                <Empty title="Essa página não existe" action={<Link className="font-semibold text-brand underline" to="/app">Voltar ao início</Link>}>
-                  Talvez o endereço tenha sido digitado errado. Vamos voltar ao início?
-                </Empty>
-              </div>
-            }
+            element={<NotFound />}
           />
         </Route>
       </Routes>

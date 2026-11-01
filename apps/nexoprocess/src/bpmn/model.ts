@@ -56,7 +56,7 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
     elementToActivity.set(el, a.id);
     activityToElement.set(a.id, el);
   }
-  const stageOf = (a: Activity) => a.stage || 'Sem etapa';
+  const stageOf = (a: Activity) => a.stage || tr('io.imp.noStage');
   const isEvent = (a: Activity) => a.type === 'start' || a.type === 'end';
   const stages = p.stageOrder.filter((s) => acts.some((a) => !isEvent(a) && stageOf(a) === s));
   for (const a of acts) if (!isEvent(a) && !stages.includes(stageOf(a))) stages.push(stageOf(a));
@@ -80,7 +80,7 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
   let implicitEnd: string | undefined;
   if (!startActs.length && acts.length) {
     implicitStart = mkId('Start', 'implicito');
-    macroNodes.unshift({ id: implicitStart, kind: 'start', order: -1, name: 'Início', bpmnType: 'startEvent' });
+    macroNodes.unshift({ id: implicitStart, kind: 'start', order: -1, name: tr('d.type.start'), bpmnType: 'startEvent' });
   }
   const macroEdges: PlaneSpec['edges'] = [];
   const addMacro = (from: string, to: string, e?: Edge) => {
@@ -176,13 +176,13 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
 function doc(a: Activity | undefined): string {
   if (!a) return '';
   const parts = [
-    a.owner && `Responsável: ${a.owner}`,
-    a.duration !== undefined && `Duração: ${fmtDuration(a.duration, a.unit)}`,
-    a.people !== undefined && `Pessoas: ${a.people}`,
-    a.wait !== undefined && `Espera: ${fmtDuration(a.wait, a.unit)}`,
+    a.owner && tr('bpmn.doc.owner', { v: a.owner }),
+    a.duration !== undefined && tr('bpmn.doc.duration', { v: fmtDuration(a.duration, a.unit) }),
+    a.people !== undefined && tr('bpmn.doc.people', { v: a.people }),
+    a.wait !== undefined && tr('bpmn.doc.wait', { v: fmtDuration(a.wait, a.unit) }),
     a.lean && `Lean: ${a.lean}`,
-    a.rework && 'Retrabalho',
-    a.critical && 'Crítica',
+    a.rework && tr('bpmn.doc.rework'),
+    a.critical && tr('bpmn.doc.critical'),
     a.notes,
   ].filter(Boolean);
   return parts.length ? `<documentation>${esc(parts.join(' · '))}</documentation>` : '';

@@ -19,4 +19,9 @@ test('comparar EN: moeda e unidade em inglês', async ({ page }) => {
   expect((await hours.getByRole('cell').allInnerTexts())[1].trim()).toBe('hours');
   const text = await page.locator('table').first().innerText();
   expect(text).not.toMatch(/R\$|horas|pessoa-hora|atividades/);
+  // Resultados: custos realizados com moeda ($), sem "R$"
+  await page.goto(page.url().replace(/\/comparar$/, '/resultados'));
+  await page.waitForLoadState('networkidle');
+  const res = await page.locator('main').innerText();
+  expect(res).not.toMatch(/R\$|\/mês/);
 });
