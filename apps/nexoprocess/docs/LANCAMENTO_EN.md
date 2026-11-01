@@ -179,10 +179,21 @@ Prova o ciclo comprar → ativar → perder o acesso, com evidência real. Anote
 - Emergência sem banco: `LICENSE_ALLOWLIST` (ver `DEPLOY_CLOUDFLARE.md`).
 - Rollback do app **não** reverte variáveis. Se a causa foi uma `VITE_*` errada, refaça o build com o valor certo (§4.1) e publique de novo; se foi `GUMROAD_*`/`SUPABASE_*`, corrija no painel **e publique de novo** (a variável só vale no próximo deployment).
 
+## 6.1 Landing de venda e páginas legais EN (estáticas, em `public/en/`)
+
+- **O que é:** `/en/` (venda), `/en/terms.html`, `/en/privacy.html`, `/en/refund.html`. HTML estático, mesmas fontes e identidade do app, sem script, sem analytics e sem recurso externo. Copy escrita por Sonnet, marcada "copy por Sonnet; revisar": **revise antes de publicar**. Capturas são do demo EN, rotuladas "Sample data".
+- **Link de compra:** o `nexo:build:venda` troca `{{GUMROAD_CHECKOUT_URL}}` por `VITE_GUMROAD_CHECKOUT_URL` e `{{SUPPORT_EMAIL}}` por `VITE_SUPPORT_EMAIL`. **O build FALHA se faltar a variável ou sobrar qualquer marcador `{{…}}`** (verificado: sem o link, o build para com "VITE_GUMROAD_CHECKOUT_URL ausente").
+- **Páginas legais em RASCUNHO:** vêm de `docs/legal-en/*.md` e mostram faixa **DRAFT** enquanto houver "TO VALIDATE"/"DRAFT". Enquanto houver faixa, o `check-sale-env` **recusa o build de venda** (verificado). Para liberar: resolva os "TO VALIDATE" (revisão jurídica), rode `npm run nexo:site:en` e faça commit.
+- **As 3 variáveis legais passam a ser** `VITE_EN_TERMS_URL=https://<domínio>/en/terms.html`, `VITE_EN_PRIVACY_URL=https://<domínio>/en/privacy.html`, `VITE_EN_REFUND_URL=https://<domínio>/en/refund.html`. **Domínio: A VALIDAR** (decisão sua).
+- **Reembolso:** a página diz 7 dias (**A VALIDAR**). Tem de bater com a configuração da Gumroad.
+- **Link para a landing:** use `/en/` com barra final. Se o Pages redireciona `/en` → `/en/`: **A VALIDAR** (não testável no `vite preview`).
+- **Verificado localmente (Chromium, `vite preview`):** /en/ e as 3 páginas abrem estáticas (não o app), sem erro de console, sem recurso externo, sem violação axe (claro/escuro); o service worker não devolve o app no lugar delas; desktop, iPhone-390, 320 px e Android sem rolagem horizontal. **NÃO verificado:** servir pelo Cloudflare Pages real (ordem estático × fallback SPA), Safari/Android reais.
+- **Refazer as capturas:** rodar `tests/e2e/shots-en-landing.spec.ts` com `SHOTS_EN_OUT=<pasta>` e converter para WebP 1200x760 (PIL) em `public/en/assets/`.
+
 ## 7. O que ainda NÃO está pronto para EN (01/11/2026)
 
-- **Interface EN: feita**, exceto: **Ajuda** (~93 textos), **templates XLSX/CSV** (cabeçalhos e valores continuam em PT; CSV usa `;` e vírgula decimal) e **mensagens de banco/rascunho/ações**. Páginas de Ajuda, Privacidade e Termos aparecem em PT dentro do app EN; o texto legal EN fica fora do app (páginas `VITE_EN_*`).
-- **Landing EN e páginas legais EN:** dependem do pacote `f5-landing-en.tar`, que **ainda não foi anexado** à sessão de engenharia. Sem as páginas legais EN, o build de venda não passa (as 3 `VITE_EN_*` são obrigatórias).
+- **Interface EN: feita** (Ajuda, templates XLSX/CSV com importação PT↔EN, mensagens de banco/rascunho/ações). Limitação: o CSV continua com `;` e vírgula decimal. Privacidade e Termos dentro do app (`Legal.tsx`) seguem em PT; o texto legal EN fica nas páginas estáticas (§6.1).
+- **Landing EN e páginas legais EN:** criadas (§6.1), mas as legais estão em **RASCUNHO** ("TO VALIDATE") e o build de venda continua recusado até a revisão jurídica.
 - **Safari do iPhone e Android reais:** NÃO verificados (impressão/PDF e telas só no Chromium); só depois do deploy (etapa 5).
 - **Textos EN** são rascunho, sem revisão nativa; privacidade/Ajuda precisam de revisão jurídica.
 - **Bundle inicial 157,8 KB gzip** (meta 130 KB): dívida técnica aceita; ver `HANDOFF_EN.md` §10.

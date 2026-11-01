@@ -83,3 +83,11 @@ Também em EN (v2): Formulário completo, Assistente de criação (inclui texto 
 ## 12. Limitação conhecida: moeda segue o idioma (decisão do revisor, 01/11/2026)
 - A moeda exibida segue o idioma: BRL em PT, USD em EN (`fmtBRL` → `formatters(locale).currency`). Os valores guardados no projeto são números sem moeda e **não são convertidos**.
 - Consequência: um projeto criado em PT (valores em reais) e aberto em EN mostra os mesmos números com "$". Não corrigir agora; registrado para decisão futura (ex.: guardar a moeda no projeto).
+
+## 13. Estado após as rodadas I1–I5 e J (01/11/2026)
+
+- **I1–I4:** Ajuda, mensagens de banco/rascunho/armazenamento, templates XLSX/CSV (importa arquivo PT ou EN em qualquer idioma ativo; provado por testes) e e2e em w320/android/licença, todos verdes.
+- **I5, inventário de PT remanescente (contagem por arquivo):** `fields.ts` 61 (rótulos canônicos PT, intencional), `Legal.tsx` 30 (intencional), `journey.ts` 8, `license/config.ts` 6, `Login.tsx` 6 (fluxo Hotmart, intencional), `compare.ts` 4, `toProcess.ts` 3, `CompareTab` 3, `advanced` 2, `WorkspacePage` 2, `demo.ts` 1, `tobe` 1, `Assistant` 1, `Import` 1, `RisksTab` 1, `ReportPage` 1. Os pequenos são códigos internos/comentários; revisar se algum virar texto visível.
+- **CSV:** `;` e vírgula decimal (limitação conhecida); CSV do plano EN usa datas ISO.
+- **`DEMO_MESSAGE`:** não usada.
+- **J:** landing e legais estáticas em `public/en/` (ver `LANCAMENTO_EN.md` §6.1). Nada publicado.

@@ -22,7 +22,7 @@ function fromHeadersFile(): Rules {
 
 function fromVercel(): Rules {
   const cfg = JSON.parse(readFileSync(new URL('vercel.json', root), 'utf8')) as { headers: { source: string; headers: { key: string; value: string }[] }[] };
-  const map: Record<string, string> = { '/(.*)': '/*', '/assets/(.*)': '/assets/*' };
+  const map: Record<string, string> = { '/(.*)': '/*', '/assets/(.*)': '/assets/*', '/en/assets/(.*)': '/en/assets/*' };
   return Object.fromEntries(cfg.headers.map((h) => [map[h.source] ?? h.source, Object.fromEntries(h.headers.map((x) => [x.key.toLowerCase(), x.value]))]));
 }
 
