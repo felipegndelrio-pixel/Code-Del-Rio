@@ -9,6 +9,7 @@ import { ThemeToggle } from '../components/AppShell';
 import { Button, Callout, Field, Input } from '../components/ui';
 import { activate, currentLicense, LICENSE } from '../license/config';
 import { endDemo, startDemo } from '../license/demo';
+import { openDemo } from '../state/actions';
 import { SupportLink } from '../components/SupportLink';
 import { useI18n } from '../i18n/I18nProvider';
 import LoginEn from './LoginEn';
@@ -35,11 +36,14 @@ export default function Login() {
     if (error) errRef.current?.focus();
   }, [error]);
 
-  // Liga a demonstração e abre a Home; o exemplo só é criado em "Abrir demonstração"
-  // (comportamento definido nos e2e da v2.5.0-rc1).
-  const tryDemo = () => {
+  const tryDemo = async () => {
     startDemo();
-    nav('/app');
+    try {
+      const w = await openDemo();
+      nav(`/app/p/${w.id}/visao-geral`);
+    } catch {
+      nav('/app');
+    }
   };
 
   const submit = async (e: FormEvent) => {

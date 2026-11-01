@@ -27,11 +27,14 @@ export default function Landing() {
       toast('bad', t('pg.land.001'));
     }
   };
-  // Modo de venda: liga a demonstração e abre a Home; o exemplo só é criado quando a pessoa
-  // escolhe "Abrir demonstração" (comportamento definido nos e2e da v2.5.0-rc1).
-  const tryDemo = () => {
+  const tryDemo = async () => {
     startDemo();
-    nav('/app');
+    try {
+      const w = await openDemo();
+      nav(`/app/p/${w.id}/visao-geral`);
+    } catch {
+      toast('bad', 'Não conseguimos abrir a demonstração neste navegador. Tente recarregar a página.');
+    }
   };
   return (
     <div className="min-h-screen">
