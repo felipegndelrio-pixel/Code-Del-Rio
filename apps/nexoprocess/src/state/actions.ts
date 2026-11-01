@@ -3,6 +3,7 @@ import { newWorkspace } from '../domain/factory';
 import type { ProcessModel, Workspace } from '../domain/types';
 import { db } from '../storage/db';
 import { askPersistentStorage } from './install';
+import { tr } from '../i18n';
 
 /** Abre o exemplo (reaproveita o existente para não duplicar). */
 export async function openDemo(reset = false): Promise<Workspace> {
@@ -41,10 +42,10 @@ export async function download(name: string, data: BlobPart, type: string) {
       const code = (e as { code?: string })?.code;
       const msg =
         code === 'declined'
-          ? 'o salvamento foi cancelado.'
+          ? tr('st.dl.declined')
           : code === 'too_large'
-            ? 'o arquivo é grande demais para ser salvo nesta visualização.'
-            : 'esta visualização não consegue salvar arquivos. Abra o projeto no app publicado.';
+            ? tr('st.dl.large')
+            : tr('st.dl.other');
       throw new Error(msg, { cause: e });
     }
     return;
@@ -67,7 +68,7 @@ export function slug(s: string) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
-      .slice(0, 50) || 'processo'
+      .slice(0, 50) || tr('st.slugFallback')
   );
 }
 
@@ -75,11 +76,11 @@ export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsh
 
 export async function downloadTemplateXlsx() {
   const { buildWorkbook } = await import('../io/workbook');
-  await download('modelo-nexoprocess.xlsx', await buildWorkbook({ includeExample: true }), XLSX_MIME);
+  await download(tr('st.file.template') + '.xlsx', await buildWorkbook({ includeExample: true }), XLSX_MIME);
 }
 export async function downloadTemplateCsv() {
   const { templateCsv } = await import('../io/workbook');
-  await download('modelo-nexoprocess-exemplo.csv', templateCsv(), 'text/csv;charset=utf-8');
+  await download(tr('st.file.templateCsv') + '.csv', templateCsv(), 'text/csv;charset=utf-8');
 }
 
 /**

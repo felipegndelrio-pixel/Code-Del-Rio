@@ -7,6 +7,7 @@
 import { normalizeWorkspace } from '../domain/factory';
 import type { Workspace } from '../domain/types';
 import { nowIso, uid } from '../domain/units';
+import { tr } from '../i18n';
 
 const DB_NAME = 'nexoprocess';
 const DB_VERSION = 1;
@@ -43,7 +44,7 @@ export async function checkStorage(): Promise<'indexeddb' | 'memoria'> {
 function open(): Promise<IDBDatabase> {
   if (dbp) return dbp;
   dbp = new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB indisponível'));
+    if (typeof indexedDB === 'undefined') return reject(new Error(tr('st.idbUnavailable')));
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -52,7 +53,7 @@ function open(): Promise<IDBDatabase> {
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error('Banco local bloqueado por outra aba.'));
+    req.onblocked = () => reject(new Error(tr('st.blocked')));
   });
   return dbp;
 }
@@ -90,9 +91,9 @@ function run<T>(db: IDBDatabase, stores: string[], body: (t: IDBTransaction, don
       }
       reject(e);
     };
-    t.oncomplete = () => (out === undefined ? reject(new Error('A transação terminou sem resultado; nada foi confirmado.')) : resolve(out));
-    t.onerror = (ev) => reject((ev.target as IDBRequest | null)?.error ?? t.error ?? new Error('Falha na transação'));
-    t.onabort = () => reject(t.error ?? new Error('Transação abortada'));
+    t.oncomplete = () => (out === undefined ? reject(new Error(tr('st.noResult'))) : resolve(out));
+    t.onerror = (ev) => reject((ev.target as IDBRequest | null)?.error ?? t.error ?? new Error(tr('st.txFail')));
+    t.onabort = () => reject(t.error ?? new Error(tr('st.txAbort')));
     const guard: Guard =
       (fn) =>
       (...a) => {
@@ -133,7 +134,7 @@ async function tx<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectS
     const req = fn(t.objectStore(store));
     t.oncomplete = () => resolve(req.result);
     t.onerror = () => reject(t.error ?? req.error);
-    t.onabort = () => reject(t.error ?? new Error('Transação abortada'));
+    t.onabort = () => reject(t.error ?? new Error(tr('st.txAbort')));
   });
 }
 
@@ -176,7 +177,7 @@ export const db = {
     if (!idb) {
       const prev = memoryFallback!.get('drafts')!.get(commitKey(draftId)) as DraftCommitRecord | undefined;
       if (prev) return { status: 'existente', workspaceId: prev.workspaceId, fingerprint: prev.fingerprint };
-      if (memoryFallback!.get('workspaces')!.has(w.id)) throw new DOMException('Já existe um projeto com este id.', 'ConstraintError');
+      if (memoryFallback!.get('workspaces')!.has(w.id)) throw new DOMException(tr('st.dupId'), 'ConstraintError');
       memoryFallback!.get('workspaces')!.set(w.id, structuredClone(w));
       memoryFallback!.get('drafts')!.set(commitKey(draftId), rec);
       return { status: 'criado', workspaceId: w.id };
@@ -270,14 +271,14 @@ export function parseBackup(text: string): Workspace[] {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error('O arquivo não é um backup válido (JSON ilegível).');
+    throw new Error(tr('st.badJson'));
   }
   const b = data as Partial<BackupFile>;
-  if (b?.format !== 'nexoprocess-backup' || !Array.isArray(b.workspaces)) throw new Error('O arquivo não é um backup do NexoProcess.');
+  if (b?.format !== 'nexoprocess-backup' || !Array.isArray(b.workspaces)) throw new Error(tr('st.notBackup'));
   try {
     return b.workspaces.map(normalizeWorkspace);
   } catch (e) {
-    throw new Error(`Backup incompleto ou corrompido: ${(e as Error).message} Nenhum dado foi alterado.`, { cause: e });
+    throw new Error(tr('st.corrupt', { why: (e as Error).message }), { cause: e });
   }
 }
 
@@ -287,7 +288,7 @@ export async function restoreBackup(list: Workspace[]): Promise<number> {
   for (const w of list) {
     const copy = structuredClone(w);
     if (existing.has(copy.id)) copy.id = uid('w_');
-    copy.history = [...(copy.history ?? []), { at: nowIso(), area: 'Backup', message: 'Restaurado de backup' }];
+    copy.history = [...(copy.history ?? []), { at: nowIso(), area: tr('st.histArea'), message: tr('st.histMsg') }];
     await db.putWorkspace(copy);
   }
   return list.length;

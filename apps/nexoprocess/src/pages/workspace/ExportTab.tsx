@@ -47,7 +47,7 @@ export default function ExportTab() {
         if (fmt === 'svg') zip.file(`${name}.svg`, s.svg);
         else zip.file(`${name}.png`, await svgToPng(s.svg, '#ffffff'));
       }
-      await download(`${base}-mapas-${fmt}.zip`, await zip.generateAsync({ type: 'uint8array' }) as Uint8Array<ArrayBuffer>, 'application/zip');
+      await download(`${base}-${t('st.file.maps')}-${fmt}.zip`, await zip.generateAsync({ type: 'uint8array' }) as Uint8Array<ArrayBuffer>, 'application/zip');
     });
   const xlsx = () =>
     run('xlsx', async () => {

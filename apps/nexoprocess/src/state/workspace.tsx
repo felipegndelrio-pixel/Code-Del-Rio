@@ -7,6 +7,7 @@ import type { ProcessModel, Workspace } from '../domain/types';
 import { nowIso, uid } from '../domain/units';
 import { validateProcess, type Issue } from '../domain/validation';
 import { db } from '../storage/db';
+import { tr } from '../i18n';
 import { demoBlocked, isDemo } from '../license/demo';
 
 /** 'demo': modo de demonstração — as alterações ficam só na memória. */
@@ -117,7 +118,7 @@ export function WorkspaceProvider({ initial, children }: { initial: Workspace; c
       const now = Date.now();
       const top = undoStack.current[undoStack.current.length - 1];
       if (!history && top && !top.labeled && now - top.at < 1500) top.at = now;
-      else undoStack.current = [...undoStack.current, { w: prev, label: history?.message ?? 'Edição de campos', labeled: !!history, at: now }].slice(-MAX_UNDO);
+      else undoStack.current = [...undoStack.current, { w: prev, label: history?.message ?? tr('st.undoDefault'), labeled: !!history, at: now }].slice(-MAX_UNDO);
       setUndoLabel(undoStack.current[undoStack.current.length - 1]?.label ?? null);
       commit(next);
     },

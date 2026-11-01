@@ -3078,6 +3078,34 @@ export const pt = {
   'hp.ai.c': ', sem IA generativa. Uma integração opcional com provedor de IA pode ser adicionada no futuro, desde que: (1) a chave fique em um servidor, nunca no navegador; (2) nada seja enviado sem seu consentimento explícito; (3) o produto continue funcionando sem ela.',
   'hp.disclaimer': 'O {brand} não é afiliado ao PMI® nem a fornecedores de ferramentas de processos. Diagramas renderizados com bpmn-js (bpmn.io) — a marca d’água do bpmn.io permanece visível conforme a licença.',
   'hp.back': 'Voltar ao app',
+
+  'st.idbUnavailable': 'IndexedDB indisponível',
+  'st.blocked': 'Banco local bloqueado por outra aba.',
+  'st.noResult': 'A transação terminou sem resultado; nada foi confirmado.',
+  'st.txFail': 'Falha na transação',
+  'st.txAbort': 'Transação abortada',
+  'st.dupId': 'Já existe um projeto com este id.',
+  'st.badJson': 'O arquivo não é um backup válido (JSON ilegível).',
+  'st.notBackup': 'O arquivo não é um backup do NexoProcess.',
+  'st.corrupt': 'Backup incompleto ou corrompido: {why} Nenhum dado foi alterado.',
+  'st.histArea': 'Backup',
+  'st.histMsg': 'Restaurado de backup',
+
+  'st.draftDeleted': 'Este rascunho já virou um projeto, que foi excluído depois.',
+  'st.draftDiverged': 'Este rascunho já virou um projeto em outra aba, com conteúdo diferente do desta aba.',
+
+  'st.dl.declined': 'o salvamento foi cancelado.',
+  'st.dl.large': 'o arquivo é grande demais para ser salvo nesta visualização.',
+  'st.dl.other': 'esta visualização não consegue salvar arquivos. Abra o projeto no app publicado.',
+  'st.slugFallback': 'processo',
+  'st.file.template': 'modelo-nexoprocess',
+  'st.file.templateCsv': 'modelo-nexoprocess-exemplo',
+
+  'st.file.plan': 'plano-de-acao',
+
+  'st.file.maps': 'mapas',
+
+  'st.undoDefault': 'Edição de campos',
 } as const;
 
 export type MessageKey = keyof typeof pt;

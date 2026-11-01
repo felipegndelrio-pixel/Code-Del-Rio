@@ -137,7 +137,7 @@ export default function PlanTab() {
   const exportCsv = async () => {
     if (demoBlocked('exportar')) return;
     try {
-      await download(`${slug(w.asIs.name)}-plano-de-acao.csv`, actionsToCsv(w), 'text/csv;charset=utf-8');
+      await download(`${slug(w.asIs.name)}-${tr('st.file.plan')}.csv`, actionsToCsv(w), 'text/csv;charset=utf-8');
       toast('ok', t('ws.plan.018'));
     } catch (e) {
       toast('bad', t('ws.plan.019', { p0: e instanceof Error ? e.message : String(e) }));

@@ -3077,4 +3077,32 @@ export const en: Record<MessageKey, string> = {
   'hp.ai.c': ', without generative AI. An optional integration with an AI provider may be added in the future, provided that: (1) the key stays on a server, never in the browser; (2) nothing is sent without your explicit consent; (3) the product keeps working without it.',
   'hp.disclaimer': '{brand} is not affiliated with PMI® or with process-tool vendors. Diagrams rendered with bpmn-js (bpmn.io) — the bpmn.io watermark remains visible as required by its license.',
   'hp.back': 'Back to the app',
+
+  'st.idbUnavailable': 'IndexedDB unavailable',
+  'st.blocked': 'Local database blocked by another tab.',
+  'st.noResult': 'The transaction ended without a result; nothing was confirmed.',
+  'st.txFail': 'Transaction failed',
+  'st.txAbort': 'Transaction aborted',
+  'st.dupId': 'A project with this id already exists.',
+  'st.badJson': 'The file is not a valid backup (unreadable JSON).',
+  'st.notBackup': 'The file is not a NexoProcess backup.',
+  'st.corrupt': 'Backup incomplete or corrupted: {why} No data was changed.',
+  'st.histArea': 'Backup',
+  'st.histMsg': 'Restored from backup',
+
+  'st.draftDeleted': 'This draft had already become a project, which was deleted afterwards.',
+  'st.draftDiverged': 'This draft had already become a project in another tab, with content different from this tab’s.',
+
+  'st.dl.declined': 'saving was cancelled.',
+  'st.dl.large': 'the file is too large to be saved in this view.',
+  'st.dl.other': 'this view cannot save files. Open the project in the published app.',
+  'st.slugFallback': 'process',
+  'st.file.template': 'nexoprocess-template',
+  'st.file.templateCsv': 'nexoprocess-template-example',
+
+  'st.file.plan': 'action-plan',
+
+  'st.file.maps': 'maps',
+
+  'st.undoDefault': 'Field edit',
 };

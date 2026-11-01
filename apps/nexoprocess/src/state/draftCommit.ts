@@ -26,6 +26,7 @@ import { uid } from '../domain/units';
 import { checkStorage, commitKey, db, type DraftCommitRecord, type SaveResult } from '../storage/db';
 import { localDraft } from '../storage/localDraft';
 import { askPersistentStorage } from './install';
+import { tr } from '../i18n';
 
 export interface DraftCommit {
   w: Workspace;
@@ -40,14 +41,14 @@ export interface DraftCommit {
 /** O rascunho já virou um projeto que não existe mais (foi excluído): não recriamos sozinhos. */
 export class DraftAlreadyUsedError extends Error {
   constructor(readonly workspaceId: string) {
-    super('Este rascunho já virou um projeto, que foi excluído depois.');
+    super(tr('st.draftDeleted'));
   }
 }
 
 /** O rascunho já virou um projeto (em outra aba) com conteúdo diferente do desta aba: o desta aba não entrou. */
 export class DraftDivergedError extends Error {
   constructor(readonly workspaceId: string) {
-    super('Este rascunho já virou um projeto em outra aba, com conteúdo diferente do desta aba.');
+    super(tr('st.draftDiverged'));
   }
 }
 
