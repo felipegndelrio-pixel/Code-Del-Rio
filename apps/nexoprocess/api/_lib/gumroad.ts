@@ -29,6 +29,23 @@ export function normalizeGumroadId(raw: unknown): string | null {
   return /^[A-Za-z0-9_-]{1,64}$/.test(body) ? body : null;
 }
 
+/**
+ * Poka-yoke: compara product_id ignorando o padding "=" (a variável colada sem "==" não pode
+ * rejeitar todas as compras). Fora do formato em qualquer lado → falso (falha fechada).
+ */
+export function sameProductId(a: unknown, b: unknown): boolean {
+  const strip = (v: unknown): string | null => {
+    if (typeof v !== 'string') return null;
+    const s = v.trim();
+    if (!/^[A-Za-z0-9_-]+={0,2}$/.test(s)) return null;
+    const body = s.replace(/=+$/, '');
+    return /^[A-Za-z0-9_-]{1,64}$/.test(body) ? body : null;
+  };
+  const x = strip(a);
+  const y = strip(b);
+  return x !== null && y !== null && x === y;
+}
+
 /** Chave digitada: só caracteres visíveis ASCII, 8 a 128 (formato real A VALIDAR na compra de teste). */
 export function normalizeLicenseKey(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
@@ -93,7 +110,7 @@ const isTrue = (v: unknown) => v === true || v === 'true';
 
 /** Decide pela resposta da API (nunca pelo Ping). expectedEmail: o e-mail digitado (D2) ou o do token. */
 export function decide(p: GumroadPurchase, cfg: GumroadConfig, expectedEmail: string | null): Decision {
-  if (typeof p.product_id !== 'string' || p.product_id.trim() !== cfg.productId.trim()) return { kind: 'reject', reason: 'outro_produto' };
+  if (!sameProductId(p.product_id, cfg.productId)) return { kind: 'reject', reason: 'outro_produto' };
   const email = normalizeEmail(p.email);
   if (!email) return { kind: 'reject', reason: 'sem_email' };
   if (expectedEmail !== null && email !== expectedEmail) return { kind: 'reject', reason: 'email_diferente' };
@@ -304,7 +321,7 @@ export async function handleGumroadPing(req: Request, deps: GumroadDeps): Promis
   if (text === null) return json(413, { error: 'grande_demais' });
   const field = pingFields(text, req.headers.get('content-type'));
   const productId = field('product_id')?.trim();
-  if (productId && productId !== deps.productId.trim()) return json(200, { ignored: 'outro_produto' });
+  if (productId && !sameProductId(productId, deps.productId)) return json(200, { ignored: 'outro_produto' });
   const key = normalizeLicenseKey(field('license_key'));
   if (!key) return json(200, { ignored: 'sem_license_key' });
   const v = await verifyGumroadLicense(deps.productId, key, deps.fetchImpl ?? fetch, deps.timeoutMs ?? 3500);

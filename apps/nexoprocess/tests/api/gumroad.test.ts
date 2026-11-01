@@ -11,6 +11,7 @@ import {
   handleGumroadPing,
   normalizeGumroadId,
   normalizeLicenseKey,
+  sameProductId,
   verifyGumroadLicense,
   type GumroadDeps,
   type GumroadPurchase,
@@ -177,6 +178,17 @@ describe('decide', () => {
     expect(decide(officialPurchase({ disputed: true }), cfg, null).kind).toBe('dispute');
     expect(decide(officialPurchase({ disputed: true, dispute_won: true }), cfg, null).kind).toBe('dispute_won');
     expect(decide(officialPurchase({ refunded: true, disputed: true, dispute_won: true }), cfg, null).kind).toBe('refunded');
+  });
+  it('poka-yoke do product_id: variável com ou sem "==" aceita; outro produto ou formato inválido rejeita', () => {
+    const semPadding = PRODUCT.replace(/=+$/, '');
+    expect(decide(officialPurchase(), { productId: semPadding, allowTest: false }, null).kind).toBe('grant');
+    expect(decide(officialPurchase(), { productId: ` ${PRODUCT} `, allowTest: false }, null).kind).toBe('grant');
+    expect(decide(officialPurchase({ product_id: semPadding }), cfg, null).kind).toBe('reject'); // a API devolve o id com padding; sem ele, falha fechada
+    expect(decide(officialPurchase(), { productId: 'outro==', allowTest: false }, null)).toEqual({ kind: 'reject', reason: 'outro_produto' });
+    expect(decide(officialPurchase(), { productId: '', allowTest: false }, null)).toEqual({ kind: 'reject', reason: 'outro_produto' });
+    expect(decide(officialPurchase({ product_id: 'a b==' }), { productId: 'a b==', allowTest: false }, null).kind).toBe('reject');
+    expect(sameProductId(PRODUCT, semPadding)).toBe(true);
+    expect(sameProductId(PRODUCT, 123)).toBe(false);
   });
   it('rejeições: outro produto, e-mail diferente, teste sem permissão, assinatura, id fora do formato', () => {
     expect(decide(officialPurchase({ product_id: 'outro==' }), cfg, null)).toEqual({ kind: 'reject', reason: 'outro_produto' });
