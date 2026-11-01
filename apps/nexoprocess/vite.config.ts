@@ -57,7 +57,7 @@ export default defineConfig(({ mode }) => {
   const env = { ...process.env, ...loadEnv(mode, import.meta.dirname, '') };
   const single = env.SINGLEFILE === 'true';
   const themeInit = readFileSync(import.meta.dirname + '/public/theme-init.js', 'utf8');
-  const buildId = (env.VITE_BUILD_ID || 'unversioned').replace(/[&<>\"]/g, (char) => ({
+  const buildId = (env.VITE_BUILD_ID || 'unversioned').replace(/[&<>"]/g, (char) => ({
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
