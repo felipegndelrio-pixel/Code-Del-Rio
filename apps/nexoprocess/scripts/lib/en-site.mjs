@@ -3,6 +3,8 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const MARKERS = { '{{GUMROAD_CHECKOUT_URL}}': 'VITE_GUMROAD_CHECKOUT_URL', '{{SUPPORT_EMAIL}}': 'VITE_SUPPORT_EMAIL' };
+/** Dias de uso offline antes de reconectar. ÚNICA fonte do texto da landing; tem de bater com o padrão do servidor (teste em tests/api/en-site.test.ts). */
+export const LICENSE_OFFLINE_DAYS = 30;
 const MARKER_ANY = /\{\{[A-Z_]+\}\}/g;
 
 /** Troca os marcadores. Em build de venda, valor ausente ou marcador que sobra é erro (lista tudo). */
@@ -17,6 +19,7 @@ export function injectHtml(html, env, { sale, file = 'html' }) {
     const safe = (v || (marker === '{{GUMROAD_CHECKOUT_URL}}' ? '#checkout' : 'support@example.invalid')).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     out = out.split(marker).join(safe);
   }
+  out = out.split('{{LICENSE_OFFLINE_DAYS}}').join(String(LICENSE_OFFLINE_DAYS));
   const left = out.match(MARKER_ANY);
   if (left) errors.push(`${file}: marcadores que sobraram: ${[...new Set(left)].join(', ')}.`);
   return { html: out, errors };

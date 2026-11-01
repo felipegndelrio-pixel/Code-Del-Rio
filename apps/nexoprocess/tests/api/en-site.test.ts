@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { draftPages, injectDist, injectHtml } from '../../scripts/lib/en-site.mjs';
+import { LICENSE_OFFLINE_DAYS, draftPages, injectDist, injectHtml } from '../../scripts/lib/en-site.mjs';
 import { mdToHtml, page } from '../../scripts/build-en-site.mjs';
 
 const SITE = new URL('../../public/en/', import.meta.url).pathname;
@@ -79,9 +79,9 @@ describe('páginas estáticas EN: sem dependência externa, sem script', () => {
       for (const m of h.matchAll(/href="((?:terms|privacy|refund)\.html)"/g)) expect(existsSync(SITE + m[1])).toBe(true);
     });
   }
-  it('index: só dois tipos de marcador (compra e suporte) e título/descrição presentes', () => {
+  it('index: só estes marcadores (compra, dias offline e suporte) e título/descrição presentes', () => {
     const h = readFileSync(SITE + 'index.html', 'utf8');
-    expect([...new Set(h.match(/\{\{[A-Z_]+\}\}/g))].sort()).toEqual(['{{GUMROAD_CHECKOUT_URL}}', '{{SUPPORT_EMAIL}}']);
+    expect([...new Set(h.match(/\{\{[A-Z_]+\}\}/g))].sort()).toEqual(['{{GUMROAD_CHECKOUT_URL}}', '{{LICENSE_OFFLINE_DAYS}}', '{{SUPPORT_EMAIL}}']);
     expect(h).toContain('From process spreadsheet to improvement plan.');
     expect(h).toContain('href="/entrar?lang=en"');
     expect(h).toMatch(/<meta name="description" content="[^"]{60,}/);
@@ -90,5 +90,23 @@ describe('páginas estáticas EN: sem dependência externa, sem script', () => {
     const h = readFileSync(SITE + 'index.html', 'utf8').toLowerCase();
     expect(h).not.toMatch(/guarantee[sd]? (savings|results|roi)|save \d|increase .* by \d|% (faster|cheaper)/);
     expect(h).toContain('estimates');
+  });
+});
+
+describe('copy da landing EN (revisão J)', () => {
+  const src = readFileSync(join(__dirname, '../../public/en/index.html'), 'utf8');
+  it('N de dias offline vem de uma constante e bate com o padrão do servidor (ttlDays)', () => {
+    const handlers = readFileSync(join(__dirname, '../../api/_lib/handlers.ts'), 'utf8');
+    expect(handlers).toContain('Number(env.LICENSE_TTL_DAYS) || ' + LICENSE_OFFLINE_DAYS);
+    const out = injectHtml(src, { VITE_GUMROAD_CHECKOUT_URL: 'https://x.y/l', VITE_SUPPORT_EMAIL: 'a@b.c' }, { sale: true });
+    expect(out.errors).toEqual([]);
+    expect(out.html).toContain(`at least once every ${LICENSE_OFFLINE_DAYS} days`);
+  });
+  it('sem alegações não provadas de navegador e com reembolso/impostos qualificados', () => {
+    expect(src).not.toMatch(/Safari \(16|107\+|104\+|iPhone and iPad/);
+    expect(src).toContain('Tested on current Chrome and Edge.');
+    expect(src).toContain('access ends at the next online license check after a refund');
+    expect(src).not.toContain('access ends on the device');
+    expect(src).toContain('Taxes may apply at checkout.');
   });
 });
