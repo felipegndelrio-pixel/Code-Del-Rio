@@ -1,0 +1,904 @@
+{
+  "template": {
+    "sheets": [
+      {
+        "name": "Leia-me",
+        "rows": [
+          [
+            "Como preencher o modelo do NexoProcess"
+          ],
+          [
+            "1. Na aba “Processo”, preencha nome e (se souber) volume e custos."
+          ],
+          [
+            "2. Na aba “Atividades”, uma linha por atividade, na ordem em que acontecem."
+          ],
+          [
+            "3. Mínimo necessário: Etapa macro, Atividade, Ordem, Duração e Unidade."
+          ]
+        ],
+        "notes": []
+      },
+      {
+        "name": "Processo",
+        "rows": [
+          [
+            "Campo",
+            "Valor (preencha aqui)",
+            "Ajuda"
+          ],
+          [
+            "Nome do processo",
+            null,
+            "Ex.: Processamento de pedido"
+          ],
+          [
+            "Descrição",
+            null,
+            "Objetivo e escopo em uma frase"
+          ],
+          [
+            "Área",
+            null,
+            "Área dona do processo"
+          ]
+        ],
+        "notes": []
+      },
+      {
+        "name": "Atividades",
+        "rows": [
+          [
+            "Código",
+            "Etapa macro",
+            "Atividade",
+            "Ordem",
+            "Tipo",
+            "Duração",
+            "Unidade",
+            "Responsável",
+            "Pessoas",
+            "Próxima atividade",
+            "Próxima se SIM",
+            "Próxima se NÃO",
+            "Classificação Lean",
+            "Tempo de espera",
+            "É retrabalho?",
+            "Frequência (%)",
+            "Crítica?",
+            "Volume da atividade",
+            "Custo-hora (R$)",
+            "Custo variável por execução (R$)",
+            "Duração mínima",
+            "Duração máxima",
+            "Observações",
+            "Duração em horas (calculado)",
+            "Esforço pessoa-h (calculado)",
+            "Custo por execução R$ (calculado)"
+          ],
+          [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+              "formula": "IF(F2=\"\",\"\",IF(G2=\"minutos\",F2/60,IF(G2=\"horas\",F2,IF(G2=\"dias\",F2*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X2=\"\",I2=\"\"),\"\",X2*I2)"
+            },
+            {
+              "formula": "IF(OR(Y2=\"\",S2=\"\"),\"\",Y2*S2)"
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+              "formula": "IF(F3=\"\",\"\",IF(G3=\"minutos\",F3/60,IF(G3=\"horas\",F3,IF(G3=\"dias\",F3*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X3=\"\",I3=\"\"),\"\",X3*I3)"
+            },
+            {
+              "formula": "IF(OR(Y3=\"\",S3=\"\"),\"\",Y3*S3)"
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+              "formula": "IF(F4=\"\",\"\",IF(G4=\"minutos\",F4/60,IF(G4=\"horas\",F4,IF(G4=\"dias\",F4*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X4=\"\",I4=\"\"),\"\",X4*I4)"
+            },
+            {
+              "formula": "IF(OR(Y4=\"\",S4=\"\"),\"\",Y4*S4)"
+            }
+          ]
+        ],
+        "notes": [
+          "Código curto e único (ex.: A1). Usado para ligar atividades. Se faltar, é gerado.\nExemplo: A1",
+          "Grupo ou fase principal (ex.: Recebimento). Vira um bloco no mapa macro.\nExemplo: Recebimento",
+          "O que acontece nesta etapa, com verbo (ex.: Registrar pedido).\nExemplo: Registrar pedido no sistema",
+          "Posição no processo (1, 2, 3…). Sem coluna de próxima atividade, o fluxo segue esta ordem.\nExemplo: 1",
+          "início, atividade, decisão ou fim. Vazio = atividade.\nExemplo: atividade",
+          "Tempo de trabalho ativo de UMA execução, sem contar espera.\nExemplo: 10",
+          "minutos, horas ou dias. Vale também para espera, mínimo e máximo.\nExemplo: minutos",
+          "Função ou área que executa (prefira a função, não o nome da pessoa).\nExemplo: Atendente",
+          "Quantas pessoas trabalham AO MESMO TEMPO nesta atividade.\nExemplo: 1",
+          "Código da próxima atividade. Vários códigos separados por vírgula = caminhos em paralelo.\nExemplo: A2",
+          "Para decisões: para onde segue quando a resposta é sim.\nExemplo: B1",
+          "Para decisões: para onde segue quando a resposta é não.\nExemplo: A3",
+          "agrega valor (o cliente pagaria), necessário (exigido, mas não agrega), desperdício (poderia não existir).\nExemplo: necessário",
+          "Tempo parado ANTES da atividade (fila, aprovação, cliente). Mesma unidade da duração.\nExemplo: 30",
+          "sim se a atividade existe para refazer/corrigir algo.\nExemplo: não",
+          "Percentual das execuções que passam por esta atividade (ex.: 20 = 1 a cada 5). Vazio = não informado.\nExemplo: 100",
+          "sim se uma falha aqui causa impacto relevante (cliente, conformidade, segurança).\nExemplo: não",
+          "Opcional: quantas vezes a atividade ocorre no período (sobrepõe o volume do processo).",
+          "Custo-hora carregado (salário + encargos + benefícios) de quem executa. Opcional.\nExemplo: 45",
+          "Outros custos por execução (taxas, materiais). Diga na aba Processo se já inclui mão de obra.",
+          "Para simular incerteza: o menor tempo realista.\nExemplo: 6",
+          "Para simular incerteza: o maior tempo realista.\nExemplo: 20",
+          "Qualquer contexto útil."
+        ]
+      },
+      {
+        "name": "Custos por função",
+        "rows": [
+          [
+            "Função / responsável",
+            "Custo-hora carregado (R$)"
+          ],
+          [
+            null,
+            null
+          ],
+          [
+            null,
+            null
+          ],
+          [
+            null,
+            null
+          ]
+        ],
+        "notes": []
+      },
+      {
+        "name": "Exemplo",
+        "rows": [
+          [
+            "Código",
+            "Etapa macro",
+            "Atividade",
+            "Ordem",
+            "Tipo",
+            "Duração",
+            "Unidade",
+            "Responsável",
+            "Pessoas",
+            "Próxima atividade",
+            "Próxima se SIM",
+            "Próxima se NÃO",
+            "Classificação Lean",
+            "Tempo de espera",
+            "É retrabalho?",
+            "Frequência (%)",
+            "Crítica?",
+            "Volume da atividade",
+            "Custo-hora (R$)",
+            "Custo variável por execução (R$)",
+            "Duração mínima",
+            "Duração máxima",
+            "Observações",
+            "Duração em horas (calculado)",
+            "Esforço pessoa-h (calculado)",
+            "Custo por execução R$ (calculado)"
+          ],
+          [
+            "S0",
+            "Recebimento",
+            "Pedido recebido",
+            1,
+            "início",
+            null,
+            "minutos",
+            null,
+            null,
+            "A1",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+              "formula": "IF(F2=\"\",\"\",IF(G2=\"minutos\",F2/60,IF(G2=\"horas\",F2,IF(G2=\"dias\",F2*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X2=\"\",I2=\"\"),\"\",X2*I2)"
+            },
+            {
+              "formula": "IF(OR(Y2=\"\",S2=\"\"),\"\",Y2*S2)"
+            }
+          ],
+          [
+            "A1",
+            "Recebimento",
+            "Registrar pedido no sistema",
+            2,
+            "atividade",
+            10,
+            "minutos",
+            "Atendente",
+            1,
+            "A2",
+            null,
+            null,
+            "necessário",
+            30,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            6,
+            20,
+            null,
+            {
+              "formula": "IF(F3=\"\",\"\",IF(G3=\"minutos\",F3/60,IF(G3=\"horas\",F3,IF(G3=\"dias\",F3*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X3=\"\",I3=\"\"),\"\",X3*I3)"
+            },
+            {
+              "formula": "IF(OR(Y3=\"\",S3=\"\"),\"\",Y3*S3)"
+            }
+          ],
+          [
+            "A2",
+            "Recebimento",
+            "Conferir dados do cliente",
+            3,
+            "atividade",
+            8,
+            "minutos",
+            "Atendente",
+            1,
+            "D1",
+            null,
+            null,
+            "necessário",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            5,
+            15,
+            null,
+            {
+              "formula": "IF(F4=\"\",\"\",IF(G4=\"minutos\",F4/60,IF(G4=\"horas\",F4,IF(G4=\"dias\",F4*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X4=\"\",I4=\"\"),\"\",X4*I4)"
+            },
+            {
+              "formula": "IF(OR(Y4=\"\",S4=\"\"),\"\",Y4*S4)"
+            }
+          ]
+        ],
+        "notes": [
+          "Código curto e único (ex.: A1). Usado para ligar atividades. Se faltar, é gerado.\nExemplo: A1",
+          "Grupo ou fase principal (ex.: Recebimento). Vira um bloco no mapa macro.\nExemplo: Recebimento",
+          "O que acontece nesta etapa, com verbo (ex.: Registrar pedido).\nExemplo: Registrar pedido no sistema",
+          "Posição no processo (1, 2, 3…). Sem coluna de próxima atividade, o fluxo segue esta ordem.\nExemplo: 1",
+          "início, atividade, decisão ou fim. Vazio = atividade.\nExemplo: atividade",
+          "Tempo de trabalho ativo de UMA execução, sem contar espera.\nExemplo: 10",
+          "minutos, horas ou dias. Vale também para espera, mínimo e máximo.\nExemplo: minutos",
+          "Função ou área que executa (prefira a função, não o nome da pessoa).\nExemplo: Atendente",
+          "Quantas pessoas trabalham AO MESMO TEMPO nesta atividade.\nExemplo: 1",
+          "Código da próxima atividade. Vários códigos separados por vírgula = caminhos em paralelo.\nExemplo: A2",
+          "Para decisões: para onde segue quando a resposta é sim.\nExemplo: B1",
+          "Para decisões: para onde segue quando a resposta é não.\nExemplo: A3",
+          "agrega valor (o cliente pagaria), necessário (exigido, mas não agrega), desperdício (poderia não existir).\nExemplo: necessário",
+          "Tempo parado ANTES da atividade (fila, aprovação, cliente). Mesma unidade da duração.\nExemplo: 30",
+          "sim se a atividade existe para refazer/corrigir algo.\nExemplo: não",
+          "Percentual das execuções que passam por esta atividade (ex.: 20 = 1 a cada 5). Vazio = não informado.\nExemplo: 100",
+          "sim se uma falha aqui causa impacto relevante (cliente, conformidade, segurança).\nExemplo: não",
+          "Opcional: quantas vezes a atividade ocorre no período (sobrepõe o volume do processo).",
+          "Custo-hora carregado (salário + encargos + benefícios) de quem executa. Opcional.\nExemplo: 45",
+          "Outros custos por execução (taxas, materiais). Diga na aba Processo se já inclui mão de obra.",
+          "Para simular incerteza: o menor tempo realista.\nExemplo: 6",
+          "Para simular incerteza: o maior tempo realista.\nExemplo: 20",
+          "Qualquer contexto útil."
+        ]
+      }
+    ],
+    "validations": [
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe um número maior ou igual a zero.\" sqref=\"B10\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Escolha sim ou não.\" sqref=\"B11\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe um número maior ou igual a zero.\" sqref=\"B6\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Período inválido\" error=\"Escolha dia, semana, mês ou ano.\" sqref=\"B7\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe um número maior ou igual a zero.\" sqref=\"B8\">",
+      "<dataValidation type=\"decimal\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe entre 1 e 24 horas.\" sqref=\"B9\">",
+      "0",
+      "&quot;sim,não&quot;",
+      "0",
+      "&quot;dia,semana,mês,ano&quot;",
+      "0",
+      "1",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Ordem: informe um número maior ou igual a zero.\" sqref=\"D2:D301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha: início, atividade, decisão ou fim.\" sqref=\"E2:E301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Duração: informe um número maior ou igual a zero (ex.: 15 ou 1,5).\" sqref=\"F2:F301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha: minutos, horas ou dias.\" sqref=\"G2:G301\">",
+      "<dataValidation type=\"whole\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Pessoas: informe um número inteiro de 0 a 500.\" sqref=\"I2:I301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha uma classificação da lista.\" sqref=\"M2:M301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Espera: informe um número maior ou igual a zero.\" sqref=\"N2:N301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha sim ou não.\" sqref=\"O2:O301\">",
+      "<dataValidation type=\"decimal\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Frequência: informe um percentual de 0 a 100.\" sqref=\"P2:P301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha sim ou não.\" sqref=\"Q2:Q301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Volume: informe um número maior ou igual a zero.\" sqref=\"R2:R301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Custo-hora: informe um valor maior ou igual a zero.\" sqref=\"S2:S301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Custo variável: informe um valor maior ou igual a zero.\" sqref=\"T2:T301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Mínimo: informe um número maior ou igual a zero.\" sqref=\"U2:U301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Máximo: informe um número maior ou igual a zero.\" sqref=\"V2:V301\">",
+      "0",
+      "&quot;início,atividade,decisão,fim&quot;",
+      "0",
+      "&quot;minutos,horas,dias&quot;",
+      "0",
+      "&quot;agrega valor,necessário,desperdício,não classificado&quot;",
+      "0",
+      "&quot;sim,não&quot;",
+      "0",
+      "&quot;sim,não&quot;",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe um número maior ou igual a zero.\" sqref=\"B2:B61\">",
+      "0"
+    ]
+  },
+  "exported": {
+    "sheets": [
+      {
+        "name": "Leia-me",
+        "rows": [
+          [
+            "Como preencher o modelo do NexoProcess"
+          ],
+          [
+            "1. Na aba “Processo”, preencha nome e (se souber) volume e custos."
+          ],
+          [
+            "2. Na aba “Atividades”, uma linha por atividade, na ordem em que acontecem."
+          ],
+          [
+            "3. Mínimo necessário: Etapa macro, Atividade, Ordem, Duração e Unidade."
+          ]
+        ],
+        "notes": []
+      },
+      {
+        "name": "Processo",
+        "rows": [
+          [
+            "Campo",
+            "Valor (preencha aqui)",
+            "Ajuda"
+          ],
+          [
+            "Nome do processo",
+            "Processamento de pedido (exemplo fictício)",
+            "Ex.: Processamento de pedido"
+          ],
+          [
+            "Descrição",
+            "Do recebimento do pedido ao despacho. Dados ilustrativos para conhecer a ferramenta.",
+            "Objetivo e escopo em uma frase"
+          ],
+          [
+            "Área",
+            "Operações (exemplo)",
+            "Área dona do processo"
+          ]
+        ],
+        "notes": []
+      },
+      {
+        "name": "Atividades",
+        "rows": [
+          [
+            "Código",
+            "Etapa macro",
+            "Atividade",
+            "Ordem",
+            "Tipo",
+            "Duração",
+            "Unidade",
+            "Responsável",
+            "Pessoas",
+            "Próxima atividade",
+            "Próxima se SIM",
+            "Próxima se NÃO",
+            "Classificação Lean",
+            "Tempo de espera",
+            "É retrabalho?",
+            "Frequência (%)",
+            "Crítica?",
+            "Volume da atividade",
+            "Custo-hora (R$)",
+            "Custo variável por execução (R$)",
+            "Duração mínima",
+            "Duração máxima",
+            "Observações",
+            "Duração em horas (calculado)",
+            "Esforço pessoa-h (calculado)",
+            "Custo por execução R$ (calculado)"
+          ],
+          [
+            "S0",
+            "Recebimento",
+            "Pedido recebido",
+            1,
+            "início",
+            null,
+            "minutos",
+            null,
+            null,
+            "A1",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            {
+              "formula": "IF(F2=\"\",\"\",IF(G2=\"minutos\",F2/60,IF(G2=\"horas\",F2,IF(G2=\"dias\",F2*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X2=\"\",I2=\"\"),\"\",X2*I2)"
+            },
+            {
+              "formula": "IF(OR(Y2=\"\",S2=\"\"),\"\",Y2*S2)"
+            }
+          ],
+          [
+            "A1",
+            "Recebimento",
+            "Registrar pedido no sistema",
+            2,
+            "atividade",
+            10,
+            "minutos",
+            "Atendente",
+            1,
+            "A2",
+            null,
+            null,
+            "necessário",
+            30,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            6,
+            20,
+            null,
+            {
+              "formula": "IF(F3=\"\",\"\",IF(G3=\"minutos\",F3/60,IF(G3=\"horas\",F3,IF(G3=\"dias\",F3*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X3=\"\",I3=\"\"),\"\",X3*I3)"
+            },
+            {
+              "formula": "IF(OR(Y3=\"\",S3=\"\"),\"\",Y3*S3)"
+            }
+          ],
+          [
+            "A2",
+            "Recebimento",
+            "Conferir dados do cliente",
+            3,
+            "atividade",
+            8,
+            "minutos",
+            "Atendente",
+            1,
+            "D1",
+            null,
+            null,
+            "necessário",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            5,
+            15,
+            null,
+            {
+              "formula": "IF(F4=\"\",\"\",IF(G4=\"minutos\",F4/60,IF(G4=\"horas\",F4,IF(G4=\"dias\",F4*Processo!$B$9,\"\"))))"
+            },
+            {
+              "formula": "IF(OR(X4=\"\",I4=\"\"),\"\",X4*I4)"
+            },
+            {
+              "formula": "IF(OR(Y4=\"\",S4=\"\"),\"\",Y4*S4)"
+            }
+          ]
+        ],
+        "notes": [
+          "Código curto e único (ex.: A1). Usado para ligar atividades. Se faltar, é gerado.\nExemplo: A1",
+          "Grupo ou fase principal (ex.: Recebimento). Vira um bloco no mapa macro.\nExemplo: Recebimento",
+          "O que acontece nesta etapa, com verbo (ex.: Registrar pedido).\nExemplo: Registrar pedido no sistema",
+          "Posição no processo (1, 2, 3…). Sem coluna de próxima atividade, o fluxo segue esta ordem.\nExemplo: 1",
+          "início, atividade, decisão ou fim. Vazio = atividade.\nExemplo: atividade",
+          "Tempo de trabalho ativo de UMA execução, sem contar espera.\nExemplo: 10",
+          "minutos, horas ou dias. Vale também para espera, mínimo e máximo.\nExemplo: minutos",
+          "Função ou área que executa (prefira a função, não o nome da pessoa).\nExemplo: Atendente",
+          "Quantas pessoas trabalham AO MESMO TEMPO nesta atividade.\nExemplo: 1",
+          "Código da próxima atividade. Vários códigos separados por vírgula = caminhos em paralelo.\nExemplo: A2",
+          "Para decisões: para onde segue quando a resposta é sim.\nExemplo: B1",
+          "Para decisões: para onde segue quando a resposta é não.\nExemplo: A3",
+          "agrega valor (o cliente pagaria), necessário (exigido, mas não agrega), desperdício (poderia não existir).\nExemplo: necessário",
+          "Tempo parado ANTES da atividade (fila, aprovação, cliente). Mesma unidade da duração.\nExemplo: 30",
+          "sim se a atividade existe para refazer/corrigir algo.\nExemplo: não",
+          "Percentual das execuções que passam por esta atividade (ex.: 20 = 1 a cada 5). Vazio = não informado.\nExemplo: 100",
+          "sim se uma falha aqui causa impacto relevante (cliente, conformidade, segurança).\nExemplo: não",
+          "Opcional: quantas vezes a atividade ocorre no período (sobrepõe o volume do processo).",
+          "Custo-hora carregado (salário + encargos + benefícios) de quem executa. Opcional.\nExemplo: 45",
+          "Outros custos por execução (taxas, materiais). Diga na aba Processo se já inclui mão de obra.",
+          "Para simular incerteza: o menor tempo realista.\nExemplo: 6",
+          "Para simular incerteza: o maior tempo realista.\nExemplo: 20",
+          "Qualquer contexto útil."
+        ]
+      },
+      {
+        "name": "Custos por função",
+        "rows": [
+          [
+            "Função / responsável",
+            "Custo-hora carregado (R$)"
+          ],
+          [
+            "Atendente",
+            45
+          ],
+          [
+            "Analista financeiro",
+            70
+          ],
+          [
+            "Operador de estoque",
+            38
+          ]
+        ],
+        "notes": []
+      }
+    ],
+    "validations": [
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe um número maior ou igual a zero.\" sqref=\"B10\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Escolha sim ou não.\" sqref=\"B11\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe um número maior ou igual a zero.\" sqref=\"B6\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Período inválido\" error=\"Escolha dia, semana, mês ou ano.\" sqref=\"B7\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe um número maior ou igual a zero.\" sqref=\"B8\">",
+      "<dataValidation type=\"decimal\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe entre 1 e 24 horas.\" sqref=\"B9\">",
+      "0",
+      "&quot;sim,não&quot;",
+      "0",
+      "&quot;dia,semana,mês,ano&quot;",
+      "0",
+      "1",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Ordem: informe um número maior ou igual a zero.\" sqref=\"D2:D301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha: início, atividade, decisão ou fim.\" sqref=\"E2:E301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Duração: informe um número maior ou igual a zero (ex.: 15 ou 1,5).\" sqref=\"F2:F301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha: minutos, horas ou dias.\" sqref=\"G2:G301\">",
+      "<dataValidation type=\"whole\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Pessoas: informe um número inteiro de 0 a 500.\" sqref=\"I2:I301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha uma classificação da lista.\" sqref=\"M2:M301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Espera: informe um número maior ou igual a zero.\" sqref=\"N2:N301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha sim ou não.\" sqref=\"O2:O301\">",
+      "<dataValidation type=\"decimal\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Frequência: informe um percentual de 0 a 100.\" sqref=\"P2:P301\">",
+      "<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Valor não permitido\" error=\"Escolha sim ou não.\" sqref=\"Q2:Q301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Volume: informe um número maior ou igual a zero.\" sqref=\"R2:R301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Custo-hora: informe um valor maior ou igual a zero.\" sqref=\"S2:S301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Custo variável: informe um valor maior ou igual a zero.\" sqref=\"T2:T301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Mínimo: informe um número maior ou igual a zero.\" sqref=\"U2:U301\">",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"Número inválido\" error=\"Máximo: informe um número maior ou igual a zero.\" sqref=\"V2:V301\">",
+      "0",
+      "&quot;início,atividade,decisão,fim&quot;",
+      "0",
+      "&quot;minutos,horas,dias&quot;",
+      "0",
+      "&quot;agrega valor,necessário,desperdício,não classificado&quot;",
+      "0",
+      "&quot;sim,não&quot;",
+      "0",
+      "&quot;sim,não&quot;",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "<dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Valor inválido\" error=\"Informe um número maior ou igual a zero.\" sqref=\"B2:B61\">",
+      "0"
+    ]
+  },
+  "templateCsv": "﻿Código;Etapa macro;Atividade;Ordem;Tipo;Duração;Unidade;Responsável;Pessoas;Próxima atividade;Próxima se SIM;Próxima se NÃO;Classificação Lean;Tempo de espera;É retrabalho?;Frequência (%);Crítica?;Volume da atividade;Custo-hora (R$);Custo variável por execução (R$);Duração mínima;Duração máxima;Observações\r\nS0;Recebimento;Pedido recebido;1;início;;minutos;;;A1;;;;;;;;;;;;;\r\nA1;Recebimento;Registrar pedido no sistema;2;atividade;10;minutos;Atendente;1;A2;;;necessário;30;;;;;;;6;20;\r\nA2;Recebimento;Conferir dados do cliente;3;atividade;8;minutos;Atendente;1;D1;;;necessário;;;;;;;;5;15;\r\nD1;Recebimento;Dados completos?;4;decisão;;minutos;;;;B1;A3;não classificado;;;;;;;;;;\r\nA3;Recebimento;Solicitar correção ao cliente;5;atividade;15;minutos;Atendente;1;A2;;;desperdício;240;sim;20;;;;;10;30;\"Cliente responde por e-mail; espera média informada pela equipe (exemplo).\"\r\nB1;Análise de crédito;Consultar limite de crédito;6;atividade;12;minutos;Analista financeiro;1;D2;;;necessário;120;;;sim;;;;8;25;\r\nD2;Análise de crédito;Crédito aprovado?;7;decisão;;minutos;;;;C1;B2;não classificado;;;;;;;;;;\r\nB2;Análise de crédito;Análise manual de crédito;8;atividade;45;minutos;Analista financeiro;2;D3;;;necessário;480;;15;sim;;;;30;90;\r\nD3;Análise de crédito;Aprovado na análise manual?;9;decisão;;minutos;;;;C1;X1;não classificado;;;;;;;;;;\r\nX1;Análise de crédito;Pedido recusado;10;fim;;minutos;;;;;;;;;;;;;;;;\r\nC1;Separação;Separar itens no estoque;11;atividade;35;minutos;Operador de estoque;2;C2;;;agrega valor;60;;;;;;;20;60;\r\nC2;Separação;Conferir itens separados;12;atividade;15;minutos;Conferente;1;D4;;;necessário;;;;;;;;10;25;\r\nD4;Separação;Itens corretos?;13;decisão;;minutos;;;;C4;C3;não classificado;;;;;;;;;;\r\nC3;Separação;Refazer separação;14;atividade;20;minutos;Operador de estoque;1;C2;;;desperdício;;sim;10;;;;;10;40;\r\nC4;Separação;Embalar pedido;15;atividade;12;minutos;Operador de estoque;1;E1;;;agrega valor;;;;;;;;8;20;\r\nE1;Expedição;Emitir nota fiscal;16;atividade;6;minutos;Faturista;1;E2;;;necessário;90;;;;;;;4;12;\r\nE2;Expedição;Agendar transporte;17;atividade;10;minutos;Analista de logística;1;E3;;;necessário;240;;;;;;;5;20;\r\nE3;Expedição;Despachar pedido;18;atividade;15;minutos;Operador de estoque;2;F1;;;agrega valor;;;;;;;;10;30;\r\nF1;Expedição;Pedido despachado;19;fim;;minutos;;;;;;;;;;;;;;;;\r\n",
+  "processCsv": "﻿Código;Etapa macro;Atividade;Ordem;Tipo;Duração;Unidade;Responsável;Pessoas;Próxima atividade;Próxima se SIM;Próxima se NÃO;Classificação Lean;Tempo de espera;É retrabalho?;Frequência (%);Crítica?;Volume da atividade;Custo-hora (R$);Custo variável por execução (R$);Duração mínima;Duração máxima;Observações\r\nS0;Recebimento;Pedido recebido;1;início;;minutos;;;A1;;;;;;;;;;;;;\r\nA1;Recebimento;Registrar pedido no sistema;2;atividade;10;minutos;Atendente;1;A2;;;necessário;30;;;;;;;6;20;\r\nA2;Recebimento;Conferir dados do cliente;3;atividade;8;minutos;Atendente;1;D1;;;necessário;;;;;;;;5;15;\r\nD1;Recebimento;Dados completos?;4;decisão;;minutos;;;;B1;A3;não classificado;;;;;;;;;;\r\nA3;Recebimento;Solicitar correção ao cliente;5;atividade;15;minutos;Atendente;1;A2;;;desperdício;240;sim;20;;;;;10;30;\"Cliente responde por e-mail; espera média informada pela equipe (exemplo).\"\r\nB1;Análise de crédito;Consultar limite de crédito;6;atividade;12;minutos;Analista financeiro;1;D2;;;necessário;120;;;sim;;;;8;25;\r\nD2;Análise de crédito;Crédito aprovado?;7;decisão;;minutos;;;;C1;B2;não classificado;;;;;;;;;;\r\nB2;Análise de crédito;Análise manual de crédito;8;atividade;45;minutos;Analista financeiro;2;D3;;;necessário;480;;15;sim;;;;30;90;\r\nD3;Análise de crédito;Aprovado na análise manual?;9;decisão;;minutos;;;;C1;X1;não classificado;;;;;;;;;;\r\nX1;Análise de crédito;Pedido recusado;10;fim;;minutos;;;;;;;;;;;;;;;;\r\nC1;Separação;Separar itens no estoque;11;atividade;35;minutos;Operador de estoque;2;C2;;;agrega valor;60;;;;;;;20;60;\r\nC2;Separação;Conferir itens separados;12;atividade;15;minutos;Conferente;1;D4;;;necessário;;;;;;;;10;25;\r\nD4;Separação;Itens corretos?;13;decisão;;minutos;;;;C4;C3;não classificado;;;;;;;;;;\r\nC3;Separação;Refazer separação;14;atividade;20;minutos;Operador de estoque;1;C2;;;desperdício;;sim;10;;;;;10;40;\r\nC4;Separação;Embalar pedido;15;atividade;12;minutos;Operador de estoque;1;E1;;;agrega valor;;;;;;;;8;20;\r\nE1;Expedição;Emitir nota fiscal;16;atividade;6;minutos;Faturista;1;E2;;;necessário;90;;;;;;;4;12;\r\nE2;Expedição;Agendar transporte;17;atividade;10;minutos;Analista de logística;1;E3;;;necessário;240;;;;;;;5;20;\r\nE3;Expedição;Despachar pedido;18;atividade;15;minutos;Operador de estoque;2;F1;;;agrega valor;;;;;;;;10;30;\r\nF1;Expedição;Pedido despachado;19;fim;;minutos;;;;;;;;;;;;;;;;\r\n",
+  "importIssues": [
+    {
+      "row": 2,
+      "severity": "warning",
+      "message": "Aba Processo — \"Volume de execuções\": valor \"x\" inválido; ignorado."
+    },
+    {
+      "row": 3,
+      "severity": "warning",
+      "message": "Aba Processo — \"Período do volume\": valor \"quinzena\" inválido; ignorado."
+    },
+    {
+      "row": 4,
+      "severity": "warning",
+      "message": "Aba Processo — \"Horas de trabalho por dia\": valor \"99\" inválido; ignorado."
+    },
+    {
+      "row": 5,
+      "severity": "warning",
+      "message": "Aba Processo — \"Custo variável já inclui mão de obra?\": valor \"talvez\" inválido; ignorado."
+    },
+    {
+      "row": 2,
+      "severity": "warning",
+      "message": "Custos por função — \"Analista\": valor \"abc\" inválido; ignorado."
+    },
+    {
+      "row": 2,
+      "field": "tipo_elemento",
+      "severity": "warning",
+      "message": "Tipo \"xyz\" não reconhecido; tratado como atividade. Use: início, atividade, decisão ou fim."
+    },
+    {
+      "row": 2,
+      "field": "unidade_duracao",
+      "severity": "error",
+      "message": "Unidade \"zzz\" não reconhecida. Use minutos, horas ou dias."
+    },
+    {
+      "row": 2,
+      "field": "duracao",
+      "severity": "error",
+      "message": "Duração: \"abc\" não é um número."
+    },
+    {
+      "row": 2,
+      "field": "classificacao_lean",
+      "severity": "warning",
+      "message": "Classificação Lean \"lixo\" não reconhecida; ficou como não classificada."
+    },
+    {
+      "row": 2,
+      "field": "tempo_espera",
+      "severity": "error",
+      "message": "Tempo de espera: valor negativo (-3)."
+    },
+    {
+      "row": 2,
+      "field": "retrabalho",
+      "severity": "warning",
+      "message": "Retrabalho: \"talvez\" não é sim/não; ignorado."
+    },
+    {
+      "row": 2,
+      "field": "frequencia_pct",
+      "severity": "error",
+      "message": "Frequência deve estar entre 0 e 100."
+    },
+    {
+      "row": 3,
+      "field": "id_atividade",
+      "severity": "error",
+      "message": "Código \"A1\" duplicado. Cada atividade precisa de um código único."
+    },
+    {
+      "row": 3,
+      "field": "unidade_duracao",
+      "severity": "info",
+      "message": "Unidade vazia: usada a unidade padrão escolhida (horas)."
+    },
+    {
+      "row": 3,
+      "field": "etapa_macro",
+      "severity": "warning",
+      "message": "Etapa macro vazia: atividade agrupada em \"Sem etapa\"."
+    },
+    {
+      "row": 4,
+      "field": "ordem",
+      "severity": "warning",
+      "message": "Ordem \"oi\" inválida; usada a posição da linha."
+    },
+    {
+      "row": 4,
+      "field": "atividade",
+      "severity": "error",
+      "message": "Nome da atividade vazio."
+    },
+    {
+      "row": 5,
+      "severity": "warning",
+      "message": "Linha sem atividade nem etapa foi ignorada."
+    },
+    {
+      "row": 2,
+      "field": "proxima_atividade",
+      "severity": "info",
+      "message": "\"Registrar\" foi ligado à atividade de mesmo nome (código A1)."
+    },
+    {
+      "row": 4,
+      "field": "proxima_se_nao",
+      "severity": "info",
+      "message": "\"Receber\" foi ligado à atividade de mesmo nome (código A1)."
+    },
+    {
+      "row": 0,
+      "field": "ordem",
+      "severity": "warning",
+      "message": "Há números de ordem repetidos; empates seguem a ordem das linhas."
+    }
+  ],
+  "importName": "Processo importado",
+  "noFlowDecision": [
+    {
+      "row": 0,
+      "severity": "warning",
+      "message": "Há decisões, mas a planilha não tem colunas de caminho (próxima se sim/não). Elas foram ligadas apenas à linha seguinte — revise as conexões."
+    }
+  ],
+  "noEtapa": [
+    [
+      "Sem etapa",
+      "Fazer"
+    ]
+  ],
+  "fileErrors": {
+    "vazio": [
+      "O arquivo está vazio.",
+      "Não há dados para ler.",
+      "Confira se salvou a planilha antes de enviar."
+    ],
+    "xls": [
+      "Formato .xls (Excel 97-2003) não é suportado.",
+      "Esse formato antigo não pode ser lido com segurança no navegador.",
+      "Salve como .xlsx ou .csv e tente de novo."
+    ],
+    "txtbin": [
+      "Formato de arquivo não suportado.",
+      "Aceitamos planilhas .xlsx e .csv.",
+      "Baixe o modelo oficial ou salve sua planilha em um desses formatos."
+    ],
+    "falso-xlsx": [
+      "O arquivo não parece ser um XLSX válido.",
+      "O conteúdo não corresponde ao formato do Excel moderno (.xlsx).",
+      "Abra no Excel/LibreOffice e use “Salvar como… → Pasta de trabalho do Excel (.xlsx)”, ou exporte como CSV."
+    ],
+    "csv-so-cabecalho": [
+      "Nenhuma linha de dados encontrada.",
+      "O CSV tem só o cabeçalho (ou está vazio).",
+      "Inclua uma linha por atividade abaixo do cabeçalho."
+    ],
+    "csv-zip": [
+      "Este arquivo é um XLSX com extensão .csv.",
+      "O conteúdo é binário (zip).",
+      "Renomeie para .xlsx ou exporte de novo como CSV."
+    ]
+  },
+  "planCsv": "﻿Ação;Responsável;Prazo;Prioridade;Situação;Indicador de sucesso;Problema relacionado;Resultado observado;Data de conclusão\r\nFazer;Ana;31/12/2026;Alta;Em andamento;KPI;;;\r\n",
+  "planNotes": [
+    "Linha 2: prazo “31/02/2026” não é uma data válida — ficou pendente.",
+    "Linha 2: prioridade “urgente” não reconhecida — ficou Média.",
+    "Linha 2: situação “parado” não reconhecida — ficou A fazer.",
+    "Linha 3: sem ação descrita — ignorada.",
+    "Linha 4: “Concluída” exige o resultado observado — importada como A fazer; conclua no app com o registro."
+  ],
+  "planErrors": {
+    "semAcao": [
+      "Não encontramos a coluna “Ação”.",
+      "Cabeçalhos lidos: Foo, Bar.",
+      "A primeira linha precisa ter os títulos das colunas: Ação, Responsável e Prazo (as duas últimas são opcionais)."
+    ],
+    "xlsx": [
+      "Formato não suportado.",
+      "Aqui importamos o plano em CSV.",
+      "No Excel ou Planilhas Google, use “Salvar como / Fazer download → CSV”."
+    ]
+  }
+}
