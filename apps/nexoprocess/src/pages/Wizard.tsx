@@ -14,6 +14,8 @@ import { StaleDraftNotice } from '../components/StaleDraftNotice';
 import { demoBlocked } from '../license/demo';
 import { useHardwareBack } from '../state/backNav';
 import { localDraft } from '../storage/localDraft';
+import { tr } from '../i18n';
+import { useI18n } from '../i18n/I18nProvider';
 
 interface WItem {
   key: string;
@@ -45,11 +47,7 @@ interface WState {
   costPerHour?: number;
 }
 
-const STEPS = ['Processo', 'Etapas', 'Atividades', 'Volume e custos', 'Revisão'];
-/** Título de cada passo, em tom de conversa; STEPS fica para o progresso ("Etapa 2 de 5: Etapas"). */
-const TITLES = ['Vamos começar pelo processo', 'Quais são as grandes etapas?', 'O que acontece em cada etapa?', 'Volume e custos (opcional)', 'Revisão final'];
-/** Destino do botão de avançar: "Avançar para as etapas". */
-const TARGET = ['o processo', 'as etapas', 'as atividades', 'volume e custos', 'a revisão'];
+const STEP_COUNT = 5;
 const DRAFT = 'wizard';
 const blankItem = (): WItem => ({ key: uid('i'), name: '', unit: 'min' });
 const initial = (): WState => ({
@@ -81,7 +79,7 @@ export function analyzeWizard(s: WState) {
 }
 
 export function wizardToProcess(s: WState): ProcessModel {
-  const p = newProcess(s.name.trim() || 'Novo processo');
+  const p = newProcess(s.name.trim() || tr('d.assistant.001'));
   p.description = s.description.trim() || undefined;
   p.area = s.area.trim() || undefined;
   p.volume = s.volume;
@@ -94,7 +92,7 @@ export function wizardToProcess(s: WState): ProcessModel {
   const first = flat[0];
   const last = flat[flat.length - 1];
   if (!first) return p;
-  acts.push(newActivity({ id: 'INICIO', stage: first.st.name.trim(), name: 'Início', type: 'start', order: ++order, next: [idOf.get(first.i.key)!] }));
+  acts.push(newActivity({ id: 'INICIO', stage: first.st.name.trim(), name: tr('d.assistant.004'), type: 'start', order: ++order, next: [idOf.get(first.i.key)!] }));
   let needsNoEnd = false;
   flat.forEach(({ st, i }, n) => {
     const nextId = flat[n + 1] ? idOf.get(flat[n + 1].i.key)! : 'FIM';
@@ -121,8 +119,8 @@ export function wizardToProcess(s: WState): ProcessModel {
     } else a.next = [nextId];
     acts.push(a);
   });
-  acts.push(newActivity({ id: 'FIM', stage: last.st.name.trim(), name: 'Fim', type: 'end', order: ++order }));
-  if (needsNoEnd) acts.push(newActivity({ id: 'FIM_NAO', stage: last.st.name.trim(), name: 'Encerrado (resposta não)', type: 'end', order: ++order }));
+  acts.push(newActivity({ id: 'FIM', stage: last.st.name.trim(), name: tr('d.type.end'), type: 'end', order: ++order }));
+  if (needsNoEnd) acts.push(newActivity({ id: 'FIM_NAO', stage: last.st.name.trim(), name: tr('d.assistant.008'), type: 'end', order: ++order }));
   // Atividades que recebem o "não" de uma decisão anterior a elas mesmas = retrabalho? Não presumimos: o usuário marca depois.
   p.activities = acts;
   p.stageOrder = stages.map((st) => st.name.trim());
@@ -130,6 +128,8 @@ export function wizardToProcess(s: WState): ProcessModel {
 }
 
 export default function Wizard() {
+  const { t } = useI18n();
+  const STEPS = [1, 2, 3, 4, 5].map((n) => t(`wz.step.${n}` as 'wz.step.1'));
   const nav = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
@@ -202,32 +202,32 @@ export default function Wizard() {
   const droppedSig = analysis.dropped.map((x) => `${x.key}:${x.reason}:${x.activities.length}`).join('|');
   const needsAck = droppedSig !== '' && ackDropped !== droppedSig;
   const blockReason = stale
-    ? 'Esta aba não cria o processo: ele já foi criado em outra aba. Copie seus dados acima.'
+    ? t('wz.block.stale')
     : analysis.invalidDecisions.length
-    ? 'Corrija o caminho do “não” nas decisões destacadas para criar o processo.'
+    ? t('wz.block.decisions')
     : issues.some((i) => i.severity === 'error')
-      ? 'Corrija os pontos em vermelho acima para criar o processo.'
+      ? t('wz.block.errors')
       : needsAck
-        ? 'Confirme acima que deseja criar o processo sem os itens que não serão salvos.'
+        ? t('wz.block.ack')
         : null;
 
   const check = (step: number): boolean => {
     const e: Record<string, string> = {};
-    if (step === 0 && !s.name.trim()) e.name = 'Faltou só o nome. Como a equipe chama esse processo? (ex.: Análise de crédito)';
+    if (step === 0 && !s.name.trim()) e.name = t('wz.err.name');
     if (step === 1) {
       const named = s.stages.filter((st) => st.name.trim());
-      if (!named.length) e.stages = 'Faltou pelo menos uma etapa. Pode ser só uma, para começar.';
+      if (!named.length) e.stages = t('wz.err.noStages');
       const names = named.map((st) => st.name.trim().toLowerCase());
-      if (new Set(names).size !== names.length) e.stages = 'Duas etapas estão com o mesmo nome. Que tal diferenciar?';
+      if (new Set(names).size !== names.length) e.stages = t('wz.err.dupStages');
     }
     if (step === 2) {
       const any = s.stages.some((st) => st.name.trim() && st.items.some((i) => i.name.trim()));
-      if (!any) e.items = 'Faltou só uma coisinha: descreva pelo menos uma atividade.';
+      if (!any) e.items = t('wz.err.noItems');
       const namedKeys = new Set(s.stages.flatMap((st) => st.items.filter((i) => i.name.trim()).map((i) => i.key)));
       for (const st of s.stages)
         for (const i of st.items) {
-          if (i.isDecision && i.name.trim() && !i.noTarget) e[`no_${i.key}`] = 'Para onde o fluxo vai quando a resposta é “não”?';
-          else if (i.isDecision && i.name.trim() && i.noTarget !== '__end' && !namedKeys.has(i.noTarget!)) e[`no_${i.key}`] = 'A atividade escolhida para o “não” foi removida. Escolha outra ou “Encerrar o processo”.';
+          if (i.isDecision && i.name.trim() && !i.noTarget) e[`no_${i.key}`] = t('wz.err.noTarget');
+          else if (i.isDecision && i.name.trim() && i.noTarget !== '__end' && !namedKeys.has(i.noTarget!)) e[`no_${i.key}`] = t('wz.err.targetRemoved');
         }
     }
     setErrors(e);
@@ -235,7 +235,7 @@ export default function Wizard() {
   };
   const go = (d: number) => {
     if (d > 0 && !check(s.step)) return;
-    set({ step: Math.max(0, Math.min(STEPS.length - 1, s.step + d)) });
+    set({ step: Math.max(0, Math.min(STEP_COUNT - 1, s.step + d)) });
     window.scrollTo({ top: 0 });
   };
 
@@ -244,7 +244,7 @@ export default function Wizard() {
   const finish = async () => {
     if (!check(0) || !check(1) || !check(2)) return;
     if (blockReason) {
-      toast('bad', `Quase lá: ${blockReason.charAt(0).toLowerCase()}${blockReason.slice(1)}`);
+      toast('bad', t('wz.toast.almost', { reason: `${blockReason.charAt(0).toLowerCase()}${blockReason.slice(1)}` }));
       return;
     }
     if (stale || demoBlocked('salvar')) return;
@@ -267,15 +267,15 @@ export default function Wizard() {
         return;
       }
       // A criação falhou: nada foi gravado, o rascunho continua e a pessoa pode tentar de novo.
-      toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
+      toast('bad', t('wz.toast.saveFail'));
       return;
     }
     setBusy(false);
     // Criado. A limpeza do rascunho é separada: se falhar, não é erro de criação.
-    if (r.reused) toast('info', 'Este rascunho já tinha virado este processo; nada foi criado de novo.');
-    if (!r.durable) toast('bad', 'Processo criado só nesta aba: o navegador bloqueou o armazenamento local. Gere o arquivo do projeto na Visão geral antes de fechar.');
-    else toast('ok', 'Pronto! Seu processo foi criado e salvo neste aparelho. Vamos conferir os dados?');
-    if (r.cleanup === 'falhou') toast('info', 'Não conseguimos apagar o rascunho antigo deste aparelho; ele não será reaberto nem criará outro processo.');
+    if (r.reused) toast('info', t('wz.toast.reused'));
+    if (!r.durable) toast('bad', t('wz.toast.notDurable'));
+    else toast('ok', t('wz.toast.ok'));
+    if (r.cleanup === 'falhou') toast('info', t('wz.toast.cleanupFail'));
     nav(`/app/p/${r.w.id}/validar`);
   };
 
@@ -288,7 +288,7 @@ export default function Wizard() {
   };
 
   const discard = async () => {
-    if (!(await confirm({ title: 'Começar do zero?', body: 'As respostas até aqui serão apagadas deste aparelho.', confirm: 'Apagar e recomeçar', danger: true }))) return;
+    if (!(await confirm({ title: t('wz.discard.title'), body: t('wz.discard.body'), confirm: t('wz.discard.confirm'), danger: true }))) return;
     await db.deleteDraft(DRAFT);
     localDraft.remove(DRAFT);
     setS(initial());
@@ -296,31 +296,31 @@ export default function Wizard() {
   };
 
   const allItems = s.stages.flatMap((st) => st.items.filter((i) => i.name.trim()).map((i) => ({ ...i, stage: st.name })));
-  const pct = Math.round(((s.step + 1) / STEPS.length) * 100);
+  const pct = Math.round(((s.step + 1) / STEP_COUNT) * 100);
 
   return (
     <div className="safe-x mx-auto max-w-3xl space-y-5 py-6">
       <div>
-        <p className="text-sm font-semibold text-brand">Formulário completo</p>
+        <p className="text-sm font-semibold text-brand">{t('wz.kicker')}</p>
         <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold outline-none">
-          {TITLES[s.step]}
+          {t(`wz.title.${s.step + 1}` as 'wz.title.1')}
         </h1>
-        <div className="mt-3" aria-label={`Etapa ${s.step + 1} de ${STEPS.length}: ${STEPS[s.step]}`}>
+        <div className="mt-3" aria-label={t('wz.progress', { n: s.step + 1, total: STEP_COUNT, name: STEPS[s.step] })}>
           <div className="flex justify-between text-xs text-muted">
             <span className="font-medium text-ink2">
-              Etapa {s.step + 1} de {STEPS.length}: {STEPS[s.step]}
+              {t('wz.progress', { n: s.step + 1, total: STEP_COUNT, name: STEPS[s.step] })}
             </span>
-            <span data-testid="draft-storage">{stale ? 'Esta aba não está salvando' : storage === 'memoria' ? 'Rascunho só nesta aba' : 'Salvo neste aparelho'}</span>
+            <span data-testid="draft-storage">{stale ? t('wz.save.stale') : storage === 'memoria' ? t('wz.save.memory') : t('wz.save.saved')}</span>
           </div>
-          <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label="Progresso do assistente" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label={t('wz.progress.bar')} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
       </div>
 
       {storage === 'memoria' && (
-        <Callout tone="warn" title="Este navegador bloqueou o armazenamento local">
-          Você pode preencher o formulário, mas o processo ficará só nesta aba e some ao fechá-la. Depois de criar, gere o arquivo do projeto na Visão geral.
+        <Callout tone="warn" title={t('wz.mem.title')}>
+          {t('wz.mem.body')}
         </Callout>
       )}
       {stale && (
@@ -335,57 +335,57 @@ export default function Wizard() {
       {already && !restored && !stale && (
         <Callout
           tone="info"
-          title={already.exists ? 'Seu último rascunho já virou um processo.' : 'Seu último rascunho já tinha virado um processo, que foi excluído depois.'}
-          action={already.exists ? <Button size="sm" variant="ghost" onClick={() => nav(`/app/p/${already.workspaceId}/visao-geral`)}>Abrir o processo</Button> : undefined}
+          title={already.exists ? t('wz.already.exists') : t('wz.already.deleted')}
+          action={already.exists ? <Button size="sm" variant="ghost" onClick={() => nav(`/app/p/${already.workspaceId}/visao-geral`)}>{t('wz.already.open')}</Button> : undefined}
         >
-          Não vamos criá-lo de novo. Este é um rascunho novo.
+          {t('wz.already.body')}
         </Callout>
       )}
       {restored && !stale && (
-        <Callout tone="info" title="Continuamos de onde você parou." action={<Button size="sm" variant="ghost" onClick={() => void discard()}>Começar do zero</Button>}>
-          Suas respostas ficaram salvas neste aparelho.
+        <Callout tone="info" title={t('wz.restored.title')} action={<Button size="sm" variant="ghost" onClick={() => void discard()}>{t('wz.restored.restart')}</Button>}>
+          {t('wz.restored.body')}
         </Callout>
       )}
 
       {s.step === 0 && (
         <Card>
           <div className="space-y-4">
-            <Field label="Como você chama esse processo?" required help="Use o nome que a equipe usa no dia a dia. Dá para mudar depois." error={errors.name}>
-              {(p) => <Input {...p} value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ex.: Análise de crédito" autoFocus />}
+            <Field label={t('wz.f.name')} required help={t('wz.f.name.help')} error={errors.name}>
+              {(p) => <Input {...p} value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('wz.f.name.ph')} autoFocus />}
             </Field>
-            <Field label="Em uma frase, para que ele serve?" help="Opcional. Ex.: do pedido do cliente até a entrega.">
+            <Field label={t('wz.f.desc')} help={t('wz.f.desc.help')}>
               {(p) => <Textarea {...p} value={s.description} onChange={(e) => set({ description: e.target.value })} />}
             </Field>
-            <Field label="Área responsável" help="Opcional.">
-              {(p) => <Input {...p} value={s.area} onChange={(e) => set({ area: e.target.value })} placeholder="Ex.: Operações" />}
+            <Field label={t('wz.f.area')} help={t('wz.optional')}>
+              {(p) => <Input {...p} value={s.area} onChange={(e) => set({ area: e.target.value })} placeholder={t('wz.f.area.ph')} />}
             </Field>
           </div>
         </Card>
       )}
 
       {s.step === 1 && (
-        <Card title="Na ordem em que acontecem" subtitle="Visão macro">
-          <p className="mb-3 text-sm text-ink2">Pense em 3 a 7 blocos, na ordem em que acontecem. Ex.: Recebimento → Análise → Execução → Entrega.</p>
+        <Card title={t('wz.s1.title')} subtitle={t('wz.s1.sub')}>
+          <p className="mb-3 text-sm text-ink2">{t('wz.s1.hint')}</p>
           {errors.stages && <p className="mb-2 text-sm font-medium text-bad" role="alert">{errors.stages}</p>}
           <ol className="space-y-2">
             {s.stages.map((st, i) => (
               <li key={st.key} className="flex items-center gap-2">
                 <span className="w-6 text-right text-sm font-bold text-muted">{i + 1}.</span>
-                <Input aria-label={`Nome da etapa ${i + 1}`} value={st.name} onChange={(e) => setStage(st.key, { name: e.target.value })} placeholder={['Ex.: Recebimento', 'Ex.: Análise', 'Ex.: Execução', 'Ex.: Entrega'][i] ?? 'Nome da etapa'} />
-                <Button size="sm" variant="ghost" aria-label="Mover para cima" disabled={i === 0} onClick={() => set({ stages: move(s.stages, i, -1) })}>
+                <Input aria-label={t('wz.s1.nameAria', { n: i + 1 })} value={st.name} onChange={(e) => setStage(st.key, { name: e.target.value })} placeholder={[t('wz.s1.ph1'), t('wz.s1.ph2'), t('wz.s1.ph3'), t('wz.s1.ph4')][i] ?? t('wz.s1.ph')} />
+                <Button size="sm" variant="ghost" aria-label={t('wz.moveUp')} disabled={i === 0} onClick={() => set({ stages: move(s.stages, i, -1) })}>
                   <ArrowUp className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="ghost" aria-label="Mover para baixo" disabled={i === s.stages.length - 1} onClick={() => set({ stages: move(s.stages, i, 1) })}>
+                <Button size="sm" variant="ghost" aria-label={t('wz.moveDown')} disabled={i === s.stages.length - 1} onClick={() => set({ stages: move(s.stages, i, 1) })}>
                   <ArrowDown className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="ghost" aria-label={`Remover etapa ${i + 1}`} disabled={s.stages.length === 1} onClick={() => set({ stages: s.stages.filter((x) => x.key !== st.key) })}>
+                <Button size="sm" variant="ghost" aria-label={t('wz.s1.removeAria', { n: i + 1 })} disabled={s.stages.length === 1} onClick={() => set({ stages: s.stages.filter((x) => x.key !== st.key) })}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </li>
             ))}
           </ol>
           <Button className="mt-3" variant="secondary" size="sm" onClick={() => set({ stages: [...s.stages, { key: uid('s'), name: '', items: [blankItem()] }] })}>
-            <Plus className="h-4 w-4" /> Adicionar etapa
+            <Plus className="h-4 w-4" /> {t('wz.s1.add')}
           </Button>
         </Card>
       )}
@@ -393,51 +393,51 @@ export default function Wizard() {
       {s.step === 2 && (
         <div className="space-y-4">
           <Callout tone="info">
-            Para cada etapa, liste o que acontece, na ordem. Só o nome é obrigatório; tempo e pessoas liberam mais análises. Quando o caminho muda conforme uma resposta (ex.: “Documentos completos?”), marque “É uma pergunta/decisão?”.
+            {t('wz.s2.hint')}
           </Callout>
           {errors.items && <p className="text-sm font-medium text-bad" role="alert">{errors.items}</p>}
           {s.stages
             .filter((st) => st.name.trim())
             .map((st, si) => (
-              <Card key={st.key} title={st.name} subtitle={`Etapa ${si + 1}`}>
+              <Card key={st.key} title={st.name} subtitle={t('wz.s2.stage', { n: si + 1 })}>
                 <ol className="space-y-3">
                   {st.items.map((it, ii) => (
                     <li key={it.key} className={clsx('rounded-xl border p-3', it.isDecision ? 'border-violet/40 bg-violet/5' : 'border-line/15 bg-surface2/40')}>
                       <div className="flex items-start gap-2">
                         <span className="mt-3 w-5 text-right text-xs font-bold text-muted">{ii + 1}.</span>
                         <div className="grid flex-1 gap-3 sm:grid-cols-2">
-                          <Field label={it.isDecision ? 'Pergunta da decisão' : 'O que acontece?'} className="sm:col-span-2">
-                            {(p) => <Input {...p} value={it.name} onChange={(e) => setItem(st.key, it.key, { name: e.target.value })} placeholder={it.isDecision ? 'Ex.: Documentos completos?' : 'Ex.: Conferir documentos do cliente'} />}
+                          <Field label={it.isDecision ? t('wz.s2.question') : t('wz.s2.what')} className="sm:col-span-2">
+                            {(p) => <Input {...p} value={it.name} onChange={(e) => setItem(st.key, it.key, { name: e.target.value })} placeholder={it.isDecision ? t('wz.s2.question.ph') : t('wz.s2.what.ph')} />}
                           </Field>
                           {!it.isDecision && (
                             <>
                               <div className="flex gap-2">
-                                <Field label="Tempo de trabalho" help="Uma execução, sem espera." className="flex-1">
-                                  {(p) => <NumberInput {...p} value={it.duration} onChange={(v) => setItem(st.key, it.key, { duration: v })} placeholder="Ex.: 15" />}
+                                <Field label={t('wz.s2.time')} help={t('wz.s2.time.help')} className="flex-1">
+                                  {(p) => <NumberInput {...p} value={it.duration} onChange={(v) => setItem(st.key, it.key, { duration: v })} placeholder={t('wz.s2.time.ph')} />}
                                 </Field>
-                                <Field label="Unidade" className="w-28">
+                                <Field label={t('wz.s2.unit')} className="w-28">
                                   {(p) => (
                                     <Select {...p} value={it.unit} onChange={(e) => setItem(st.key, it.key, { unit: e.target.value as DurationUnit })}>
-                                      <option value="min">minutos</option>
-                                      <option value="h">horas</option>
-                                      <option value="d">dias</option>
+                                      <option value="min">{t('wz.unit.min')}</option>
+                                      <option value="h">{t('wz.unit.h')}</option>
+                                      <option value="d">{t('wz.unit.d')}</option>
                                     </Select>
                                   )}
                                 </Field>
                               </div>
-                              <Field label="Quem faz?" help="Função ou área (opcional).">
-                                {(p) => <Input {...p} value={it.owner ?? ''} onChange={(e) => setItem(st.key, it.key, { owner: e.target.value })} placeholder="Ex.: Atendente" list="wiz-owners" />}
+                              <Field label={t('wz.s2.who')} help={t('wz.s2.who.help')}>
+                                {(p) => <Input {...p} value={it.owner ?? ''} onChange={(e) => setItem(st.key, it.key, { owner: e.target.value })} placeholder={t('wz.s2.who.ph')} list="wiz-owners" />}
                               </Field>
-                              <Field label="Quantas pessoas ao mesmo tempo?" help="Opcional. Habilita o esforço em pessoa-hora.">
-                                {(p) => <NumberInput {...p} value={it.people} onChange={(v) => setItem(st.key, it.key, { people: v })} placeholder="Ex.: 1" />}
+                              <Field label={t('wz.s2.people')} help={t('wz.s2.people.help')}>
+                                {(p) => <NumberInput {...p} value={it.people} onChange={(v) => setItem(st.key, it.key, { people: v })} placeholder={t('wz.s2.people.ph')} />}
                               </Field>
-                              <Field label={<>Isso agrega valor? <Term k="lean" iconOnly /></>} help="Opcional — pode classificar depois.">
+                              <Field label={<>{t('wz.s2.value')} <Term k="lean" iconOnly /></>} help={t('wz.s2.value.help')}>
                                 {(p) => (
                                   <Select {...p} value={it.lean ?? ''} onChange={(e) => setItem(st.key, it.key, { lean: e.target.value as LeanClass | '' })}>
-                                    <option value="">Não sei ainda</option>
-                                    <option value="VA">Agrega valor (o cliente pagaria por isso)</option>
-                                    <option value="NNVA">Necessário, mas não agrega valor</option>
-                                    <option value="W">Desperdício (poderia não existir)</option>
+                                    <option value="">{t('wz.lean.unknown')}</option>
+                                    <option value="VA">{t('wz.lean.va')}</option>
+                                    <option value="NNVA">{t('wz.lean.nnva')}</option>
+                                    <option value="W">{t('wz.lean.w')}</option>
                                   </Select>
                                 )}
                               </Field>
@@ -446,13 +446,13 @@ export default function Wizard() {
                           {it.isDecision && (
                             <>
                               <p className="text-sm text-ink2 sm:col-span-2">
-                                <Badge tone="ok">Sim</Badge> segue para a próxima atividade da lista.
+                                <Badge tone="ok">{t('wz.yes')}</Badge> {t('wz.yes.rest')}
                               </p>
-                              <Field label="Se a resposta for NÃO, vai para…" className="sm:col-span-2" error={errors[`no_${it.key}`]}>
+                              <Field label={t('wz.s2.noTo')} className="sm:col-span-2" error={errors[`no_${it.key}`]}>
                                 {(p) => (
                                   <Select {...p} value={it.noTarget ?? ''} onChange={(e) => setItem(st.key, it.key, { noTarget: e.target.value })}>
-                                    <option value="">Escolha…</option>
-                                    <option value="__end">Encerrar o processo</option>
+                                    <option value="">{t('wz.s2.choose')}</option>
+                                    <option value="__end">{t('wz.s2.endProcess')}</option>
                                     {allItems
                                       .filter((x) => x.key !== it.key)
                                       .map((x) => (
@@ -467,17 +467,17 @@ export default function Wizard() {
                           )}
                           <label className="flex min-h-[40px] items-center gap-2 text-sm text-ink2 sm:col-span-2">
                             <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--brand))]" checked={!!it.isDecision} onChange={(e) => setItem(st.key, it.key, { isDecision: e.target.checked })} />
-                            <GitBranch className="h-4 w-4 text-violet" aria-hidden /> É uma pergunta/decisão?
+                            <GitBranch className="h-4 w-4 text-violet" aria-hidden /> {t('wz.s2.isDecision')}
                           </label>
                         </div>
                         <div className="flex flex-col">
-                          <Button size="sm" variant="ghost" aria-label="Mover para cima" disabled={ii === 0} onClick={() => setStage(st.key, { items: move(st.items, ii, -1) })}>
+                          <Button size="sm" variant="ghost" aria-label={t('wz.moveUp')} disabled={ii === 0} onClick={() => setStage(st.key, { items: move(st.items, ii, -1) })}>
                             <ArrowUp className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="ghost" aria-label="Mover para baixo" disabled={ii === st.items.length - 1} onClick={() => setStage(st.key, { items: move(st.items, ii, 1) })}>
+                          <Button size="sm" variant="ghost" aria-label={t('wz.moveDown')} disabled={ii === st.items.length - 1} onClick={() => setStage(st.key, { items: move(st.items, ii, 1) })}>
                             <ArrowDown className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="ghost" aria-label="Remover atividade" disabled={st.items.length === 1} onClick={() => setStage(st.key, { items: st.items.filter((x) => x.key !== it.key) })}>
+                          <Button size="sm" variant="ghost" aria-label={t('wz.s2.removeAria')} disabled={st.items.length === 1} onClick={() => setStage(st.key, { items: st.items.filter((x) => x.key !== it.key) })}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -486,7 +486,7 @@ export default function Wizard() {
                   ))}
                 </ol>
                 <Button className="mt-3" size="sm" variant="secondary" onClick={() => setStage(st.key, { items: [...st.items, blankItem()] })}>
-                  <Plus className="h-4 w-4" /> Adicionar atividade em {st.name}
+                  <Plus className="h-4 w-4" /> {t('wz.s2.addIn', { stage: st.name })}
                 </Button>
               </Card>
             ))}
@@ -499,31 +499,31 @@ export default function Wizard() {
       )}
 
       {s.step === 3 && (
-        <Card title="Volume e custos" subtitle="Opcional">
-          <p className="mb-4 text-sm text-ink2">Sem estes números você já vê o mapa, os tempos e os desperdícios. Com eles, calculamos o esforço por mês e o custo estimado. Não sabe agora? Pode pular e preencher depois.</p>
+        <Card title={t('wz.s3.title')} subtitle={t('wz.s3.sub')}>
+          <p className="mb-4 text-sm text-ink2">{t('wz.s3.hint')}</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Quantas vezes o processo acontece?" help="Ex.: 1.200 pedidos.">
-              {(p) => <NumberInput {...p} value={s.volume} onChange={(v) => set({ volume: v })} placeholder="Ex.: 1200" />}
+            <Field label={t('wz.s3.volume')} help={t('wz.s3.volume.help')}>
+              {(p) => <NumberInput {...p} value={s.volume} onChange={(v) => set({ volume: v })} placeholder={t('wz.s3.volume.ph')} />}
             </Field>
-            <Field label="Por…">
+            <Field label={t('wz.s3.per')}>
               {(p) => (
                 <Select {...p} value={s.period} onChange={(e) => set({ period: e.target.value as Period })}>
-                  <option value="dia">dia</option>
-                  <option value="semana">semana</option>
-                  <option value="mes">mês</option>
-                  <option value="ano">ano</option>
+                  <option value="dia">{t('wz.period.dia')}</option>
+                  <option value="semana">{t('wz.period.semana')}</option>
+                  <option value="mes">{t('wz.period.mes')}</option>
+                  <option value="ano">{t('wz.period.ano')}</option>
                 </Select>
               )}
             </Field>
-            <Field label="Custo-hora carregado (R$)" help="Salário + encargos + benefícios ÷ horas trabalhadas. Pode ajustar por função depois." className="sm:col-span-2">
-              {(p) => <NumberInput {...p} value={s.costPerHour} onChange={(v) => set({ costPerHour: v })} placeholder="Ex.: 55" />}
+            <Field label={t('wz.s3.cost')} help={t('wz.s3.cost.help')} className="sm:col-span-2">
+              {(p) => <NumberInput {...p} value={s.costPerHour} onChange={(v) => set({ costPerHour: v })} placeholder={t('wz.s3.cost.ph')} />}
             </Field>
           </div>
         </Card>
       )}
 
       {s.step === 4 && (
-        <Card title="Confira antes de criarmos" subtitle={s.name}>
+        <Card title={t('wz.s4.title')} subtitle={s.name}>
           <ol className="space-y-3 text-sm">
             {s.stages
               .filter((st) => st.name.trim())
@@ -547,38 +547,38 @@ export default function Wizard() {
           </ol>
           <div className="mt-4 space-y-2">
             {analysis.invalidDecisions.length > 0 && (
-              <Callout tone="bad" title="Decisões com o caminho do “não” perdido" action={<Button size="sm" variant="secondary" onClick={() => set({ step: 2 })}>Corrigir nas atividades</Button>}>
+              <Callout tone="bad" title={t('wz.s4.invTitle')} action={<Button size="sm" variant="secondary" onClick={() => set({ step: 2 })}>{t('wz.s4.invFix')}</Button>}>
                 <ul className="list-disc pl-4" data-testid="wizard-invalid-decisions">
                   {analysis.invalidDecisions.map((x) => (
                     <li key={x.key}>
-                      “{x.name}” ({x.stage}): a atividade escolhida para o “não” foi removida ou não entra no processo.
+                      {t('wz.s4.invItem', { name: x.name, stage: x.stage })}
                     </li>
                   ))}
                 </ul>
               </Callout>
             )}
             {analysis.dropped.length > 0 && (
-              <Callout tone="warn" title="Não serão salvos no processo">
+              <Callout tone="warn" title={t('wz.s4.dropTitle')}>
                 <ul className="space-y-2" data-testid="wizard-dropped-items">
                   {analysis.dropped.map((x) => (
                     <li key={x.key} className="flex flex-wrap items-center justify-between gap-2">
                       <span>
-                        {x.reason === 'sem_nome' ? `Etapa sem nome com ${x.activities.length === 1 ? '1 atividade' : `${x.activities.length} atividades`}: ${x.activities.join('; ')}` : `Etapa “${x.name}” — sem atividades`}
+                        {x.reason === 'sem_nome' ? (x.activities.length === 1 ? t('wz.s4.dropUnnamed1', { list: x.activities.join('; ') }) : t('wz.s4.dropUnnamedN', { n: x.activities.length, list: x.activities.join('; ') })) : t('wz.s4.dropNoAct', { name: x.name })}
                       </span>
                       <Button size="sm" variant="ghost" onClick={() => set({ step: x.reason === 'sem_nome' ? 1 : 2 })}>
-                        {x.reason === 'sem_nome' ? 'Dar nome à etapa' : 'Adicionar atividades'}
+                        {x.reason === 'sem_nome' ? t('wz.s4.nameIt') : t('wz.s4.addActs')}
                       </Button>
                     </li>
                   ))}
                 </ul>
                 <label className="mt-3 flex min-h-[44px] items-center gap-2 font-medium text-ink">
                   <input type="checkbox" className="h-5 w-5" checked={!needsAck} onChange={(e) => setAckDropped(e.target.checked ? droppedSig : '')} />
-                  Entendi: criar o processo sem esses itens
+                  {t('wz.s4.ack')}
                 </label>
               </Callout>
             )}
             {issues.filter((i) => i.severity !== 'info').length === 0 && !analysis.dropped.length && !analysis.invalidDecisions.length ? (
-              <Callout tone="ok">Tudo certo por aqui. Vamos criar o processo?</Callout>
+              <Callout tone="ok">{t('wz.s4.allGood')}</Callout>
             ) : (
               issues
                 .filter((i) => i.severity !== 'info')
@@ -598,23 +598,23 @@ export default function Wizard() {
         <Button variant="ghost" onClick={() => (s.step === 0 ? nav('/app') : go(-1))}>
           <ArrowLeft className="h-4 w-4" aria-hidden />
           {s.step === 0 ? (
-            'Sair'
+            t('wz.exit')
           ) : (
             <>
-              <span className="sm:hidden">Voltar</span>
-              <span className="hidden sm:inline">Voltar para {TARGET[s.step - 1]}</span>
+              <span className="sm:hidden">{t('wz.back')}</span>
+              <span className="hidden sm:inline">{t('wz.backTo', { target: t(`wz.target.${s.step}` as 'wz.target.1') })}</span>
             </>
           )}
         </Button>
-        {s.step < STEPS.length - 1 ? (
+        {s.step < STEP_COUNT - 1 ? (
           <div className="flex w-full gap-2 sm:w-auto">
             {s.step === 3 && (
               <Button variant="secondary" className="flex-1 sm:flex-none" onClick={() => go(1)}>
-                Pular por agora
+                {t('wz.skip')}
               </Button>
             )}
             <Button className="flex-1 sm:flex-none" onClick={() => go(1)}>
-              Avançar para {TARGET[s.step + 1]} <ArrowRight className="h-4 w-4" aria-hidden />
+              {t('wz.next', { target: t(`wz.target.${s.step + 2}` as 'wz.target.1') })} <ArrowRight className="h-4 w-4" aria-hidden />
             </Button>
           </div>
         ) : (
@@ -625,7 +625,7 @@ export default function Wizard() {
               </p>
             )}
             <Button className="w-full sm:w-auto" onClick={() => void finish()} loading={busy} disabled={!!blockReason} aria-describedby={blockReason ? 'wizard-block-reason' : undefined}>
-              Criar processo e ver o mapa
+              {t('wz.create')}
             </Button>
           </div>
         )}
@@ -636,16 +636,16 @@ export default function Wizard() {
 
 /** Texto simples do formulário, para a pessoa copiar quando esta aba fica desatualizada. */
 function wizardText(s: WState): string {
-  const lines = [`Processo: ${s.name || '(sem nome)'}`];
-  if (s.description) lines.push(`Para que serve: ${s.description}`);
-  if (s.area) lines.push(`Área: ${s.area}`);
+  const lines = [tr('wz.text.process', { name: s.name || tr('wz.text.noName') })];
+  if (s.description) lines.push(tr('wz.text.purpose', { v: s.description }));
+  if (s.area) lines.push(tr('wz.text.area', { v: s.area }));
   for (const st of s.stages) {
     if (!st.name && !st.items.some((i) => i.name)) continue;
-    lines.push('', `Etapa: ${st.name || '(sem nome)'}`);
-    for (const i of st.items.filter((x) => x.name)) lines.push(`- ${i.isDecision ? 'Decisão: ' : ''}${i.name}${i.owner ? ` · ${i.owner}` : ''}${i.duration !== undefined && !i.isDecision ? ` · ${i.duration} ${i.unit}` : ''}`);
+    lines.push('', tr('wz.text.stage', { name: st.name || tr('wz.text.noName') }));
+    for (const i of st.items.filter((x) => x.name)) lines.push(`- ${i.isDecision ? tr('wz.text.decision') : ''}${i.name}${i.owner ? ` · ${i.owner}` : ''}${i.duration !== undefined && !i.isDecision ? ` · ${i.duration} ${i.unit}` : ''}`);
   }
-  if (s.volume !== undefined) lines.push('', `Volume: ${s.volume} por ${s.period}`);
-  if (s.costPerHour !== undefined) lines.push(`Custo-hora: R$ ${s.costPerHour}`);
+  if (s.volume !== undefined) lines.push('', tr('wz.text.volume', { v: s.volume, per: tr(`wz.text.per.${s.period}` as 'wz.text.per.dia') }));
+  if (s.costPerHour !== undefined) lines.push(tr('wz.text.cost', { v: s.costPerHour }));
   return lines.join('\n');
 }
 
