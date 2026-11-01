@@ -187,3 +187,15 @@ test('PT golden: assistente — roteiro completo', async ({ page }) => {
   await expect(page.getByText('Desenhando mapas…')).toHaveCount(0);
   await check('asst-relatorio', page);
 });
+
+// Painel de detalhes de uma atividade no mapa (aberto ao clicar numa atividade da etapa).
+test('PT golden: mapa — detalhes da atividade', async ({ page }) => {
+  await prepare(page);
+  const base = await openDemo(page);
+  await page.goto(`${base}/mapa`);
+  await page.waitForSelector('.djs-element[data-element-id^="Stage_"]');
+  await page.getByRole('navigation', { name: 'Etapas do processo' }).getByRole('button').nth(1).click();
+  await page.locator('tbody tr').first().getByRole('button').first().click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await check('map-detalhe', page);
+});
