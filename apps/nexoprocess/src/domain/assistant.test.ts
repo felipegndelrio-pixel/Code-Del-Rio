@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { setActiveLocale } from '../i18n';
 import { draftActivityFrom, draftToProcess, emptyDraft, parseActivityLine, parseList } from './assistant';
 import { computeMetrics } from './metrics';
 import { validateProcess } from './validation';
@@ -68,5 +69,20 @@ describe('rascunho → processo', () => {
   });
   it('rascunho vazio não gera atividades', () => {
     expect(draftToProcess(emptyDraft()).activities).toEqual([]);
+  });
+});
+
+describe('interpretação de texto livre em EN (só com o idioma ativo EN)', () => {
+  afterEach(() => setActiveLocale('pt'));
+  it('responsável, duração e separadores em inglês', () => {
+    setActiveLocale('en');
+    expect(parseActivityLine('Approve purchase by Manager (15 min)')).toEqual({ name: 'Approve purchase', duration: 15, unit: 'min', owner: 'Manager' });
+    expect(parseActivityLine('Review quote by the Buyer - 2 hours')).toMatchObject({ name: 'Review quote', duration: 2, unit: 'h', owner: 'Buyer' });
+    expect(parseActivityLine('Ship order (1 day)')).toMatchObject({ duration: 1, unit: 'd' });
+    expect(parseList('request, then approve, finally buy')).toEqual(['Request', 'Approve', 'Buy']);
+  });
+  it('em PT nada muda, mesmo com palavras em inglês', () => {
+    expect(parseActivityLine('Approve purchase by Manager (15 min)')).toEqual({ name: 'Approve purchase by Manager', duration: 15, unit: 'min', owner: undefined });
+    expect(parseList('request, then approve')).toEqual(['Request, then approve']);
   });
 });

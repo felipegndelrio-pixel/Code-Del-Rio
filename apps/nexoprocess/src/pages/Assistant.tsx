@@ -13,6 +13,8 @@ import { checkStorage, db } from '../storage/db';
 import { shareProject } from '../state/actions';
 import { createFromDraft, DraftAlreadyUsedError, DraftDivergedError, resumeDraft, staleFromSave, type StaleDraft } from '../state/draftCommit';
 import { StaleDraftNotice } from '../components/StaleDraftNotice';
+import { lazyLabels, tr, type MessageKey } from '../i18n';
+import { useI18n } from '../i18n/I18nProvider';
 import { useHardwareBack } from '../state/backNav';
 import { localDraft } from '../storage/localDraft';
 import { demoBlocked } from '../license/demo';
@@ -21,9 +23,9 @@ import { stepRequirements } from '../domain/journey';
 import type { Workspace } from '../domain/types';
 
 const DRAFT = 'assistant';
-const SECTIONS = ['Processo', 'Etapas', 'Atividades', 'Detalhes', 'Decisões', 'Volume e custo', 'Revisão'];
-const UNIT_TXT: Record<DurationUnit, string> = { min: 'min', h: 'h', d: 'dias' };
-const PERIOD_TXT: Record<Period, string> = { dia: 'dia', semana: 'semana', mes: 'mês', ano: 'ano' };
+const SECTION_COUNT = 7;
+const UNIT_TXT = lazyLabels<DurationUnit>({ min: 'as.unit.min', h: 'as.unit.h', d: 'as.unit.d' });
+const PERIOD_TXT = lazyLabels<Period>({ dia: 'wz.period.dia', semana: 'wz.period.semana', mes: 'wz.period.mes', ano: 'wz.period.ano' });
 
 function stepOrder(d: AssistantDraft): string[] {
   return ['name', 'trigger', 'outcome', 'stages', ...d.stages.map((s) => `acts:${s.key}`), 'details', 'decisions', 'volume', 'cost', 'review'];
@@ -32,20 +34,20 @@ function stepOrder(d: AssistantDraft): string[] {
 function stepTarget(step: string, d: AssistantDraft): string {
   if (step.startsWith('acts:')) {
     const st = d.stages.find((x) => `acts:${x.key}` === step);
-    return st ? `as atividades de “${st.name}”` : 'as atividades';
+    return st ? tr('as.target.actsOf', { name: st.name }) : tr('as.target.acts');
   }
-  const T: Record<string, string> = { name: 'o nome', trigger: 'o início do processo', outcome: 'o fim do processo', stages: 'as etapas', details: 'os detalhes', decisions: 'as decisões', volume: 'o volume', cost: 'o custo-hora', review: 'a revisão' };
-  return T[step] ?? 'a próxima pergunta';
+  const T: Record<string, MessageKey> = { name: 'as.target.name', trigger: 'as.target.trigger', outcome: 'as.target.outcome', stages: 'as.target.stages', details: 'as.target.details', decisions: 'as.target.decisions', volume: 'as.target.volume', cost: 'as.target.cost', review: 'as.target.review' };
+  return tr(T[step] ?? 'as.target.next');
 }
-const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+const plural = (n: number, one: MessageKey, many: MessageKey) => tr(n === 1 ? one : many, { n });
 
 /** Confirmação curta ao chegar em marcos do roteiro (não aparece ao corrigir a partir da revisão). */
 function ackFor(step: string, d: AssistantDraft, order: string[]): string | null {
   const acts = allActivities(d);
-  if (step === 'trigger') return `Ótimo, vamos mapear “${d.name}”.`;
-  if (step === order.find((x) => x.startsWith('acts:'))) return `Boa! ${plural(d.stages.length, 'etapa definida', 'etapas definidas')}. Agora, o que acontece em cada uma.`;
-  if (step === 'details' && acts.length) return `Boa, isso já ajuda a mapear o fluxo: ${plural(acts.length, 'atividade', 'atividades')} até aqui.`;
-  if (step === 'volume') return 'Fluxo desenhado. Faltam só dois números, e os dois são opcionais.';
+  if (step === 'trigger') return tr('as.ack.trigger', { name: d.name });
+  if (step === order.find((x) => x.startsWith('acts:'))) return tr('as.ack.stages', { count: plural(d.stages.length, 'as.n.stageDef.1', 'as.n.stageDef.n') });
+  if (step === 'details' && acts.length) return tr('as.ack.details', { count: plural(acts.length, 'as.n.act.1', 'as.n.act.n') });
+  if (step === 'volume') return tr('as.ack.volume');
   return null;
 }
 
@@ -57,6 +59,8 @@ function sectionOf(step: string): number {
 }
 
 export default function Assistant() {
+  const { t: tx } = useI18n();
+  const SECTIONS = [1, 2, 3, 4, 5, 6, 7].map((n) => tx(`as.section.${n}` as 'as.section.1'));
   const nav = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
@@ -127,7 +131,7 @@ export default function Assistant() {
 
   const order = stepOrder(d);
   const idx = Math.max(0, order.indexOf(d.step));
-  const nextLabel = d.returnToReview ? 'Voltar à revisão' : `Avançar para ${stepTarget(order[Math.min(order.length - 1, idx + 1)], d)}`;
+  const nextLabel = d.returnToReview ? tx('as.backToReview') : tx('as.next', { target: stepTarget(order[Math.min(order.length - 1, idx + 1)], d) });
   const ack = d.returnToReview ? null : ackFor(d.step, d, order);
   const set = (patch: Partial<AssistantDraft>) => setD((x) => ({ ...x, ...patch }));
   const go = (step: string) => setD((x) => ({ ...x, step, returnToReview: x.step === 'review' && SINGLE_ANSWER.has(step) }));
@@ -176,15 +180,15 @@ export default function Assistant() {
   const droppedSig = analysis.droppedStages.map((x) => `${x.key}:${x.reason}:${x.activities.length}`).join('|');
   const needsAck = droppedSig !== '' && ackDropped !== droppedSig;
   const blockReason = stale
-    ? 'Esta aba não cria o projeto: ele já foi criado em outra aba. Copie seus dados acima.'
+    ? tx('as.block.stale')
     : !analysis.flat.length
-    ? 'Falta pelo menos uma atividade: complete uma etapa para criar o projeto.'
+    ? tx('as.block.noActs')
     : issues.some((i) => i.severity === 'error')
-      ? 'Corrija os pontos em vermelho acima para criar o projeto.'
+      ? tx('as.block.errors')
       : analysis.invalidDecisions.length
-        ? 'Corrija ou remova as decisões destacadas para criar o projeto.'
+        ? tx('as.block.decisions')
         : needsAck
-          ? 'Confirme acima que deseja criar o projeto sem os itens que não serão salvos.'
+          ? tx('as.block.ack')
           : null;
 
   const finish = async () => {
@@ -203,7 +207,7 @@ export default function Assistant() {
       if (e instanceof DraftDivergedError) setStale({ reason: 'divergente', workspaceId: e.workspaceId });
       else if (e instanceof DraftAlreadyUsedError) setStale({ reason: 'excluido' });
       // A criação falhou: nada foi gravado, o rascunho continua e a pessoa pode tentar de novo.
-      else toast('bad', 'Não conseguimos salvar neste navegador. Confira se o armazenamento do site está liberado e tente de novo.');
+      else toast('bad', tx('wz.toast.saveFail'));
     } finally {
       setBusy(false);
     }
@@ -216,7 +220,7 @@ export default function Assistant() {
     setRestored(false);
   };
   const discard = async () => {
-    if (!(await confirm({ title: 'Começar do zero?', body: 'As respostas até aqui serão apagadas deste aparelho.', confirm: 'Apagar e recomeçar', danger: true }))) return;
+    if (!(await confirm({ title: tx('wz.discard.title'), body: tx('wz.discard.body'), confirm: tx('wz.discard.confirm'), danger: true }))) return;
     await db.deleteDraft(DRAFT).catch(() => {});
     localDraft.remove(DRAFT);
     setD(emptyDraft());
@@ -233,12 +237,12 @@ export default function Assistant() {
     <div className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-6 pt-4 sm:pt-8">
       <div className="mb-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-xl font-semibold">Vamos mapear seu processo</h1>
+          <h1 className="text-xl font-semibold">{tx('as.h1')}</h1>
           <Link to="/app/novo/formulario" className="inline-flex min-h-[32px] items-center text-xs font-semibold text-accent hover:underline">
-            Prefere preencher tudo de uma vez?
+            {tx('as.fillAll')}
           </Link>
         </div>
-        <ol className="mt-3 flex gap-1" aria-label={`Etapa ${section + 1} de ${SECTIONS.length}: ${SECTIONS[section]}`}>
+        <ol className="mt-3 flex gap-1" aria-label={tx('as.progress', { n: section + 1, total: SECTION_COUNT, name: SECTIONS[section] })}>
           {SECTIONS.map((s, i) => (
             <li key={s} className="flex-1" title={s}>
               <span className={clsx('block h-1.5 rounded-full', i < section ? 'bg-brand' : i === section ? 'bg-accentStrong' : 'bg-surface2')} />
@@ -247,16 +251,16 @@ export default function Assistant() {
         </ol>
         <p className="mt-1 flex justify-between text-xs text-muted">
           <span className="font-medium text-ink2">
-            Etapa {section + 1} de {SECTIONS.length}: {SECTIONS[section]}
+            {tx('as.progress', { n: section + 1, total: SECTION_COUNT, name: SECTIONS[section] })}
           </span>
-          <span data-testid="draft-storage">{stale ? 'Esta aba não está salvando' : storage === 'memoria' ? 'Rascunho só nesta aba' : 'Rascunho salvo neste aparelho'}</span>
+          <span data-testid="draft-storage">{stale ? tx('wz.save.stale') : storage === 'memoria' ? tx('wz.save.memory') : tx('as.save.saved')}</span>
         </p>
       </div>
 
       {storage === 'memoria' && (
         <div className="mb-3">
-          <Callout tone="warn" title="Este navegador bloqueou o armazenamento local">
-            Você pode montar o projeto, mas ele ficará só nesta aba e some ao fechá-la. Depois de criar, baixe o arquivo do projeto para não perder nada.
+          <Callout tone="warn" title={tx('wz.mem.title')}>
+            {tx('as.mem.body')}
           </Callout>
         </div>
       )}
@@ -275,16 +279,16 @@ export default function Assistant() {
         <div className="mb-3">
           <Callout
             tone="info"
-            title={already.exists ? 'Seu último rascunho já virou um projeto.' : 'Seu último rascunho já tinha virado um projeto, que foi excluído depois.'}
-            action={already.exists ? <Button size="sm" variant="ghost" onClick={() => nav(`/app/p/${already.workspaceId}/visao-geral`)}>Abrir o projeto</Button> : undefined}
+            title={already.exists ? tx('as.already.exists') : tx('as.already.deleted')}
+            action={already.exists ? <Button size="sm" variant="ghost" onClick={() => nav(`/app/p/${already.workspaceId}/visao-geral`)}>{tx('as.already.open')}</Button> : undefined}
           >
-            Não vamos criá-lo de novo. Este é um rascunho novo.
+            {tx('wz.already.body')}
           </Callout>
         </div>
       )}
       {restored && !stale && (
         <div className="mb-3">
-          <Callout tone="info" title="Continuamos de onde você parou." action={<Button size="sm" variant="ghost" onClick={() => void discard()}>Começar do zero</Button>} />
+          <Callout tone="info" title={tx('wz.restored.title')} action={<Button size="sm" variant="ghost" onClick={() => void discard()}>{tx('wz.restored.restart')}</Button>} />
         </div>
       )}
 
@@ -309,9 +313,9 @@ export default function Assistant() {
           data-back
           className="-ml-2 -mt-1 mb-2 inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-ink2 hover:bg-surface2 hover:text-ink"
           onClick={() => (canBack ? back() : nav('/app'))}
-          aria-label={canBack ? (d.returnToReview ? 'Voltar ao resumo' : 'Voltar à pergunta anterior') : 'Voltar para Meus projetos'}
+          aria-label={canBack ? (d.returnToReview ? tx('as.back.summary') : tx('as.back.prev')) : tx('as.back.home')}
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden /> Voltar
+          <ArrowLeft className="h-4 w-4" aria-hidden /> {tx('wz.back')}
         </button>
         {ack && (
           <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-ok" data-testid="assistant-ack">
@@ -320,35 +324,35 @@ export default function Assistant() {
         )}
         {d.step === 'name' && (
           <TextStep
-            q="Vamos começar. Como você chama esse processo?"
-            help="Use o nome que a equipe usa no dia a dia. Dá para mudar depois."
-            placeholder="Ex.: Análise de crédito"
+            q={tx('as.name.q')}
+            help={tx('wz.f.name.help')}
+            placeholder={tx('wz.f.name.ph')}
             nextLabel={nextLabel}
             value={d.name}
             onChange={(v) => set({ name: v })}
-            examples={['Aprovação de compras', 'Atendimento de solicitações internas', 'Processamento de pedidos']}
+            examples={[tx('as.name.ex1'), tx('as.name.ex2'), tx('as.name.ex3')]}
             onNext={() => next()}
             required
           />
         )}
         {d.step === 'trigger' && (
-          <TextStep q="O que faz esse processo começar?" help="Pense no evento que dispara o trabalho." placeholder="Ex.: uma área pede a compra de um material" nextLabel={nextLabel} value={d.trigger ?? ''} onChange={(v) => set({ trigger: v })} onNext={() => next()} onSkip={() => next({ trigger: undefined })} />
+          <TextStep q={tx('as.trigger.q')} help={tx('as.trigger.help')} placeholder={tx('as.trigger.ph')} nextLabel={nextLabel} value={d.trigger ?? ''} onChange={(v) => set({ trigger: v })} onNext={() => next()} onSkip={() => next({ trigger: undefined })} />
         )}
         {d.step === 'outcome' && (
-          <TextStep q="E como ele termina? O que é entregue no fim?" help="O resultado que fecha o ciclo." placeholder="Ex.: pedido de compra enviado ao fornecedor" nextLabel={nextLabel} value={d.outcome ?? ''} onChange={(v) => set({ outcome: v })} onNext={() => next()} onSkip={() => next({ outcome: undefined })} />
+          <TextStep q={tx('as.outcome.q')} help={tx('as.outcome.help')} placeholder={tx('as.outcome.ph')} nextLabel={nextLabel} value={d.outcome ?? ''} onChange={(v) => set({ outcome: v })} onNext={() => next()} onSkip={() => next({ outcome: undefined })} />
         )}
         {d.step === 'stages' && (
           <ListStep
-            q="Quais são as grandes etapas, na ordem em que acontecem?"
-            help="De 2 a 7 blocos costuma bastar. Ex.: Solicitação → Aprovação → Cotação → Compra."
+            q={tx('as.stages.q')}
+            help={tx('as.stages.help')}
             items={d.stages.map((s) => ({ key: s.key, label: s.name }))}
             onChange={(items) =>
               set({
                 stages: items.map((it) => d.stages.find((s) => s.key === it.key) ?? { key: it.key, name: it.label, activities: [] }).map((s, i) => ({ ...s, name: items[i].label })),
               })
             }
-            addLabel="Adicionar etapa"
-            textPlaceholder={'Solicitação\nAprovação\nCotação\nCompra'}
+            addLabel={tx('wz.s1.add')}
+            textPlaceholder={tx('as.stages.textPh')}
             nextLabel={nextLabel}
             onNext={() => next()}
           />
@@ -360,8 +364,8 @@ export default function Assistant() {
             return (
               <ListStep
                 key={st.key}
-                q={`O que acontece na etapa “${st.name}”?`}
-                help="Liste as atividades em ordem, começando por um verbo. Se já souber quem faz e quanto tempo leva, escreva junto — “Aprovar compra por Gestor (15 min)” — e não perguntamos de novo."
+                q={tx('as.acts.q', { name: st.name })}
+                help={tx('as.acts.help')}
                 items={st.activities.map((a) => ({ key: a.key, label: a.name, meta: [a.owner, a.duration !== undefined ? `${fmtNum(a.duration)} ${UNIT_TXT[a.unit]}` : ''].filter(Boolean).join(' · ') }))}
                 parse={(line) => {
                   const a = draftActivityFrom(line);
@@ -378,15 +382,15 @@ export default function Assistant() {
                     }),
                   })
                 }
-                addLabel="Adicionar atividade"
-                textPlaceholder={'Aprovar por Gestor (15 min)\nAnalisar orçamento por Comprador\nRegistrar pedido'}
+                addLabel={tx('as.acts.add')}
+                textPlaceholder={tx('as.acts.textPh')}
                 nextLabel={nextLabel}
                 onNext={() => next()}
                 onSkip={() => {
                   setStage(st.key, { skipped: true });
                   next();
                 }}
-                skipLabel="Ainda não sei — completo depois"
+                skipLabel={tx('as.acts.skip')}
               />
             );
           })()}
@@ -394,20 +398,20 @@ export default function Assistant() {
         {d.step === 'decisions' && <DecisionsStep d={d} analysis={analysis} set={set} nextLabel={nextLabel} onNext={() => next({ decisionsAnswered: true })} />}
         {d.step === 'volume' && (
           <div className="space-y-4">
-            <Bubble>Quantas vezes esse processo acontece?</Bubble>
-            <p className="text-sm text-ink2">Com esse número, calculamos o esforço por mês e a capacidade da equipe. Sem ele, ainda mostramos o tempo de cada execução.</p>
+            <Bubble>{tx('as.vol.q')}</Bubble>
+            <p className="text-sm text-ink2">{tx('as.vol.help')}</p>
             <div className="flex flex-wrap items-end gap-3">
-              <Field label="Execuções" className="w-40">
-                {(f) => <NumberInput {...f} value={d.volume} onChange={(v) => set({ volume: v, volumeUnknown: false })} placeholder="Ex.: 300" />}
+              <Field label={tx('as.vol.runs')} className="w-40">
+                {(f) => <NumberInput {...f} value={d.volume} onChange={(v) => set({ volume: v, volumeUnknown: false })} placeholder={tx('as.vol.ph')} />}
               </Field>
               <div>
-                <p className="mb-1 text-sm font-medium">por</p>
-                <Segmented<Period> label="Período do volume" value={d.period} onChange={(v) => set({ period: v })} options={(Object.keys(PERIOD_TXT) as Period[]).map((k) => ({ value: k, label: PERIOD_TXT[k] }))} />
+                <p className="mb-1 text-sm font-medium">{tx('as.vol.per')}</p>
+                <Segmented<Period> label={tx('as.vol.period')} value={d.period} onChange={(v) => set({ period: v })} options={(Object.keys(PERIOD_TXT) as Period[]).map((k) => ({ value: k, label: PERIOD_TXT[k] }))} />
               </div>
             </div>
             <Actions>
               <Button variant="secondary" onClick={() => next({ volume: undefined, volumeUnknown: true })}>
-                Não sei ainda
+                {tx('wz.lean.unknown')}
               </Button>
               <Button data-primary onClick={() => next({ volumeUnknown: false })} disabled={d.volume === undefined}>
                 {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
@@ -417,14 +421,14 @@ export default function Assistant() {
         )}
         {d.step === 'cost' && (
           <div className="space-y-4">
-            <Bubble>Quanto custa, em média, uma hora de quem executa?</Bubble>
-            <p className="text-sm text-ink2">Some salário, encargos e benefícios e divida pelas horas trabalhadas. É opcional: sem esse dado, não mostramos valores em R$ — nunca estimamos por você.</p>
-            <Field label="Custo-hora (R$)" className="w-48">
-              {(f) => <NumberInput {...f} value={d.costPerHour} onChange={(v) => set({ costPerHour: v, costUnknown: false })} placeholder="Ex.: 55" />}
+            <Bubble>{tx('as.cost.q')}</Bubble>
+            <p className="text-sm text-ink2">{tx('as.cost.help')}</p>
+            <Field label={tx('as.cost.label')} className="w-48">
+              {(f) => <NumberInput {...f} value={d.costPerHour} onChange={(v) => set({ costPerHour: v, costUnknown: false })} placeholder={tx('wz.s3.cost.ph')} />}
             </Field>
             <Actions>
               <Button variant="secondary" onClick={() => next({ costPerHour: undefined, costUnknown: true })}>
-                Não sei / prefiro não informar
+                {tx('as.cost.skip')}
               </Button>
               <Button data-primary onClick={() => next({ costUnknown: false })} disabled={d.costPerHour === undefined}>
                 {nextLabel} <ChevronRight className="h-4 w-4" aria-hidden />
@@ -434,22 +438,22 @@ export default function Assistant() {
         )}
         {d.step === 'review' && process && (
           <div className="space-y-4">
-            <Bubble>Tudo pronto! Confira o resumo antes de criarmos o projeto.</Bubble>
+            <Bubble>{tx('as.rev.q')}</Bubble>
             <dl className="divide-y divide-line/10 rounded-lg border border-line/15 text-sm" data-testid="assistant-review">
-              <ReviewRow label="Processo" value={d.name} onEdit={() => go('name')} />
-              <ReviewRow label="Início · fim" value={`${d.trigger || 'Início'} → ${d.outcome || 'Fim'}`} onEdit={() => go('trigger')} />
-              <ReviewRow label="Etapas" value={analysis.stages.map((s) => `${s.name.trim()} (${s.activities.filter((a) => a.name.trim()).length})`).join(' → ') || '—'} onEdit={() => go('stages')} />
-              <ReviewRow label="Detalhes" value={`${acts.filter((a) => a.duration !== undefined).length}/${acts.length} com tempo · ${acts.filter((a) => a.owner).length}/${acts.length} com responsável`} onEdit={() => set({ step: 'details', detailIndex: 0 })} />
-              <ReviewRow label="Decisões" value={analysis.decisions.length ? analysis.decisions.map((x) => x.question.trim()).join('; ') : 'Nenhuma'} onEdit={() => go('decisions')} />
-              <ReviewRow label="Volume" value={d.volumeUnknown || d.volume === undefined ? 'Não informado' : `${fmtNum(d.volume)} por ${PERIOD_TXT[d.period]}`} onEdit={() => go('volume')} />
-              <ReviewRow label="Custo-hora" value={d.costUnknown || d.costPerHour === undefined ? 'Não informado' : `R$ ${fmtNum(d.costPerHour)}`} onEdit={() => go('cost')} />
+              <ReviewRow label={tx('as.rev.process')} value={d.name} onEdit={() => go('name')} />
+              <ReviewRow label={tx('as.rev.startEnd')} value={`${d.trigger || tr('d.type.start')} → ${d.outcome || tr('d.type.end')}`} onEdit={() => go('trigger')} />
+              <ReviewRow label={tx('as.rev.stages')} value={analysis.stages.map((s) => `${s.name.trim()} (${s.activities.filter((a) => a.name.trim()).length})`).join(' → ') || '—'} onEdit={() => go('stages')} />
+              <ReviewRow label={tx('as.rev.details')} value={tx('as.rev.detailsVal', { t: `${acts.filter((a) => a.duration !== undefined).length}/${acts.length}`, o: `${acts.filter((a) => a.owner).length}/${acts.length}` })} onEdit={() => set({ step: 'details', detailIndex: 0 })} />
+              <ReviewRow label={tx('as.rev.decisions')} value={analysis.decisions.length ? analysis.decisions.map((x) => x.question.trim()).join('; ') : tx('as.rev.none')} onEdit={() => go('decisions')} />
+              <ReviewRow label={tx('as.rev.volume')} value={d.volumeUnknown || d.volume === undefined ? tx('as.rev.notInformed') : tx('as.perPeriod', { v: fmtNum(d.volume), period: PERIOD_TXT[d.period] })} onEdit={() => go('volume')} />
+              <ReviewRow label={tx('as.rev.cost')} value={d.costUnknown || d.costPerHour === undefined ? tx('as.rev.notInformed') : tx('as.money', { v: fmtNum(d.costPerHour) })} onEdit={() => go('cost')} />
             </dl>
             {analysis.invalidDecisions.length > 0 && (
-              <Callout tone="bad" title={plural(analysis.invalidDecisions.length, 'decisão precisa de correção', 'decisões precisam de correção')} action={<Button size="sm" variant="secondary" onClick={() => go('decisions')}>Corrigir decisões</Button>}>
+              <Callout tone="bad" title={plural(analysis.invalidDecisions.length, 'as.n.decFix.1', 'as.n.decFix.n')} action={<Button size="sm" variant="secondary" onClick={() => go('decisions')}>{tx('as.rev.fixDecisions')}</Button>}>
                 <ul className="list-disc pl-4" data-testid="invalid-decisions">
                   {analysis.invalidDecisions.map((x) => (
                     <li key={x.decision.key}>
-                      Decisão {x.n}
+                      {tx('as.rev.decN', { n: x.n })}
                       {x.decision.question.trim() ? ` “${x.decision.question.trim()}”` : ''}: {PROBLEM_TXT[x.problem]}
                     </li>
                   ))}
@@ -457,28 +461,28 @@ export default function Assistant() {
               </Callout>
             )}
             {analysis.droppedStages.length > 0 && (
-              <Callout tone="warn" title="Não serão salvos no projeto">
+              <Callout tone="warn" title={tx('as.rev.dropTitle')}>
                 <ul className="space-y-2" data-testid="dropped-items">
                   {analysis.droppedStages.map((x) => (
                     <li key={x.key} className="flex flex-wrap items-center justify-between gap-2">
                       <span>
-                        Etapa “{x.name || 'sem nome'}” — {DROP_TXT[x.reason]}
-                        {x.activities.length ? ` (${plural(x.activities.length, 'atividade', 'atividades')}: ${x.activities.join('; ')})` : ''}
+                        {tx('as.rev.dropStage', { name: x.name || tx('wz.text.noNameShort'), reason: DROP_TXT[x.reason] })}
+                        {x.activities.length ? ` (${plural(x.activities.length, 'as.n.act.1', 'as.n.act.n')}: ${x.activities.join('; ')})` : ''}
                       </span>
                       <Button size="sm" variant="ghost" onClick={() => (x.reason === 'sem_nome' ? go('stages') : setD((y) => ({ ...y, step: `acts:${x.key}`, returnToReview: true })))}>
-                        Completar agora
+                        {tx('as.rev.completeNow')}
                       </Button>
                     </li>
                   ))}
                 </ul>
                 <label className="mt-3 flex min-h-[44px] items-center gap-2 font-medium text-ink">
                   <input type="checkbox" className="h-5 w-5" checked={!needsAck} onChange={(e) => setAckDropped(e.target.checked ? droppedSig : '')} />
-                  Entendi: criar o projeto sem esses itens
+                  {tx('as.rev.ack')}
                 </label>
               </Callout>
             )}
             {issues.length === 0 && !analysis.invalidDecisions.length && !analysis.droppedStages.length ? (
-              <Callout tone="ok">Tudo certo por aqui. Você pode completar ou ajustar qualquer dado depois.</Callout>
+              <Callout tone="ok">{tx('as.rev.allGood')}</Callout>
             ) : (
               issues.slice(0, 6).map((i) => (
                 <Callout key={i.id} tone={i.severity === 'error' ? 'bad' : 'warn'} title={i.message}>
@@ -493,7 +497,7 @@ export default function Assistant() {
                 </p>
               )}
               <Button data-primary onClick={() => void finish()} loading={busy} disabled={!!blockReason} aria-describedby={blockReason ? 'assistant-block-reason' : undefined}>
-                <Check className="h-4 w-4" aria-hidden /> Criar meu projeto
+                <Check className="h-4 w-4" aria-hidden /> {tx('as.rev.create')}
               </Button>
             </Actions>
           </div>
@@ -506,49 +510,41 @@ export default function Assistant() {
 
 /** Texto simples do rascunho, para a pessoa copiar quando esta aba fica desatualizada. */
 function draftText(d: AssistantDraft): string {
-  const lines = [`Processo: ${d.name || '(sem nome)'}`];
-  if (d.trigger) lines.push(`Começa quando: ${d.trigger}`);
-  if (d.outcome) lines.push(`Termina com: ${d.outcome}`);
+  const lines = [tr('wz.text.process', { name: d.name || tr('wz.text.noName') })];
+  if (d.trigger) lines.push(tr('as.text.starts', { v: d.trigger }));
+  if (d.outcome) lines.push(tr('as.text.ends', { v: d.outcome }));
   for (const s of d.stages) {
-    lines.push('', `Etapa: ${s.name || '(sem nome)'}${s.skipped ? ' (para completar depois)' : ''}`);
+    lines.push('', tr('wz.text.stage', { name: s.name || tr('wz.text.noName') }) + (s.skipped ? tr('as.text.later') : ''));
     for (const a of s.activities) lines.push(`- ${a.name}${a.owner ? ` · ${a.owner}` : ''}${a.duration !== undefined ? ` · ${fmtNum(a.duration)} ${UNIT_TXT[a.unit]}` : ''}`);
   }
-  if (d.decisions.length) lines.push('', 'Decisões:', ...d.decisions.map((x) => `- ${x.question}`));
-  if (d.volume !== undefined && !d.volumeUnknown) lines.push('', `Volume: ${fmtNum(d.volume)} por ${PERIOD_TXT[d.period]}`);
-  if (d.costPerHour !== undefined && !d.costUnknown) lines.push(`Custo-hora: R$ ${fmtNum(d.costPerHour)}`);
+  if (d.decisions.length) lines.push('', tr('as.text.decisions'), ...d.decisions.map((x) => `- ${x.question}`));
+  if (d.volume !== undefined && !d.volumeUnknown) lines.push('', tr('as.text.volume', { v: fmtNum(d.volume), period: PERIOD_TXT[d.period] }));
+  if (d.costPerHour !== undefined && !d.costUnknown) lines.push(tr('wz.text.cost', { v: fmtNum(d.costPerHour) }));
   return lines.join('\n');
 }
 
 function summary(step: string, d: AssistantDraft): { q: string; a: string } {
-  if (step === 'name') return { q: 'Como você chama esse processo?', a: d.name };
-  if (step === 'trigger') return { q: 'O que faz esse processo começar?', a: d.trigger || 'Pulado — dá para completar depois' };
-  if (step === 'outcome') return { q: 'Como ele termina?', a: d.outcome || 'Pulado — dá para completar depois' };
-  if (step === 'stages') return { q: 'Quais são as grandes etapas?', a: d.stages.map((s) => s.name).join(' → ') };
+  if (step === 'name') return { q: tr('wz.f.name'), a: d.name };
+  if (step === 'trigger') return { q: tr('as.trigger.q'), a: d.trigger || tr('as.sum.skipped') };
+  if (step === 'outcome') return { q: tr('as.sum.endQ'), a: d.outcome || tr('as.sum.skipped') };
+  if (step === 'stages') return { q: tr('as.sum.stagesQ'), a: d.stages.map((s) => s.name).join(' → ') };
   if (step.startsWith('acts:')) {
     const s = d.stages.find((x) => `acts:${x.key}` === step);
     if (!s) return { q: '', a: '' };
-    return { q: `O que acontece em “${s.name}”?`, a: s.skipped ? 'Pulado — dá para completar depois' : s.activities.map((a) => a.name).join('; ') };
+    return { q: tr('as.sum.actsQ', { name: s.name }), a: s.skipped ? tr('as.sum.skipped') : s.activities.map((a) => a.name).join('; ') };
   }
   if (step === 'details') {
     const acts = allActivities(d);
-    return { q: 'Detalhes das atividades', a: `${acts.filter((a) => a.duration !== undefined).length} de ${acts.length} com tempo informado` };
+    return { q: tr('as.sum.detailsQ'), a: tr('as.sum.detailsA', { a: acts.filter((x) => x.duration !== undefined).length, b: acts.length }) };
   }
-  if (step === 'decisions') return { q: 'Há pontos de decisão?', a: d.decisions.length ? d.decisions.map((x) => x.question).join('; ') : 'Nenhum' };
-  if (step === 'volume') return { q: 'Quantas vezes o processo acontece?', a: d.volumeUnknown || d.volume === undefined ? 'Não sei ainda' : `${fmtNum(d.volume)} por ${PERIOD_TXT[d.period]}` };
-  if (step === 'cost') return { q: 'Custo-hora médio', a: d.costUnknown || d.costPerHour === undefined ? 'Não informado' : `R$ ${fmtNum(d.costPerHour)}` };
+  if (step === 'decisions') return { q: tr('as.sum.decQ'), a: d.decisions.length ? d.decisions.map((x) => x.question).join('; ') : tr('as.sum.none') };
+  if (step === 'volume') return { q: tr('as.sum.volQ'), a: d.volumeUnknown || d.volume === undefined ? tr('wz.lean.unknown') : tr('as.perPeriod', { v: fmtNum(d.volume), period: PERIOD_TXT[d.period] }) };
+  if (step === 'cost') return { q: tr('as.sum.costQ'), a: d.costUnknown || d.costPerHour === undefined ? tr('as.rev.notInformed') : tr('as.money', { v: fmtNum(d.costPerHour) }) };
   return { q: '', a: '' };
 }
 
-const PROBLEM_TXT: Record<DecisionProblem, string> = {
-  sem_pergunta: 'falta escrever a pergunta.',
-  atividade_removida: 'a atividade escolhida em “Acontece depois de” foi removida ou está numa etapa que não entra no projeto.',
-  destino_removido: 'a atividade escolhida em “Se a resposta for NÃO” foi removida ou está numa etapa que não entra no projeto.',
-};
-const DROP_TXT: Record<'pulada' | 'sem_atividades' | 'sem_nome', string> = {
-  pulada: 'marcada para completar depois',
-  sem_atividades: 'sem atividades',
-  sem_nome: 'sem nome',
-};
+const PROBLEM_TXT = lazyLabels<DecisionProblem>({ sem_pergunta: 'as.prob.noQuestion', atividade_removida: 'as.prob.actRemoved', destino_removido: 'as.prob.targetRemoved' });
+const DROP_TXT = lazyLabels<'pulada' | 'sem_atividades' | 'sem_nome'>({ pulada: 'as.drop.later', sem_atividades: 'as.drop.noActs', sem_nome: 'wz.text.noNameShort' });
 
 // Perguntas de resposta única: corrigidas a partir do resumo, voltam direto ao resumo.
 const SINGLE_ANSWER = new Set(['name', 'trigger', 'outcome', 'decisions', 'volume', 'cost']);
@@ -564,11 +560,12 @@ function Bubble({ children }: { children: ReactNode }) {
   );
 }
 function Answer({ children, onEdit }: { children: ReactNode; onEdit: () => void }) {
+  const { t: tx } = useI18n();
   return (
     <div className="flex items-start justify-end gap-2 pl-10">
       <p className="min-w-0 rounded-2xl rounded-tr-sm bg-brand/10 px-3 py-2 text-sm text-ink">{children}</p>
       <button type="button" onClick={onEdit} className="mt-1 inline-flex min-h-[32px] shrink-0 items-center gap-1 text-xs font-semibold text-accent hover:underline">
-        <Pencil className="h-3 w-3" aria-hidden /> Corrigir
+        <Pencil className="h-3 w-3" aria-hidden /> {tx('as.fix')}
       </button>
     </div>
   );
@@ -577,18 +574,20 @@ function Actions({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap justify-end gap-2 pt-1">{children}</div>;
 }
 function ReviewRow({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) {
+  const { t: tx } = useI18n();
   return (
     <div className="flex items-start gap-3 px-3 py-2.5">
       <dt className="w-28 shrink-0 text-muted">{label}</dt>
       <dd className="min-w-0 flex-1 text-ink">{value}</dd>
-      <button type="button" onClick={onEdit} className="shrink-0 text-xs font-semibold text-accent hover:underline" aria-label={`Corrigir ${label}`}>
-        Corrigir
+      <button type="button" onClick={onEdit} className="shrink-0 text-xs font-semibold text-accent hover:underline" aria-label={tx('as.fixLabel', { label })}>
+        {tx('as.fix')}
       </button>
     </div>
   );
 }
 
 function TextStep({ q, help, placeholder, nextLabel, value, onChange, examples, onNext, onSkip, required }: { q: string; help: string; placeholder: string; nextLabel: string; value: string; onChange: (v: string) => void; examples?: string[]; onNext: () => void; onSkip?: () => void; required?: boolean }) {
+  const { t: tx } = useI18n();
   return (
     <form
       className="space-y-3"
@@ -601,7 +600,7 @@ function TextStep({ q, help, placeholder, nextLabel, value, onChange, examples, 
       <p className="text-sm text-ink2">{help}</p>
       <Input aria-label={q} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} enterKeyHint="next" />
       {examples && (
-        <div className="flex flex-wrap gap-2" aria-label="Sugestões de nome">
+        <div className="flex flex-wrap gap-2" aria-label={tx('as.name.suggestions')}>
           {examples.map((x) => (
             <button key={x} type="button" onClick={() => onChange(x)} className="min-h-[36px] rounded-full border border-line/20 px-3 text-sm text-ink2 hover:border-accent hover:text-ink">
               {x}
@@ -612,7 +611,7 @@ function TextStep({ q, help, placeholder, nextLabel, value, onChange, examples, 
       <Actions>
         {onSkip && (
           <Button variant="ghost" onClick={onSkip}>
-            Pular por agora
+            {tx('wz.skip')}
           </Button>
         )}
         <Button type="submit" disabled={required && !value.trim()}>
@@ -625,6 +624,7 @@ function TextStep({ q, help, placeholder, nextLabel, value, onChange, examples, 
 
 type Item = { key: string; label: string; meta?: string; raw?: string };
 function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, nextLabel, onNext, onSkip, skipLabel, parse }: { q: string; help: string; items: Item[]; onChange: (items: Item[]) => void; addLabel: string; textPlaceholder: string; nextLabel: string; onNext: () => void; onSkip?: () => void; skipLabel?: string; parse?: (line: string) => Item }) {
+  const { t: tx } = useI18n();
   const [mode, setMode] = useState<'um' | 'texto'>('um');
   const [one, setOne] = useState('');
   const [text, setText] = useState('');
@@ -648,15 +648,15 @@ function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, nextLab
       <Bubble>{q}</Bubble>
       <p className="text-sm text-ink2">{help}</p>
       <Segmented
-        label="Como informar"
+        label={tx('as.list.how')}
         value={mode}
         onChange={(m) => {
           setMode(m);
           setPreview(null);
         }}
         options={[
-          { value: 'um', label: 'Uma por vez' },
-          { value: 'texto', label: 'Escrever em texto' },
+          { value: 'um', label: tx('as.list.one') },
+          { value: 'texto', label: tx('as.list.text') },
         ]}
       />
       {mode === 'um' ? (
@@ -675,7 +675,7 @@ function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, nextLab
         </form>
       ) : preview ? (
         <div className="space-y-2 rounded-lg border border-accent/30 bg-accent/5 p-3">
-          <p className="text-sm font-medium">Entendemos assim — confira antes de adicionar:</p>
+          <p className="text-sm font-medium">{tx('as.list.preview')}</p>
           <ol className="list-decimal space-y-0.5 pl-5 text-sm">
             {preview.map((p) => (
               <li key={p.key}>
@@ -693,38 +693,38 @@ function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, nextLab
                 setMode('um');
               }}
             >
-              <ListPlus className="h-4 w-4" aria-hidden /> Adicionar {preview.length} item(ns)
+              <ListPlus className="h-4 w-4" aria-hidden /> {tx('as.list.addN', { n: preview.length })}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setPreview(null)}>
-              Ajustar o texto
+              {tx('as.list.adjust')}
             </Button>
           </div>
         </div>
       ) : (
         <div className="space-y-2">
-          <Textarea aria-label={`${q} (texto livre)`} value={text} onChange={(e) => setText(e.target.value)} placeholder={textPlaceholder} rows={5} />
-          <p className="text-xs text-muted">Um item por linha, ou separados por “;”, “→” ou “depois”. Você confirma a interpretação antes de adicionar.</p>
+          <Textarea aria-label={tx('as.list.freeText', { q })} value={text} onChange={(e) => setText(e.target.value)} placeholder={textPlaceholder} rows={5} />
+          <p className="text-xs text-muted">{tx('as.list.hint')}</p>
           <Button size="sm" variant="secondary" disabled={!text.trim()} onClick={() => setPreview(parseList(text).map(toItem))}>
-            Organizar em lista
+            {tx('as.list.organize')}
           </Button>
         </div>
       )}
       {items.length > 0 && (
-        <ol className="space-y-1.5" aria-label="Itens adicionados">
+        <ol className="space-y-1.5" aria-label={tx('as.list.added')}>
           {items.map((it, i) => (
             <li key={it.key} className="flex items-center gap-2 rounded-lg border border-line/15 bg-surface2/40 py-1 pl-3 pr-1">
               <span className="w-5 text-xs font-semibold text-muted">{i + 1}.</span>
               <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-2">
-                <input aria-label={`Item ${i + 1}`} value={it.label} onChange={(e) => onChange(items.map((x) => (x.key === it.key ? { ...x, label: e.target.value } : x)))} className="min-h-[36px] min-w-0 flex-1 bg-transparent text-sm text-ink outline-none focus-visible:outline-none" />
+                <input aria-label={tx('as.list.item', { n: i + 1 })} value={it.label} onChange={(e) => onChange(items.map((x) => (x.key === it.key ? { ...x, label: e.target.value } : x)))} className="min-h-[36px] min-w-0 flex-1 bg-transparent text-sm text-ink outline-none focus-visible:outline-none" />
                 {it.meta && <span className="-mt-1 pb-1 text-xs text-muted sm:mt-0 sm:shrink-0 sm:pb-0">{it.meta}</span>}
               </span>
-              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-ink disabled:opacity-30" aria-label={`Mover ${it.label} para cima`} disabled={i === 0} onClick={() => move(i, -1)}>
+              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-ink disabled:opacity-30" aria-label={tx('as.list.up', { label: it.label })} disabled={i === 0} onClick={() => move(i, -1)}>
                 <ArrowUp className="h-4 w-4" />
               </button>
-              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-ink disabled:opacity-30" aria-label={`Mover ${it.label} para baixo`} disabled={i === items.length - 1} onClick={() => move(i, 1)}>
+              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-ink disabled:opacity-30" aria-label={tx('as.list.down', { label: it.label })} disabled={i === items.length - 1} onClick={() => move(i, 1)}>
                 <ArrowDown className="h-4 w-4" />
               </button>
-              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-bad" aria-label={`Remover ${it.label}`} onClick={() => onChange(items.filter((x) => x.key !== it.key))}>
+              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-bad" aria-label={tx('as.list.remove', { label: it.label })} onClick={() => onChange(items.filter((x) => x.key !== it.key))}>
                 <X className="h-4 w-4" />
               </button>
             </li>
@@ -734,7 +734,7 @@ function ListStep({ q, help, items, onChange, addLabel, textPlaceholder, nextLab
       <Actions>
         {onSkip && (
           <Button variant="ghost" onClick={onSkip}>
-            {skipLabel ?? 'Pular por agora'}
+            {skipLabel ?? tx('wz.skip')}
           </Button>
         )}
         <Button data-primary onClick={onNext} disabled={!items.length || items.some((x) => !x.label.trim())}>
@@ -765,13 +765,14 @@ function Chips<T extends string>({ label, value, options, onChange }: { label: s
 }
 
 function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: AssistantDraft; owners: string[]; setAct: (k: string, p: Partial<DraftActivity>) => void; set: (p: Partial<AssistantDraft>) => void; nextLabel: string; onNext: () => void }) {
+  const { t: tx } = useI18n();
   const acts = allActivities(d);
   const i = Math.min(d.detailIndex, Math.max(0, acts.length - 1));
   const a = acts[i];
   if (!a)
     return (
       <div className="space-y-3">
-        <Bubble>Ainda não há atividades para detalhar. Tudo bem, seguimos.</Bubble>
+        <Bubble>{tx('as.det.none')}</Bubble>
         <Actions>
           <Button data-primary onClick={onNext}>{nextLabel}</Button>
         </Actions>
@@ -781,75 +782,75 @@ function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: Assista
   return (
     <div className="space-y-4">
       <Bubble>
-        Vamos detalhar “{a.name}” <span className="font-normal text-muted">({a.stage})</span>
+        {tx('as.det.title', { name: a.name })} <span className="font-normal text-muted">({a.stage})</span>
       </Bubble>
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
-        Atividade {i + 1} de {acts.length} · tudo é opcional — “Não sei” também é resposta.
-        {known && <Badge tone="ok">Tempo e responsável já informados no texto</Badge>}
+        {tx('as.det.count', { n: i + 1, total: acts.length })}
+        {known && <Badge tone="ok">{tx('as.det.known')}</Badge>}
       </p>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Quanto tempo de trabalho leva uma vez? (sem contar espera)</legend>
+        <legend className="text-sm font-medium">{tx('as.det.timeQ')}</legend>
         <div className="flex flex-wrap items-center gap-2">
-          <NumberInput aria-label="Tempo de trabalho" className="w-28" value={a.durationUnknown ? undefined : a.duration} onChange={(v) => setAct(a.key, { duration: v, durationUnknown: false })} placeholder="Ex.: 15" />
-          <Segmented<DurationUnit> label="Unidade do tempo" value={a.unit} onChange={(u) => setAct(a.key, { unit: u })} options={[{ value: 'min', label: 'min' }, { value: 'h', label: 'horas' }, { value: 'd', label: 'dias' }]} />
+          <NumberInput aria-label={tx('wz.s2.time')} className="w-28" value={a.durationUnknown ? undefined : a.duration} onChange={(v) => setAct(a.key, { duration: v, durationUnknown: false })} placeholder={tx('wz.s2.time.ph')} />
+          <Segmented<DurationUnit> label={tx('as.det.unitLabel')} value={a.unit} onChange={(u) => setAct(a.key, { unit: u })} options={[{ value: 'min', label: tx('as.unit.min') }, { value: 'h', label: tx('wz.unit.h') }, { value: 'd', label: tx('wz.unit.d') }]} />
           <button type="button" aria-pressed={!!a.durationUnknown} onClick={() => setAct(a.key, { durationUnknown: !a.durationUnknown, duration: undefined })} className={clsx('min-h-[40px] rounded-full border px-3 text-sm', a.durationUnknown ? 'border-brand bg-brand text-brandInk' : 'border-line/25 text-ink2')}>
-            Ainda não medido
+            {tx('as.det.unmeasured')}
           </button>
         </div>
       </fieldset>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Quem faz isso na prática? Pode ser uma função ou uma área.</legend>
-        {owners.length > 0 && <Chips label="Responsáveis já citados" value={a.owner} options={owners.map((o) => ({ value: o, label: o }))} onChange={(v) => setAct(a.key, { owner: v })} />}
-        <Input aria-label="Quem faz" value={a.owner ?? ''} onChange={(e) => setAct(a.key, { owner: e.target.value || undefined })} placeholder="Ex.: Comprador" />
+        <legend className="text-sm font-medium">{tx('as.det.whoQ')}</legend>
+        {owners.length > 0 && <Chips label={tx('as.det.owners')} value={a.owner} options={owners.map((o) => ({ value: o, label: o }))} onChange={(v) => setAct(a.key, { owner: v })} />}
+        <Input aria-label={tx('as.det.who')} value={a.owner ?? ''} onChange={(e) => setAct(a.key, { owner: e.target.value || undefined })} placeholder={tx('as.det.who.ph')} />
       </fieldset>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Quantas pessoas trabalham nela ao mesmo tempo?</legend>
-        <Chips label="Pessoas" value={a.people !== undefined ? String(Math.min(a.people, 4)) as '1' : undefined} options={[{ value: '1', label: '1' }, { value: '2', label: '2' }, { value: '3', label: '3' }, { value: '4', label: '4 ou mais' }]} onChange={(v) => setAct(a.key, { people: Number(v) })} />
+        <legend className="text-sm font-medium">{tx('as.det.peopleQ')}</legend>
+        <Chips label={tx('as.det.people')} value={a.people !== undefined ? String(Math.min(a.people, 4)) as '1' : undefined} options={[{ value: '1', label: '1' }, { value: '2', label: '2' }, { value: '3', label: '3' }, { value: '4', label: tx('as.det.fourPlus') }]} onChange={(v) => setAct(a.key, { people: Number(v) })} />
       </fieldset>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">O trabalho fica esperando antes desta atividade? (fila, aprovação, cliente)</legend>
-        <Chips label="Espera" value={a.waitState} options={[{ value: 'nao_ha', label: 'Não há espera' }, { value: 'informada', label: 'Sim, informar' }, { value: 'nao_sei', label: 'Não sei' }]} onChange={(v) => setAct(a.key, { waitState: v })} />
+        <legend className="text-sm font-medium">{tx('as.det.waitQ')}</legend>
+        <Chips label={tx('as.det.wait')} value={a.waitState} options={[{ value: 'nao_ha', label: tx('as.det.noWait') }, { value: 'informada', label: tx('as.det.yesInform') }, { value: 'nao_sei', label: tx('as.det.unsure') }]} onChange={(v) => setAct(a.key, { waitState: v })} />
         {a.waitState === 'informada' && (
           <div className="flex items-center gap-2 text-sm">
-            <NumberInput aria-label="Tempo de espera" className="w-28" value={a.wait} onChange={(v) => setAct(a.key, { wait: v })} />
-            <span className="text-ink2">{UNIT_TXT[a.unit]} (mesma unidade do tempo de trabalho)</span>
+            <NumberInput aria-label={tx('as.det.waitTime')} className="w-28" value={a.wait} onChange={(v) => setAct(a.key, { wait: v })} />
+            <span className="text-ink2">{tx('as.det.sameUnit', { unit: UNIT_TXT[a.unit] })}</span>
           </div>
         )}
       </fieldset>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Esta atividade existe para refazer ou corrigir algo?</legend>
-        <Chips label="Retrabalho" value={a.rework} options={[{ value: 'nao', label: 'Não' }, { value: 'sim', label: 'Sim, é retrabalho' }, { value: 'nao_sei', label: 'Não sei' }]} onChange={(v) => setAct(a.key, { rework: v })} />
+        <legend className="text-sm font-medium">{tx('as.det.reworkQ')}</legend>
+        <Chips label={tx('as.det.rework')} value={a.rework} options={[{ value: 'nao', label: tx('as.det.no') }, { value: 'sim', label: tx('as.det.yesRework') }, { value: 'nao_sei', label: tx('as.det.unsure') }]} onChange={(v) => setAct(a.key, { rework: v })} />
         {a.rework === 'sim' && (
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-ink2">Acontece em</span>
-            <NumberInput aria-label="Frequência do retrabalho (%)" className="w-24" value={a.reworkPct} onChange={(v) => setAct(a.key, { reworkPct: v !== undefined ? Math.min(100, v) : undefined })} />
-            <span className="text-ink2">de cada 100 execuções (vazio = não sei)</span>
+            <span className="text-ink2">{tx('as.det.happensIn')}</span>
+            <NumberInput aria-label={tx('as.det.reworkPct')} className="w-24" value={a.reworkPct} onChange={(v) => setAct(a.key, { reworkPct: v !== undefined ? Math.min(100, v) : undefined })} />
+            <span className="text-ink2">{tx('as.det.outOf100')}</span>
           </div>
         )}
       </fieldset>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">O cliente pagaria por esta atividade? (opcional)</legend>
+        <legend className="text-sm font-medium">{tx('as.det.leanQ')}</legend>
         <Chips<LeanClass | 'nao_sei'>
-          label="Classificação Lean"
+          label={tx('as.det.lean')}
           value={a.lean}
           options={[
-            { value: 'VA', label: 'Sim, agrega valor' },
-            { value: 'NNVA', label: 'Não, mas é exigida' },
-            { value: 'W', label: 'Não e poderia não existir' },
-            { value: 'nao_sei', label: 'Não sei' },
+            { value: 'VA', label: tx('as.det.leanVA') },
+            { value: 'NNVA', label: tx('as.det.leanNNVA') },
+            { value: 'W', label: tx('as.det.leanW') },
+            { value: 'nao_sei', label: tx('as.det.unsure') },
           ]}
           onChange={(v) => setAct(a.key, { lean: v })}
         />
-        <p className="text-xs text-muted">“Exigida” inclui controles, leis, segurança e restrições operacionais — não é desperdício.</p>
+        <p className="text-xs text-muted">{tx('as.det.requiredNote')}</p>
       </fieldset>
       <Actions>
         {i > 0 && (
           <Button variant="ghost" onClick={() => set({ detailIndex: i - 1 })}>
-            <ChevronLeft className="h-4 w-4" aria-hidden /> Anterior
+            <ChevronLeft className="h-4 w-4" aria-hidden /> {tx('as.det.prev')}
           </Button>
         )}
         <Button variant="secondary" onClick={onNext}>
-          Pular detalhes restantes
+          {tx('as.det.skipRest')}
         </Button>
         {i < acts.length - 1 ? (
           <Button
@@ -859,7 +860,7 @@ function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: Assista
               set({ detailIndex: i + 1 });
             }}
           >
-            Próxima atividade <ChevronRight className="h-4 w-4" aria-hidden />
+            {tx('as.det.nextAct')} <ChevronRight className="h-4 w-4" aria-hidden />
           </Button>
         ) : (
           <Button
@@ -878,6 +879,7 @@ function DetailsStep({ d, owners, setAct, set, nextLabel, onNext }: { d: Assista
 }
 
 function DecisionsStep({ d, analysis, set, nextLabel, onNext }: { d: AssistantDraft; analysis: DraftAnalysis; set: (p: Partial<AssistantDraft>) => void; nextLabel: string; onNext: () => void }) {
+  const { t: tx } = useI18n();
   // Só atividades que entram no projeto podem ser escolhidas (as de etapas puladas, não).
   const acts = analysis.flat.map(({ s, a }) => ({ key: a.key, name: a.name.trim(), stage: s.name.trim() }));
   const valid = new Set(acts.map((a) => a.key));
@@ -887,8 +889,8 @@ function DecisionsStep({ d, analysis, set, nextLabel, onNext }: { d: AssistantDr
   const blocked = problems.size > 0;
   return (
     <div className="space-y-4">
-      <Bubble>Em algum momento o caminho depende de uma resposta sim ou não?</Bubble>
-      <p className="text-sm text-ink2">Ex.: “Orçamento aprovado?”. Com “sim”, o fluxo segue; com “não”, volta para uma atividade (retrabalho) ou encerra. Pode haver mais de uma decisão depois da mesma atividade: elas ficam em sequência.</p>
+      <Bubble>{tx('as.dec.q')}</Bubble>
+      <p className="text-sm text-ink2">{tx('as.dec.help')}</p>
       {d.decisions.map((x, n) => {
         const problem = problems.get(x.key);
         const afterOk = valid.has(x.afterKey);
@@ -896,23 +898,23 @@ function DecisionsStep({ d, analysis, set, nextLabel, onNext }: { d: AssistantDr
         return (
           <div key={x.key} className={clsx('space-y-3 rounded-lg border p-3', problem ? 'border-bad/50 bg-bad/5' : 'border-violet/30 bg-violet/5')} data-testid="assistant-decision">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">Decisão {n + 1}</p>
-              <Button size="sm" variant="ghost" aria-label={`Remover decisão ${n + 1}`} onClick={() => set({ decisions: d.decisions.filter((y) => y.key !== x.key) })}>
+              <p className="text-sm font-semibold">{tx('as.rev.decN', { n: n + 1 })}</p>
+              <Button size="sm" variant="ghost" aria-label={tx('as.dec.removeAria', { n: n + 1 })} onClick={() => set({ decisions: d.decisions.filter((y) => y.key !== x.key) })}>
                 <Trash2 className="h-4 w-4" aria-hidden />
               </Button>
             </div>
             {problem && (
               <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-bad">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {problem === 'sem_pergunta' ? 'Escreva a pergunta desta decisão (ou remova a decisão).' : `${PROBLEM_TXT[problem].charAt(0).toUpperCase()}${PROBLEM_TXT[problem].slice(1)} Escolha outra atividade ou remova a decisão.`}
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {problem === 'sem_pergunta' ? tx('as.dec.writeQ') : tx('as.dec.chooseOther', { problem: `${PROBLEM_TXT[problem].charAt(0).toUpperCase()}${PROBLEM_TXT[problem].slice(1)}` })}
               </p>
             )}
-            <Field label="Pergunta">{(f) => <Input {...f} value={x.question} onChange={(e) => setDec(x.key, { question: e.target.value })} placeholder="Ex.: Orçamento aprovado?" />}</Field>
-            <Field label="Acontece depois de qual atividade?">
+            <Field label={tx('as.dec.question')}>{(f) => <Input {...f} value={x.question} onChange={(e) => setDec(x.key, { question: e.target.value })} placeholder={tx('as.dec.question.ph')} />}</Field>
+            <Field label={tx('as.dec.after')}>
               {(f) => (
                 <Select {...f} value={afterOk ? x.afterKey : ''} onChange={(e) => setDec(x.key, { afterKey: e.target.value })} aria-invalid={!afterOk || undefined}>
                   {!afterOk && (
                     <option value="" disabled>
-                      Escolha a atividade…
+                      {tx('as.dec.chooseAct')}
                     </option>
                   )}
                   {acts.map((a) => (
@@ -923,18 +925,18 @@ function DecisionsStep({ d, analysis, set, nextLabel, onNext }: { d: AssistantDr
                 </Select>
               )}
             </Field>
-            <Field label="Se a resposta for NÃO, vai para…">
+            <Field label={tx('wz.s2.noTo')}>
               {(f) => (
                 <Select {...f} value={noOk ? x.noTarget : ''} onChange={(e) => setDec(x.key, { noTarget: e.target.value })} aria-invalid={!noOk || undefined}>
                   {!noOk && (
                     <option value="" disabled>
-                      Escolha para onde vai…
+                      {tx('as.dec.chooseTo')}
                     </option>
                   )}
-                  <option value="__end">Encerrar o processo</option>
+                  <option value="__end">{tx('wz.s2.endProcess')}</option>
                   {acts.map((a) => (
                     <option key={a.key} value={a.key}>
-                      Voltar/ir para: {a.stage} › {a.name}
+                      {tx('as.dec.goTo')} {a.stage} › {a.name}
                     </option>
                   ))}
                 </Select>
@@ -945,15 +947,15 @@ function DecisionsStep({ d, analysis, set, nextLabel, onNext }: { d: AssistantDr
       })}
       {blocked && (
         <p className="text-sm text-ink2" data-testid="decisions-block-reason">
-          Para continuar, corrija ou remova as decisões destacadas.
+          {tx('as.dec.blocked')}
         </p>
       )}
       <Actions>
         <Button variant="secondary" onClick={add} disabled={!acts.length}>
-          <Plus className="h-4 w-4" aria-hidden /> {d.decisions.length ? 'Outra decisão' : 'Sim, adicionar decisão'}
+          <Plus className="h-4 w-4" aria-hidden /> {d.decisions.length ? tx('as.dec.another') : tx('as.dec.yesAdd')}
         </Button>
         <Button data-primary onClick={onNext} disabled={blocked}>
-          {d.decisions.length ? nextLabel : `Não há decisões — ${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}`} <ChevronRight className="h-4 w-4" aria-hidden />
+          {d.decisions.length ? nextLabel : tx('as.dec.noneNext', { next: `${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}` })} <ChevronRight className="h-4 w-4" aria-hidden />
         </Button>
       </Actions>
     </div>
@@ -962,6 +964,7 @@ function DecisionsStep({ d, analysis, set, nextLabel, onNext }: { d: AssistantDr
 
 /** "Aha!": o que acabou de ser mapeado, com números reais do processo criado. */
 function Success({ w, durable, cleanupFailed, reused, warnings, onOpen }: { w: Workspace; durable: boolean; cleanupFailed: boolean; reused: boolean; warnings: number; onOpen: (path: string) => void }) {
+  const { t: tx } = useI18n();
   const p = w.asIs;
   const tasks = p.activities.filter((a) => a.type === 'task');
   const owners = new Set(tasks.map((a) => a.owner?.trim()).filter(Boolean)).size;
@@ -974,16 +977,16 @@ function Success({ w, durable, cleanupFailed, reused, warnings, onOpen }: { w: W
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), []);
   const facts = [
-    plural(tasks.length, 'atividade em ordem', 'atividades em ordem'),
-    owners ? plural(owners, 'responsável identificado', 'responsáveis identificados') : null,
-    decisions ? plural(decisions, 'ponto de decisão', 'pontos de decisão') : null,
-    recs ? plural(recs, 'oportunidade de melhoria para avaliar', 'oportunidades de melhoria para avaliar') : null,
+    plural(tasks.length, 'as.n.inOrder.1', 'as.n.inOrder.n'),
+    owners ? plural(owners, 'as.n.owner.1', 'as.n.owner.n') : null,
+    decisions ? plural(decisions, 'as.n.decPoint.1', 'as.n.decPoint.n') : null,
+    recs ? plural(recs, 'as.n.opp.1', 'as.n.opp.n') : null,
   ].filter(Boolean) as string[];
   const download = async () => {
     try {
       await shareProject(w);
     } catch {
-      toast('bad', 'Não foi possível gerar o arquivo do projeto. Tente de novo.');
+      toast('bad', tx('as.ok.fileFail'));
     }
   };
   return (
@@ -993,16 +996,16 @@ function Success({ w, durable, cleanupFailed, reused, warnings, onOpen }: { w: W
           {durable ? <Sparkles className="h-7 w-7" /> : <AlertTriangle className="h-7 w-7" />}
         </span>
         <h1 ref={headingRef} tabIndex={-1} className="mt-4 text-2xl font-extrabold tracking-tight outline-none">
-          {durable ? 'Excelente! ' : ''}Seu processo foi mapeado com {plural(p.stageOrder.length, 'etapa', 'etapas')}.
+          {durable ? tx('as.ok.titleDurable', { stages: plural(p.stageOrder.length, 'as.n.stage.1', 'as.n.stage.n') }) : tx('as.ok.title', { stages: plural(p.stageOrder.length, 'as.n.stage.1', 'as.n.stage.n') })}
         </h1>
         {durable ? (
           <p className="mt-2 text-ink2" data-testid="success-storage">
-            “{p.name}” foi criado e está salvo neste aparelho, com o mapa do processo pronto para ver.
+            {tx('as.ok.saved', { name: p.name })}
           </p>
         ) : (
           <div className="mt-3 text-left" data-testid="success-storage">
-            <Callout tone="warn" title="Ainda não está salvo neste aparelho" action={<Button size="sm" onClick={() => void download()}><Download className="h-4 w-4" aria-hidden /> Baixar arquivo do projeto</Button>}>
-              O navegador bloqueou o armazenamento local: “{p.name}” existe só nesta aba e some ao fechá-la. Baixe o arquivo do projeto e importe-o depois em “Meus projetos → Importar projeto”.
+            <Callout tone="warn" title={tx('as.ok.notSaved')} action={<Button size="sm" onClick={() => void download()}><Download className="h-4 w-4" aria-hidden /> {tx('as.ok.download')}</Button>}>
+              {tx('as.ok.notSavedBody', { name: p.name })}
             </Callout>
           </div>
         )}
@@ -1016,40 +1019,40 @@ function Success({ w, durable, cleanupFailed, reused, warnings, onOpen }: { w: W
             {diagReady ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-ok" aria-hidden /> : <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden />}
             <span>
               {!diagReady
-                ? 'Diagnóstico ainda não calculado: falta a duração das atividades. Informe o tempo de cada atividade em “Dados”.'
+                ? tx('as.ok.diagNo')
                 : timed < tasks.length
-                  ? `Diagnóstico calculado com ${timed} de ${tasks.length} atividades com duração; complete as demais para um resultado completo.`
-                  : 'Diagnóstico calculado com a duração de todas as atividades.'}
+                  ? tx('as.ok.diagPartial', { a: timed, b: tasks.length })
+                  : tx('as.ok.diagAll')}
             </span>
           </li>
           {warnings > 0 && (
             <li className="flex items-start gap-2 text-ink2">
-              <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden /> {plural(warnings, 'ponto para completar quando puder', 'pontos para completar quando puder')}
+              <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden /> {plural(warnings, 'as.n.warn.1', 'as.n.warn.n')}
             </li>
           )}
         </ul>
         {reused && (
           <p className="mt-4 text-xs text-muted" data-testid="success-reused">
-            Este rascunho já tinha virado este projeto; nada foi criado de novo.
+            {tx('as.ok.reused')}
           </p>
         )}
         {cleanupFailed && (
           <p className="mt-4 text-xs text-muted" data-testid="success-cleanup">
-            O projeto foi criado. Não conseguimos apagar o rascunho antigo deste aparelho; ele não será reaberto nem criará outro projeto.
+            {tx('as.ok.cleanup')}
           </p>
         )}
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
           {diagReady ? (
             <Button size="lg" onClick={() => onOpen('plano')}>
-              Ver meu Plano de Ação <ChevronRight className="h-4 w-4" aria-hidden />
+              {tx('as.ok.plan')} <ChevronRight className="h-4 w-4" aria-hidden />
             </Button>
           ) : (
             <Button size="lg" onClick={() => onOpen('dados')}>
-              Informar as durações <ChevronRight className="h-4 w-4" aria-hidden />
+              {tx('as.ok.durations')} <ChevronRight className="h-4 w-4" aria-hidden />
             </Button>
           )}
           <Button size="lg" variant="secondary" onClick={() => onOpen(warnings ? 'validar' : 'mapa')}>
-            <MapIcon className="h-4 w-4" aria-hidden /> {warnings ? 'Revisar os dados' : 'Ver o mapa'}
+            <MapIcon className="h-4 w-4" aria-hidden /> {warnings ? tx('as.ok.review') : tx('as.ok.map')}
           </Button>
         </div>
       </div>

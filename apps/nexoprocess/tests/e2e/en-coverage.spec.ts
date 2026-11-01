@@ -10,7 +10,7 @@ const GOLDEN = JSON.parse(readFileSync(new URL('./golden/pt-screens.json', impor
 const REPORT = process.env.NEXO_EN_REPORT;
 const COMPLETE: string[] = (process.env.NEXO_EN_COMPLETE ?? '').split(',').filter(Boolean);
 
-const ALLOWED = /\b(AS-IS|TO-BE|BPMN|XML|SVG|PNG|ZIP|XLSX|CSV|JSON|PDF|FMEA|RPN|RACI|Lean|NexoProcess|IndexedDB|Excel|Safari|iPhone|iPad|Camunda|bpmn\.io|bpmn-moddle|ERP|IA|AI|LGPD|P\d+|R|A|C|I|OK)\b/g;
+const ALLOWED = /\b(AS-IS|TO-BE|BPMN|XML|SVG|PNG|ZIP|XLSX|CSV|JSON|PDF|FMEA|RPN|RACI|Lean|NexoProcess|IndexedDB|Excel|Safari|iPhone|iPad|Camunda|bpmn\.io|bpmn-moddle|ERP|IA|AI|LGPD|P\d+|R|A|C|I|OK|Item|Volume|min|h)\b/g;
 const hasWords = (line: string) => /[A-Za-zÀ-ÿ]{2,}/.test(line.replace(ALLOWED, ' ').replace(/[\d.,:;·×÷≥≤→—–%$/()#+\-_=<>"“”]+/g, ' '));
 
 async function capture(page: Page): Promise<string> {
@@ -125,4 +125,74 @@ test('EN cobertura: formulário (passos, erros, decisão e revisão)', async ({ 
   await check('form-4-revisao-confirmada', page);
   await page.reload();
   await check('form-rascunho-restaurado', page);
+});
+
+test('EN cobertura: assistente — roteiro completo', async ({ page }) => {
+  test.setTimeout(120_000);
+  await prepare(page);
+  await page.addInitScript(() => localStorage.setItem('nexo-ui.lang', 'en'));
+  await page.goto('/app/novo');
+  await check('assistente', page);
+  await check('asst-nome', page);
+  await page.getByLabel('Let’s start. What do you call this process?').fill('Purchasing');
+  await page.getByRole('button', { name: 'Continue to the start of the process' }).click();
+  await check('asst-inicio', page);
+  await page.getByLabel('What makes this process start?').fill('a department requests a material');
+  await page.getByRole('button', { name: 'Continue to the end of the process' }).click();
+  await page.getByRole('button', { name: 'Skip for now' }).click();
+  await check('asst-etapas-vazio', page);
+  const add = async (label: string, v: string) => {
+    await page.getByRole('textbox', { name: label, exact: true }).fill(v);
+    await page.getByRole('textbox', { name: label, exact: true }).press('Enter');
+  };
+  await add('Add stage', 'Request');
+  await add('Add stage', 'Approval');
+  await page.getByRole('radio', { name: 'Write as text' }).click();
+  await check('asst-etapas-texto', page);
+  await page.getByLabel('What are the main stages, in the order they happen? (free text)').fill('Quotation\nPurchase');
+  await page.getByRole('button', { name: 'Organize into a list' }).click();
+  await check('asst-etapas-previa', page);
+  await page.getByRole('button', { name: /Add 2 item/ }).click();
+  await check('asst-etapas-lista', page);
+  await page.locator('[data-primary]').click();
+  await check('asst-atividades-vazio', page);
+  await page.getByRole('radio', { name: 'Write as text' }).click();
+  await page.getByLabel(/\(free text\)$/).fill('Approve by Manager (15 min)\nReview quote by Buyer');
+  await page.getByRole('button', { name: 'Organize into a list' }).click();
+  await page.getByRole('button', { name: /Add 2 item/ }).click();
+  await check('asst-atividades-lista', page);
+  await page.locator('[data-primary]').click();
+  await page.getByRole('button', { name: 'Not sure yet — I’ll complete it later' }).click();
+  await add('Add activity', 'Register order');
+  await page.locator('[data-primary]').click();
+  await add('Add activity', 'Send to supplier');
+  await page.locator('[data-primary]').click();
+  await check('asst-detalhes-1', page);
+  await page.getByRole('radio', { name: 'No waiting' }).click();
+  await page.getByRole('radio', { name: 'Yes, it is rework' }).click();
+  await check('asst-detalhes-retrabalho', page);
+  await page.getByRole('radio', { name: 'Yes, it adds value' }).click();
+  await page.getByRole('button', { name: 'Next activity' }).click();
+  await check('asst-detalhes-2', page);
+  await page.getByRole('button', { name: 'Skip remaining details' }).click();
+  await check('asst-decisoes-vazio', page);
+  await page.getByRole('button', { name: 'Yes, add a decision' }).click();
+  await check('asst-decisoes-erro', page);
+  await page.getByLabel('Question', { exact: true }).fill('Quote approved?');
+  await check('asst-decisoes', page);
+  await page.locator('[data-primary]').click();
+  await check('asst-volume', page);
+  await page.getByLabel('Runs').fill('300');
+  await page.locator('[data-primary]').click();
+  await check('asst-custo', page);
+  await page.getByRole('button', { name: 'Not sure / I’d rather not say' }).click();
+  await check('asst-revisao', page);
+  await page.getByLabel('Got it: create the project without these items').check();
+  await check('asst-revisao-confirmada', page);
+  await page.reload();
+  await check('asst-rascunho-restaurado', page);
+  await page.getByLabel('Got it: create the project without these items').check();
+  await page.getByRole('button', { name: 'Create my project' }).click();
+  await expect(page.getByTestId('assistant-success')).toBeVisible();
+  await check('asst-sucesso', page);
 });

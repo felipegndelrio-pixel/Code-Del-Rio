@@ -4,7 +4,7 @@ import { newActivity, newProcess, normalizeStages } from './factory';
 import type { Activity, DurationUnit, LeanClass, Period, ProcessModel } from './types';
 import { parseLocaleNumber, uid } from './units';
 
-import { tr } from '../i18n';
+import { getActiveLocale, tr } from '../i18n';
 export type Unknown = 'nao_sei';
 export interface DraftActivity {
   key: string;
@@ -64,12 +64,16 @@ export function emptyDraft(): AssistantDraft {
  * (";", " → ", " -> ", "(e) depois", "(e) em seguida", "(e) então"), removendo
  * numeração ("1.", "2)", "-", "•").
  */
+/** O PT usa exatamente as expressões de sempre; o EN acrescenta as palavras em inglês. */
+const en = () => getActiveLocale() === 'en';
+const unitRe = () => (en() ? '(min(?:ute|uto)?s?|h(?:our|ora)?s?|hr?s?|d(?:ay|ia)?s?)' : '(min(?:uto)?s?|h(?:ora)?s?|hr?s?|d(?:ia)?s?)');
+
 export function parseList(text: string): string[] {
   const normalized = text
     .replace(/\r/g, '')
     .replace(/\s*(?:→|->|=>)\s*/g, '\n')
     .replace(/;\s*/g, '\n')
-    .replace(/,?\s+(?:e\s+)?(?:depois|em seguida|então|após isso|por fim|finalmente)\s+/gi, '\n');
+    .replace(en() ? /,?\s+(?:and\s+)?(?:then|next|after that|finally|depois|em seguida|então|após isso|por fim|finalmente)\s+/gi : /,?\s+(?:e\s+)?(?:depois|em seguida|então|após isso|por fim|finalmente)\s+/gi, '\n');
   return normalized
     .split('\n')
     .map((s) => s.replace(/^\s*(?:\d+\s*[.)º°-]\s*|[-•*]\s+)/, '').trim())
@@ -78,14 +82,14 @@ export function parseList(text: string): string[] {
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1));
 }
 
-const UNIT_RE = '(min(?:uto)?s?|h(?:ora)?s?|hr?s?|d(?:ia)?s?)';
+
 /** Extrai duração ("(10 min)", "- 2h", "1,5 horas") e responsável ("por Atendente") de uma linha. */
 export function parseActivityLine(line: string): { name: string; duration?: number; unit?: DurationUnit; owner?: string } {
   let name = line.trim();
   let duration: number | undefined;
   let unit: DurationUnit | undefined;
   let owner: string | undefined;
-  const dur = new RegExp(`[\\s(,–—-]*\\(?\\s*(\\d+(?:[.,]\\d+)?)\\s*${UNIT_RE}\\s*\\)?\\s*$`, 'i').exec(name);
+  const dur = new RegExp(`[\\s(,–—-]*\\(?\\s*(\\d+(?:[.,]\\d+)?)\\s*${unitRe()}\\s*\\)?\\s*$`, 'i').exec(name);
   if (dur) {
     const n = parseLocaleNumber(dur[1]);
     if (n !== undefined && !Number.isNaN(n)) {
@@ -95,7 +99,7 @@ export function parseActivityLine(line: string): { name: string; duration?: numb
       name = name.slice(0, dur.index).trim();
     }
   }
-  const by = /\s+(?:por|pelo|pela|feito por|responsável:?)\s+(?:o |a )?([A-ZÀ-Ú][\wÀ-ú ]{1,40})$/u.exec(name);
+  const by = (en() ? /\s+(?:[Bb]y|[Dd]one by|[Oo]wner:?|por|pelo|pela|feito por|responsável:?)\s+(?:the )?([A-ZÀ-Ú][\wÀ-ú ]{1,40})$/u : /\s+(?:por|pelo|pela|feito por|responsável:?)\s+(?:o |a )?([A-ZÀ-Ú][\wÀ-ú ]{1,40})$/u).exec(name);
   if (by) {
     owner = by[1].trim();
     name = name.slice(0, by.index).trim();
