@@ -70,6 +70,12 @@ export interface GumroadPurchase {
 
 export type VerifyResult = { kind: 'ok'; purchase: GumroadPurchase } | { kind: 'not_found' } | { kind: 'unavailable'; reason: string };
 
+/** Só para GUMROAD_DEBUG_REASONS: o verify preenche status HTTP e a mensagem pública da API. Não altera o retorno. */
+export interface VerifyTrace {
+  http?: number;
+  message?: string;
+}
+
 /**
  * product_id no formato da Gumroad: base64url com padding "=" até comprimento múltiplo de 4
  * (determinístico). Aceita a variável colada com ou sem "==". Fora do formato, devolve o valor
@@ -82,8 +88,14 @@ export function gumroadProductIdForApi(raw: string): string {
   return m[1] + '='.repeat((4 - (m[1].length % 4)) % 4);
 }
 
+async function publicMessage(r: Response): Promise<string | undefined> {
+  const body: unknown = await r.json().catch(() => null);
+  const m = body && typeof body === 'object' ? (body as { message?: unknown }).message : undefined;
+  return typeof m === 'string' ? m : undefined;
+}
+
 /** POST /v2/licenses/verify. Sem access_token (o endpoint não exige). Nunca lança. */
-export async function verifyGumroadLicense(productId: string, licenseKey: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<VerifyResult> {
+export async function verifyGumroadLicense(productId: string, licenseKey: string, fetchImpl: typeof fetch, timeoutMs: number, trace?: VerifyTrace): Promise<VerifyResult> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -93,12 +105,19 @@ export async function verifyGumroadLicense(productId: string, licenseKey: string
       body: new URLSearchParams({ product_id: gumroadProductIdForApi(productId), license_key: licenseKey, increment_uses_count: 'false' }).toString(),
       signal: ctrl.signal,
     });
-    if (r.status === 404) return { kind: 'not_found' };
+    if (trace) trace.http = r.status;
+    if (r.status === 404) {
+      if (trace) trace.message = await publicMessage(r);
+      return { kind: 'not_found' };
+    }
     if (!r.ok) return { kind: 'unavailable', reason: `http_${r.status}` };
     const body: unknown = await r.json().catch(() => null);
     if (!body || typeof body !== 'object') return { kind: 'unavailable', reason: 'json_invalido' };
-    const b = body as { success?: unknown; purchase?: unknown };
-    if (b.success !== true) return { kind: 'not_found' };
+    const b = body as { success?: unknown; purchase?: unknown; message?: unknown };
+    if (b.success !== true) {
+      if (trace && typeof b.message === 'string') trace.message = b.message;
+      return { kind: 'not_found' };
+    }
     if (!b.purchase || typeof b.purchase !== 'object') return { kind: 'unavailable', reason: 'sem_purchase' };
     return { kind: 'ok', purchase: b.purchase as GumroadPurchase };
   } catch (e) {
@@ -193,6 +212,8 @@ export interface GumroadDeps {
   timeoutMs?: number;
   now?: () => number;
   missing?: string[];
+  /** GUMROAD_DEBUG_REASONS === "1" (só staging/Preview): respostas não-200 ganham o campo "debug". */
+  debugReasons?: boolean;
 }
 
 const json = (status: number, body: unknown) =>
@@ -207,6 +228,29 @@ const MANUAL = {
   message_pt: 'Encontramos sua compra na Gumroad, mas não conseguimos ativá-la automaticamente. Fale com o suporte para ativarmos para você.',
 };
 const UNAVAILABLE = { error: 'falha_verificacao', message: 'We could not verify your license right now. Please try again shortly.' };
+
+// ---------------------------------------------------------------- depuração (GUMROAD_DEBUG_REASONS=1; NUNCA em Production)
+const BASE64URL_PADDED = /^[A-Za-z0-9_-]+={0,2}$/;
+
+/** Forma do product_id sem revelar o valor: tamanho, formato, codepoints fora do alfabeto e impressão digital curta. */
+async function describeId(v: string) {
+  const outside = [...new Set([...v].filter((c) => !/[A-Za-z0-9_=-]/.test(c)).map((c) => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`))].slice(0, 12);
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+  return {
+    length: v.length,
+    base64url_padded_ok: BASE64URL_PADDED.test(v) && v.length % 4 === 0,
+    outside_charset: outside,
+    // 8 hex do SHA-256: permite ao fundador comparar com o id da Gumroad no PC (mesmo hash = mesmo valor) sem expô-lo.
+    sha256_8: [...digest.slice(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join(''),
+  };
+}
+
+/** Texto público da API da Gumroad, sem a chave nem e-mails, no máximo 200 caracteres. */
+function scrubMessage(m: string, ...secrets: (string | null | undefined)[]): string {
+  let out = m;
+  for (const s of secrets) if (s) out = out.split(s).join('[removido]');
+  return out.replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[email]').slice(0, 200);
+}
 
 function notConfigured(route: string, missing: string[] | undefined) {
   const faltando = missing?.length ? missing : undefined;
@@ -223,6 +267,7 @@ export function gumroadDepsFromEnv(env: Record<string, string | undefined>, base
     allowTest: env.GUMROAD_ALLOW_TEST === '1',
     reverifyAfterSec: Number.isFinite(reverify) && reverify >= 0 ? reverify : 86_400,
     pingSecret: env.GUMROAD_PING_SECRET?.trim() || null,
+    ...(env.GUMROAD_DEBUG_REASONS === '1' ? { debugReasons: true } : {}),
     missing: [...(base.missing ?? []), ...(productId ? [] : ['GUMROAD_PRODUCT_ID'])],
   };
 }
@@ -258,14 +303,31 @@ export async function handleGumroadLicense(req: Request, deps: GumroadDeps): Pro
     email = normalizeEmail(body.email);
     if (!email) return json(400, { error: 'email_invalido', message: 'Enter a valid email.' });
   }
-  const v = await verifyGumroadLicense(deps.productId, key, deps.fetchImpl ?? fetch, deps.timeoutMs ?? 5000);
+  const trace: VerifyTrace | undefined = deps.debugReasons ? {} : undefined;
+  const v = await verifyGumroadLicense(deps.productId, key, deps.fetchImpl ?? fetch, deps.timeoutMs ?? 5000, trace);
+  // Desligado (padrão), nada é calculado e o corpo das respostas é idêntico ao de antes.
+  const debug = async (stage: string, extra: Record<string, unknown> = {}): Promise<{ debug?: Record<string, unknown> }> => {
+    if (!deps.debugReasons) return {};
+    const sent = gumroadProductIdForApi(deps.productId as string);
+    return {
+      debug: {
+        stage,
+        ...extra,
+        gumroad_http_status: trace?.http ?? null,
+        ...(trace?.message ? { gumroad_message: scrubMessage(trace.message, key, email) } : {}),
+        configured_product_id: await describeId(deps.productId as string),
+        sent_to_api_product_id: await describeId(sent),
+        sent_equals_configured: sent === deps.productId,
+      },
+    };
+  };
   if (v.kind === 'unavailable') {
     console.error(`gumroad verify indisponível (${v.reason}) (${maskEmail(email)})`);
-    return json(502, UNAVAILABLE);
+    return json(502, { ...UNAVAILABLE, ...(await debug('verify_unavailable', { reason: v.reason })) });
   }
   if (v.kind === 'not_found') {
     console.log(`gumroad verify: chave não encontrada (${maskEmail(email)})`);
-    return json(404, NOT_FOUND);
+    return json(404, { ...NOT_FOUND, ...(await debug('verify_not_found')) });
   }
   const d = decide(v.purchase, { productId: deps.productId, allowTest: !!deps.allowTest }, email);
   let applied: Applied;
@@ -273,7 +335,7 @@ export async function handleGumroadLicense(req: Request, deps: GumroadDeps): Pro
     applied = await applyDecision(d, deps.store, new Date(nowMs).toISOString());
   } catch (e) {
     console.error(`gumroad: falha ao gravar (${maskEmail(email)}) — ${e instanceof Error ? e.message : String(e)}`);
-    return json(502, { error: 'falha_armazenamento', message: UNAVAILABLE.message });
+    return json(502, { error: 'falha_armazenamento', message: UNAVAILABLE.message, ...(await debug('storage_failed')) });
   }
   console.log(`gumroad ${d.kind} → ${applied.status}${applied.status === 'rejected' ? ` (${applied.reason})` : ''} (${maskEmail(email)})`);
   if (applied.status === 'rejected' && MANUAL_REASONS.has(applied.reason)) {
@@ -289,9 +351,13 @@ export async function handleGumroadLicense(req: Request, deps: GumroadDeps): Pro
       }
       if (manual === 'active') return issue(deps.privateJwk, email, now, deps.ttlDays);
     }
-    return json(422, MANUAL);
+    return json(422, { ...MANUAL, ...(await debug('reject', { reason: applied.reason })) });
   }
-  if (applied.status !== 'active') return json(404, NOT_FOUND); // mesma resposta para todos os "não"
+  if (applied.status !== 'active') {
+    // mesma resposta para todos os "não"
+    const extra = applied.status === 'rejected' ? await debug('reject', { reason: applied.reason }) : await debug('applied', { status: applied.status, decision: d.kind });
+    return json(404, { ...NOT_FOUND, ...extra });
+  }
   return issue(deps.privateJwk, email, now, deps.ttlDays);
 }
 

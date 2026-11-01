@@ -37,11 +37,25 @@ Em Settings → Variables and Secrets → Production. São só nomes; os valores
 | `VITE_EN_REFUND_URL` | URL pública da política de reembolso EN | idem |
 | `GUMROAD_REVERIFY_AFTER_SEC` | opcional (padrão 86400) | texto |
 | `GUMROAD_ALLOW_TEST` | **não criar** (compra de teste desligada) | — |
+| `GUMROAD_DEBUG_REASONS` | **SÓ no ambiente Preview/staging, NUNCA em Production.** Exatamente `1` liga o campo `debug` nas respostas de erro de `/api/gumroad-license` (ver §2.1). Qualquer outro valor, ou ausente, não muda nada | texto (só Preview) |
 
 - **Build de venda a partir desta branch exige as 4 variáveis do EN** (`VITE_GUMROAD_CHECKOUT_URL`, `VITE_EN_TERMS_URL`, `VITE_EN_PRIVACY_URL`, `VITE_EN_REFUND_URL`; https, sem marcador): o `check-sale-env` recusa o build sem elas. Vale para qualquer build de venda daqui, PT ou EN. A troca PT de sábado usa a TAG `v2.5.0-rc1`, que não tem essa exigência. Crie as páginas legais EN antes de montar este build.
 - **A produção atual foi publicada por upload direto (wrangler).** As `VITE_*` do painel **não** valem nesse caminho: elas entram no build feito no seu computador (§4.1, via `Read-Host`). Mudou uma `VITE_*`? Refaça o build e o deploy. `GUMROAD_*`, `LICENSE_*` e `SUPABASE_*` ficam no painel e as functions leem a cada requisição.
 - As variáveis atuais (`LICENSE_PRIVATE_JWK`, `SUPABASE_*`, `HOTMART_*`, `VITE_LICENSE_*`, `VITE_SUPPORT_EMAIL`) continuam iguais.
 - Sem as `VITE_EN_*`, a tela EN simplesmente não mostra os links legais. Melhor publicar as páginas legais antes de vender (CDC/LGPD; nos EUA, A VALIDAR com assessoria).
+
+### 2.1 Depuração do staging: `GUMROAD_DEBUG_REASONS` (branch `wip/staging-debug`)
+
+**NUNCA em Production.** Serve para descobrir por que o login real devolve 404 quando não há como ler os logs da Function. Só vale se o valor for exatamente `1`. Desligada, as respostas são idênticas às de hoje (teste automatizado).
+
+Ligada, as respostas **não-200** de `/api/gumroad-license` que vêm depois da validação de entrada (404, 422, 502) ganham o campo `debug`:
+- `stage`: `verify_not_found` (a Gumroad não encontrou a chave), `verify_unavailable` (+ `reason`), `reject` (+ `reason`: `outro_produto`, `email_diferente`, `compra_de_teste`, `assinatura`, `id_fora_do_formato`, `sem_email`), `applied` (+ `status` e `decision`; o banco não deu acesso) ou `storage_failed`.
+- `gumroad_http_status` e, se a API mandou, `gumroad_message` (texto público da Gumroad, sem a chave nem e-mails, no máximo 200 caracteres).
+- `configured_product_id` e `sent_to_api_product_id`: `length`, `base64url_padded_ok` (casa com base64url com "=" e comprimento múltiplo de 4), `outside_charset` (só os codepoints `U+XXXX` fora de `A-Za-z0-9_=-`, por exemplo `U+200B`, espaço de largura zero que o `trim` não remove) e `sha256_8` (8 hex do SHA-256 do valor). `sent_equals_configured` diz se a variável foi completada com `==`.
+
+**Nunca aparecem:** e-mail, chave, sale_id, token nem o valor de qualquer variável (testes conferem). O `sha256_8` não revela o valor, mas permite compará-lo com o product_id que a Gumroad mostra no seu PC: se o hash do id correto for diferente do `configured_product_id.sha256_8`, a variável do Preview tem um caractere diferente (por exemplo `O` no lugar de `0`, que o `outside_charset` não detecta). Com Python (o fundador já usa): `python -c "import hashlib;print(hashlib.sha256('PRODUCT_ID_AQUI'.encode()).hexdigest()[:8])"` (8 caracteres; o product_id vai entre aspas simples, com os `==`, exatamente como a Gumroad mostra).
+
+**Depois de resolver:** apague a variável do Preview e publique de novo (variável só vale a partir do próximo deployment). `check-sale-env` na branch principal para recusar essa variável no ambiente local: não incluído aqui (não toca `wip/en-foundation`); A VALIDAR se vale a pena.
 
 ## 3. Banco (Supabase) — exige GO seu
 

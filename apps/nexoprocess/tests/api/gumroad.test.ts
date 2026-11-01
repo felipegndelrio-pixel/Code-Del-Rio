@@ -481,3 +481,129 @@ describe('supabaseStore.purchaseState', () => {
     await expect(mk('x', 500).purchaseState!('gumroad', 'T1')).rejects.toThrow('HTTP 500');
   });
 });
+
+describe('GUMROAD_DEBUG_REASONS (só staging): campo "debug" nas respostas não-200', () => {
+  const body = async (r: Response) => (await r.json()) as Record<string, any>;
+  const call = (f: ReturnType<typeof fakeStore>, respond: () => Response | Promise<Response>, over: Partial<GumroadDeps> = {}, email = 'customer@example.com') =>
+    handleGumroadLicense(req({ email, license_key: KEY }), deps(f.store, gumroad(respond).fetchImpl, over));
+  const sha8 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))).slice(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const SECRETS = [KEY, 'customer@example.com', 'intruso@dominio.com', 'FO8TXN-dbxYaBdahG97Y-Q', PRODUCT, PRODUCT.replace(/=+$/, '')];
+  const clean = (b: unknown) => {
+    const s = JSON.stringify(b);
+    for (const secret of SECRETS) expect(s, secret).not.toContain(secret);
+  };
+
+  it('a variável só vale se for exatamente "1"', () => {
+    const base = { store: null, privateJwk: null };
+    expect(gumroadDepsFromEnv({ GUMROAD_PRODUCT_ID: PRODUCT, GUMROAD_DEBUG_REASONS: '1' }, base).debugReasons).toBe(true);
+    for (const v of [undefined, '', '0', 'true', ' 1', '1 ', 'yes', '2']) expect(gumroadDepsFromEnv({ GUMROAD_PRODUCT_ID: PRODUCT, GUMROAD_DEBUG_REASONS: v }, base).debugReasons, String(v)).toBeUndefined();
+  });
+
+  it('desligado: o corpo das respostas é idêntico ao de antes (sem campo debug)', async () => {
+    const f = fakeStore();
+    const r404 = await call(f, notFound);
+    expect(r404.status).toBe(404);
+    expect(await body(r404)).toEqual({ error: 'sem_licenca', message: 'We could not find an active purchase for this email and license key.' });
+    const r502 = await call(f, () => new Response('x', { status: 503 }));
+    expect(await body(r502)).toEqual({ error: 'falha_verificacao', message: 'We could not verify your license right now. Please try again shortly.' });
+    const r422 = await call(f, ok(officialPurchase({ sale_id: 'abc' })));
+    expect(Object.keys(await body(r422)).sort()).toEqual(['error', 'message', 'message_pt']);
+    const rRej = await call(f, ok(officialPurchase()), {}, 'intruso@dominio.com');
+    expect(await body(rRej)).toEqual({ error: 'sem_licenca', message: 'We could not find an active purchase for this email and license key.' });
+  });
+
+  it('ligado + chave não encontrada: stage, status HTTP e mensagem pública da Gumroad', async () => {
+    const r = await call(fakeStore(), notFound, { debugReasons: true });
+    const b = await body(r);
+    expect(r.status).toBe(404);
+    expect(b.error).toBe('sem_licenca');
+    expect(b.debug).toMatchObject({ stage: 'verify_not_found', gumroad_http_status: 404, gumroad_message: 'That license does not exist for the provided product.', sent_equals_configured: true });
+    expect(b.debug.configured_product_id).toEqual({ length: 24, base64url_padded_ok: true, outside_charset: [], sha256_8: await sha8(PRODUCT) });
+    clean(b);
+  });
+
+  it('ligado: caractere invisível no product_id aparece como codepoint, nunca como valor', async () => {
+    const bad = PRODUCT + '​';
+    const r = await call(fakeStore(), notFound, { debugReasons: true, productId: bad });
+    const d = (await body(r)).debug;
+    expect(d.configured_product_id).toMatchObject({ length: 25, base64url_padded_ok: false, outside_charset: ['U+200B'] });
+    expect(d.sent_to_api_product_id).toMatchObject({ length: 25, base64url_padded_ok: false, outside_charset: ['U+200B'] });
+    expect(d.sent_equals_configured).toBe(true);
+    expect(d.configured_product_id.sha256_8).toBe(await sha8(bad));
+    expect(d.configured_product_id.sha256_8).not.toBe(await sha8(PRODUCT));
+    clean({ d });
+  });
+
+  it('ligado: variável colada sem "==" é completada na chamada e o debug mostra os dois tamanhos', async () => {
+    const short = PRODUCT.replace(/=+$/, '');
+    const d = (await body(await call(fakeStore(), notFound, { debugReasons: true, productId: short }))).debug;
+    expect(d.configured_product_id.length).toBe(22);
+    expect(d.sent_to_api_product_id).toMatchObject({ length: 24, base64url_padded_ok: true });
+    expect(d.sent_equals_configured).toBe(false);
+  });
+
+  it('ligado + rejeição: stage reject com o motivo (e-mail diferente, teste, assinatura)', async () => {
+    const f = fakeStore();
+    const e = (await body(await call(f, ok(officialPurchase()), { debugReasons: true }, 'intruso@dominio.com'))).debug;
+    expect(e).toMatchObject({ stage: 'reject', reason: 'email_diferente' });
+    const t = (await body(await call(f, ok(officialPurchase({ test: true })), { debugReasons: true }))).debug;
+    expect(t).toMatchObject({ stage: 'reject', reason: 'compra_de_teste' });
+    const s = (await body(await call(f, ok(officialPurchase({ recurrence: false })), { debugReasons: true }))).debug;
+    expect(s).toMatchObject({ stage: 'reject', reason: 'assinatura' });
+    expect(f.calls).toEqual([]);
+    clean({ e, t, s });
+  });
+
+  it('ligado + 422 (id fora do formato): stage reject', async () => {
+    const r = await call(fakeStore(), ok(officialPurchase({ sale_id: 'abc' })), { debugReasons: true });
+    const b = await body(r);
+    expect(r.status).toBe(422);
+    expect(b.debug).toMatchObject({ stage: 'reject', reason: 'id_fora_do_formato' });
+    clean(b);
+  });
+
+  it('ligado + banco bloqueou: stage applied com status e decisão', async () => {
+    const f = fakeStore({ grant: { result: 'blocked', status: 'revoked' } });
+    const b = await body(await call(f, ok(officialPurchase()), { debugReasons: true }));
+    expect(b.debug).toMatchObject({ stage: 'applied', status: 'revoked', decision: 'grant', gumroad_http_status: 200 });
+    clean(b);
+  });
+
+  it('ligado + Gumroad fora do ar e falha de armazenamento', async () => {
+    const down = await call(fakeStore(), () => new Response('x', { status: 503 }), { debugReasons: true });
+    expect(down.status).toBe(502);
+    expect((await body(down)).debug).toMatchObject({ stage: 'verify_unavailable', reason: 'http_503', gumroad_http_status: 503 });
+    const st = await call(fakeStore({ fail: true }), ok(officialPurchase()), { debugReasons: true });
+    expect((await body(st)).debug).toMatchObject({ stage: 'storage_failed' });
+  });
+
+  it('success:false com 200: a mensagem pública entra, sem a chave nem e-mails', async () => {
+    const msg = `No license ${KEY} for customer@example.com or other@x.org`;
+    const r = await call(fakeStore(), () => new Response(JSON.stringify({ success: false, message: msg }), { status: 200 }), { debugReasons: true });
+    const b = await body(r);
+    expect(b.debug.gumroad_message).toBe('No license [removido] for [removido] or [email]');
+    clean(b);
+    const long = await body(await call(fakeStore(), () => new Response(JSON.stringify({ success: false, message: 'a'.repeat(500) }), { status: 404 }), { debugReasons: true }));
+    expect(long.debug.gumroad_message).toHaveLength(200);
+  });
+
+  it('ligado: resposta 200 (sucesso) não ganha debug e o token continua válido', async () => {
+    const r = await call(fakeStore(), ok(officialPurchase()), { debugReasons: true });
+    expect(r.status).toBe(200);
+    const b = await body(r);
+    expect(Object.keys(b).sort()).toEqual(['email', 'exp', 'token']);
+  });
+
+  it('ligado: nenhum erro de entrada (400/405/413) ganha debug', async () => {
+    const f = fakeStore();
+    const d = deps(f.store, gumroad(ok(officialPurchase())).fetchImpl, { debugReasons: true });
+    for (const r of [await handleGumroadLicense(req({ email: 'customer@example.com' }), d), await handleGumroadLicense(req({ email: 'x', license_key: KEY }), d), await handleGumroadLicense(new Request('https://x.test/api/gumroad-license'), d)]) {
+      expect((await body(r)).debug).toBeUndefined();
+    }
+  });
+
+  it('verifyGumroadLicense sem trace devolve exatamente o mesmo de antes', async () => {
+    expect(await verifyGumroadLicense(PRODUCT, KEY, gumroad(notFound).fetchImpl, 1000)).toEqual({ kind: 'not_found' });
+    expect(await verifyGumroadLicense(PRODUCT, KEY, gumroad(() => new Response('x', { status: 503 })).fetchImpl, 1000)).toEqual({ kind: 'unavailable', reason: 'http_503' });
+  });
+});
