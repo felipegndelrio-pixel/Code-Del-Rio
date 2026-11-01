@@ -5,7 +5,7 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import { BRAND } from '../../config/brand';
 import { buildBpmn } from '../../bpmn/model';
 import { Badge, BasisTag, Button, Field, Select } from '../../components/ui';
-import { CONFIDENCE_LABEL, businessCases, CASE_LABEL, compareScenarios, responsibilityChanges } from '../../domain/compare';
+import { CONFIDENCE_LABEL, businessCases, CASE_LABEL, compareScenarios, isCostUnit, responsibilityChanges, unitText } from '../../domain/compare';
 import { relatedProblemOf } from '../../domain/plan';
 import { bottlenecks, CRITERION_LABEL, dataGaps, pareto } from '../../domain/metrics';
 import { GROUP_LABEL } from '../../domain/recommendations';
@@ -30,10 +30,6 @@ const PAIR_LABEL = lazyLabels<string>({
   costMonth: 'rp.pair.costMonth',
   reworkMonth: 'rp.pair.reworkMonth',
 });
-/** Unidades e valores que o domínio entrega em código (PT); o texto mostrado segue o idioma. */
-const UNIT_KEY: Record<string, MessageKey> = { horas: 'rp.u.horas', 'pessoa-hora': 'rp.u.pessoaHora', atividades: 'rp.u.atividades' };
-const unitText = (u: string) => (UNIT_KEY[u] ? tr(UNIT_KEY[u]) : u);
-const isCostUnit = (u: string) => u === tr('d.compare.015');
 const BASIS_KEY: Record<string, MessageKey> = { calculado: 'rp.basis.calculado', informado: 'rp.basis.informado', estimado: 'rp.basis.estimado', a_validar: 'rp.basis.a_validar', realizado: 'rp.basis.realizado' };
 const basisText = (b: string) => (BASIS_KEY[b] ? tr(BASIS_KEY[b]) : b);
 const pbText = (n: number) => (n === 0 ? tr('rp.pb.immediate') : tr('rp.pb.months', { n: fmtNum(n, 1) }));

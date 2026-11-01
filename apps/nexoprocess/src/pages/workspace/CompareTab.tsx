@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { CompareBars } from '../../components/charts';
 import { Badge, BasisTag, Button, Callout, Card, Empty, Field, HowCalc, Input, NumberInput, Select, Stat, Table, td, Term, th } from '../../components/ui';
-import { businessCases, CASE_LABEL, compareScenarios, CONFIDENCE_LABEL, DEFAULT_SENSITIVITY, responsibilityChanges, roleLoads, type CompareRow } from '../../domain/compare';
+import { businessCases, CASE_LABEL, compareScenarios, CONFIDENCE_LABEL, DEFAULT_SENSITIVITY, isCostUnit, responsibilityChanges, roleLoads, unitText, type CompareRow } from '../../domain/compare';
 import type { Scenario, SensitivityCase } from '../../domain/types';
 import { fmtBRL, fmtDateTime, fmtHours, fmtNum, fmtPct, nowIso } from '../../domain/units';
 import { useWorkspace } from '../../state/workspace';
@@ -13,7 +13,7 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { lazyLabels } from '../../i18n';
 function fmtVal(r: Pick<CompareRow, 'unit'>, v: number | null) {
   if (v === null) return '—';
-  if (r.unit === 'R$/mês') return fmtBRL(v);
+  if (isCostUnit(r.unit)) return fmtBRL(v);
   if (r.unit === 'horas') return fmtHours(v);
   return fmtNum(v);
 }
@@ -90,7 +90,7 @@ export default function CompareTab() {
                       {r.label}
                       {r.note && <span className="block text-xs text-muted">{r.note}</span>}
                     </td>
-                    <td className={td}>{r.unit}</td>
+                    <td className={td}>{unitText(r.unit)}</td>
                     <td className={clsx(td, 'tabular')}>{fmtVal(r, r.asIs)}</td>
                     <td className={clsx(td, 'tabular')}>{fmtVal(r, r.toBe)}</td>
                     <td className={clsx(td, 'tabular', better && 'text-ok', worse && r.lowerIsBetter && 'text-bad')}>{r.diff === null ? '—' : `${r.diff > 0 ? '+' : ''}${fmtVal(r, r.diff)}`}</td>

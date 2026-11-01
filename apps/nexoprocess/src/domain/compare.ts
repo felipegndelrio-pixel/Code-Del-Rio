@@ -4,7 +4,7 @@ import { computeMetrics, costOf, isWork, type ProcessMetrics } from './metrics';
 import type { ProcessModel, Scenario, Sensitivity } from './types';
 import { isNum, reductionPct } from './units';
 
-import { lazyLabels, tr } from '../i18n';
+import { lazyLabels, tr, type MessageKey } from '../i18n';
 export type Basis = 'informado' | 'calculado' | 'estimado' | 'a_validar' | 'realizado';
 
 export interface Figures {
@@ -322,3 +322,9 @@ export function roleLoads(asIs: Figures, toBe: Figures): RoleLoad[] {
     })
     .sort((p, q) => Math.abs(q.diffMonthH ?? 0) - Math.abs(p.diffMonthH ?? 0));
 }
+
+/** Unidades que o domínio entrega em código (PT); o texto mostrado segue o idioma ativo. */
+const UNIT_KEY: Record<string, MessageKey> = { horas: 'rp.u.horas', 'pessoa-hora': 'rp.u.pessoaHora', atividades: 'rp.u.atividades' };
+export const unitText = (u: string): string => (UNIT_KEY[u] ? tr(UNIT_KEY[u]) : u);
+/** A unidade de custo é um texto traduzido ('R$/mês' em PT, '$/month' em EN): compare sempre por aqui. */
+export const isCostUnit = (u: string): boolean => u === tr('d.compare.015');
