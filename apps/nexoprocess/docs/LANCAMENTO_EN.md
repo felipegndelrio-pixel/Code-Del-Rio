@@ -77,6 +77,15 @@ Em Settings → Variables and Secrets → Production. São só nomes; os valores
 - Falha em E1, E4 ou E5, ou erro 5xx em `/api/*`: **rollback do app** (Deployments → deployment anterior → Rollback). O rollback não mexe no banco.
 - Falha só em E2, E3 ou E6: o PT segue funcionando. Tratar sem rollback.
 
+## Teste de fumaça real (fundador, antes de abrir a venda; sem mexer em variáveis)
+1. Faça uma compra do próprio produto com **cupom de 100%**.
+2. Ative em `/entrar?lang=en` com o e-mail da compra e a license key. Esperado: entra (token).
+3. No painel da Gumroad, **reembolse** essa compra.
+4. Tente ativar de novo com a mesma chave. Esperado: "We could not find an active purchase" (HTTP 404) e, no banco, a compra como `refunded` (consulta no runbook §13 de `GUMROAD_ENTITLEMENT.md`).
+5. Anote só **se o product_id/sale_id tem "=" e o comprimento**, nunca o valor.
+- Prova a detecção de reembolso com evidência real. Se falhar no passo 2, a causa mais provável é formato de id ou `GUMROAD_PRODUCT_ID` (o código aceita a variável com ou sem "==", mas a chamada à API da Gumroad usa o valor colado; A VALIDAR com a 1ª compra real).
+- Pendente de decisão do fundador (NÃO implementado): TTL próprio de 7 dias para tokens Gumroad, para reduzir a janela offline após reembolso.
+
 ## 6. O que ainda NÃO está pronto para EN (31/10/2026)
 
 - **Interface interna em EN: em andamento.** Até terminar, o comprador EN entra em inglês e vê partes do app em português.

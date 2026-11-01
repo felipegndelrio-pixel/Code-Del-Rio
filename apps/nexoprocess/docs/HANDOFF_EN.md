@@ -54,5 +54,14 @@ Dicionário: 2086 chaves (`ws.` 1075, `d.` 625, `pg.` 116, `home.` 84, `ui.` 49,
 - T5 (landing f5): só quando o fundador anexar `f5-landing-en.tar`; extrair em commit separado, sem publicar.
 - Regras de modelo: ver `CLAUDE.md` (MODEL ROUTING POLICY).
 
+## Teste de fumaça real (fundador, antes de abrir a venda; sem mexer em variáveis)
+1. Faça uma compra do próprio produto com **cupom de 100%**.
+2. Ative em `/entrar?lang=en` com o e-mail da compra e a license key. Esperado: entra (token).
+3. No painel da Gumroad, **reembolse** essa compra.
+4. Tente ativar de novo com a mesma chave. Esperado: "We could not find an active purchase" (HTTP 404) e, no banco, a compra como `refunded` (consulta no runbook §13 de `GUMROAD_ENTITLEMENT.md`).
+5. Anote só **se o product_id/sale_id tem "=" e o comprimento**, nunca o valor.
+- Prova a detecção de reembolso com evidência real. Se falhar no passo 2, a causa mais provável é formato de id ou `GUMROAD_PRODUCT_ID` (o código aceita a variável com ou sem "==", mas a chamada à API da Gumroad usa o valor colado; A VALIDAR com a 1ª compra real).
+- Pendente de decisão do fundador (NÃO implementado): TTL próprio de 7 dias para tokens Gumroad, para reduzir a janela offline após reembolso.
+
 ## 8. Documentos relacionados
 `docs/GUMROAD_ENTITLEMENT.md` (decisões D1–D8, runbook), `docs/LANCAMENTO_EN.md` (runbook do fundador), `docs/legal-en/` (rascunho legal), `docs/DEPLOY_CLOUDFLARE.md`.
