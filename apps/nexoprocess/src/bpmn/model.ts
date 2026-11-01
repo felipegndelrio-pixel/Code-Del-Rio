@@ -104,7 +104,7 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
   const needsImplicitEnd = acts.filter((a) => a.type !== 'end' && g.out.get(a.id)!.length === 0);
   if (needsImplicitEnd.length) {
     implicitEnd = mkId('End', 'implicito');
-    macroNodes.push({ id: implicitEnd, kind: 'end', order: 9999, name: 'Fim', bpmnType: 'endEvent' });
+    macroNodes.push({ id: implicitEnd, kind: 'end', order: 9999, name: tr('d.type.end'), bpmnType: 'endEvent' });
     for (const a of needsImplicitEnd) addMacro(macroOf(a), implicitEnd);
   }
   const macro: PlaneSpec = { id: 'Plane_macro', owner: processId, nodes: macroNodes, edges: macroEdges, layout: layoutGraph(macroNodes, macroEdges) };
@@ -117,7 +117,7 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
     const nodes: PlaneSpec['nodes'] = [];
     const edges: PlaneSpec['edges'] = [];
     const startId = mkId('Start', `${sub}_entrada`);
-    nodes.push({ id: startId, kind: 'start', order: -1, name: 'Início da etapa', bpmnType: 'startEvent' });
+    nodes.push({ id: startId, kind: 'start', order: -1, name: tr('bpmn.stageStart'), bpmnType: 'startEvent' });
     for (const a of inner)
       nodes.push({ id: activityToElement.get(a.id)!, kind: a.type === 'decision' ? 'gateway' : 'task', order: a.order, name: a.name, bpmnType: a.type === 'decision' ? 'exclusiveGateway' : 'task', activityId: a.id });
     const ends = new Map<string, string>();
@@ -153,8 +153,8 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
       const targetOf = (e: Edge) => {
         const b = g.byId.get(e.to)!;
         if (innerIds.has(b.id)) return activityToElement.get(b.id)!;
-        if (b.type === 'end') return endFor(`fim_${b.id}`, `Fim: ${b.name}`);
-        return endFor(`para_${stageOf(b)}`, `Segue para: ${stageOf(b)}`);
+        if (b.type === 'end') return endFor(`fim_${b.id}`, tr('bpmn.endOf', { name: b.name }));
+        return endFor(`para_${stageOf(b)}`, tr('bpmn.goesTo', { stage: stageOf(b) }));
       };
       const seqOuts = outs.filter((e) => e.kind === 'seq');
       if (a.type !== 'decision' && seqOuts.length > 1) {
@@ -163,7 +163,7 @@ export function buildBpmn(p: ProcessModel): BpmnBuild {
         flow(src, split);
         for (const e of seqOuts) flow(split, targetOf(e), e);
       } else for (const e of outs) flow(src, targetOf(e), e);
-      if (!outs.length && a.type !== 'decision') flow(src, endFor('fim_etapa', 'Fim'));
+      if (!outs.length && a.type !== 'decision') flow(src, endFor('fim_etapa', tr('d.type.end')));
     }
     if (!edges.some((e) => e.from === startId) && inner.length) flow(startId, activityToElement.get(inner[0].id)!);
     return { id: mkId('Plane', sub), owner: sub, stage: s, nodes, edges, layout: layoutGraph(nodes, edges) };

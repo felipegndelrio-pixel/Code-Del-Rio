@@ -3,6 +3,7 @@
 // cortados ou vazios na impressão do Safari; estes desenham em coordenadas fixas
 // (viewBox) e escalam para a largura da folha em qualquer navegador.
 import type { ReactNode } from 'react';
+import { tr } from '../i18n';
 
 /** Cores fixas (legíveis no papel e nos dois temas); as mesmas da paleta clara dos gráficos da tela. */
 export const RC = {
@@ -195,8 +196,8 @@ export function PairBars({ rows, label }: { rows: { label: string; asIs: number;
       </svg>
       <Legend
         items={[
-          { label: 'AS-IS (hoje)', color: RC.asIs },
-          { label: 'TO-BE (proposto)', color: RC.toBe },
+          { label: tr('rp.legend.asis'), color: RC.asIs },
+          { label: tr('rp.legend.tobe'), color: RC.toBe },
         ]}
       />
     </>

@@ -10,7 +10,7 @@ const GOLDEN = JSON.parse(readFileSync(new URL('./golden/pt-screens.json', impor
 const REPORT = process.env.NEXO_EN_REPORT;
 const COMPLETE: string[] = (process.env.NEXO_EN_COMPLETE ?? '').split(',').filter(Boolean);
 
-const ALLOWED = /\b(AS-IS|TO-BE|BPMN|XML|SVG|PNG|ZIP|XLSX|CSV|JSON|PDF|FMEA|RPN|RACI|Lean|NexoProcess|IndexedDB|Excel|Safari|iPhone|iPad|Camunda|bpmn\.io|bpmn-moddle|ERP|IA|AI|LGPD|P\d+|R|A|C|I|OK|Item|Volume|min|h)\b/g;
+const ALLOWED = /\b(AS-IS|TO-BE|BPMN|XML|SVG|PNG|ZIP|XLSX|CSV|JSON|PDF|FMEA|RPN|RACI|Lean|NexoProcess|IndexedDB|Excel|Safari|iPhone|iPad|Camunda|bpmn\.io|bpmn-moddle|ERP|IA|AI|LGPD|P\d+|R|A|C|I|OK|Item|Volume|min|h|Payback)\b/g;
 const hasWords = (line: string) => /[A-Za-zÀ-ÿ]{2,}/.test(line.replace(ALLOWED, ' ').replace(/[\d.,:;·×÷≥≤→—–%$/()#+\-_=<>"“”]+/g, ' '));
 
 async function capture(page: Page): Promise<string> {
@@ -195,4 +195,9 @@ test('EN cobertura: assistente — roteiro completo', async ({ page }) => {
   await page.getByRole('button', { name: 'Create my project' }).click();
   await expect(page.getByTestId('assistant-success')).toBeVisible();
   await check('asst-sucesso', page);
+  await page.getByRole('button', { name: 'Review the data' }).click();
+  await expect(page).toHaveURL(/\/validar$/);
+  await page.goto(page.url().replace(/\/validar$/, '/relatorio'));
+  await expect(page.getByText('Drawing maps…')).toHaveCount(0);
+  await check('asst-relatorio', page);
 });

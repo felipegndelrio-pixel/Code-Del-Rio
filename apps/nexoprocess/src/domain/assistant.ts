@@ -201,7 +201,7 @@ export function draftToProcess(d: AssistantDraft): ProcessModel {
       acts.push(newActivity({ id: dec.id, stage: s.name.trim(), name: dec.question.trim(), type: 'decision', order: ++order, nextYes: chain[j + 1]?.id ?? nextId, nextNo: no }));
     });
   });
-  acts.push(newActivity({ id: 'FIM', stage: lastStage, name: d.outcome?.trim() || 'Fim', type: 'end', order: ++order }));
+  acts.push(newActivity({ id: 'FIM', stage: lastStage, name: d.outcome?.trim() || tr('d.type.end'), type: 'end', order: ++order }));
   if (needsNoEnd) acts.push(newActivity({ id: 'FIM_NAO', stage: lastStage, name: tr('d.assistant.008'), type: 'end', order: ++order }));
   p.activities = acts;
   p.stageOrder = stages.map((s) => s.name.trim());

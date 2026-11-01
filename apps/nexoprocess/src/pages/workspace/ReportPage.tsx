@@ -17,23 +17,33 @@ import { ACTION_STATUS } from './PlanTab';
 import { demoBlocked } from '../../license/demo';
 import { printAs, restoreTitle } from '../../state/print';
 import { HBars, PairBars, RC, ReportFigure, ShareBar, StackedHBars } from '../../components/reportCharts';
+import { lazyLabels, tr, type MessageKey } from '../../i18n';
+import { useI18n } from '../../i18n/I18nProvider';
 
 // Rótulos curtos para o gráfico AS-IS × TO-BE (a tabela completa segue no detalhamento).
-const PAIR_LABEL: Record<string, string> = {
-  active: 'Trabalho ativo / execução',
-  wait: 'Espera / execução',
-  elapsed: 'Tempo decorrido',
-  effortExec: 'Esforço / execução',
-  effortMonth: 'Esforço / mês',
-  costMonth: 'Custo / mês',
-  reworkMonth: 'Retrabalho / mês',
-};
+const PAIR_LABEL = lazyLabels<string>({
+  active: 'rp.pair.active',
+  wait: 'rp.pair.wait',
+  elapsed: 'rp.pair.elapsed',
+  effortExec: 'rp.pair.effortExec',
+  effortMonth: 'rp.pair.effortMonth',
+  costMonth: 'rp.pair.costMonth',
+  reworkMonth: 'rp.pair.reworkMonth',
+});
+/** Unidades e valores que o domínio entrega em código (PT); o texto mostrado segue o idioma. */
+const UNIT_KEY: Record<string, MessageKey> = { horas: 'rp.u.horas', 'pessoa-hora': 'rp.u.pessoaHora', atividades: 'rp.u.atividades' };
+const unitText = (u: string) => (UNIT_KEY[u] ? tr(UNIT_KEY[u]) : u);
+const isCostUnit = (u: string) => u === tr('d.compare.015');
+const BASIS_KEY: Record<string, MessageKey> = { calculado: 'rp.basis.calculado', informado: 'rp.basis.informado', estimado: 'rp.basis.estimado', a_validar: 'rp.basis.a_validar', realizado: 'rp.basis.realizado' };
+const basisText = (b: string) => (BASIS_KEY[b] ? tr(BASIS_KEY[b]) : b);
+const pbText = (n: number) => (n === 0 ? tr('rp.pb.immediate') : tr('rp.pb.months', { n: fmtNum(n, 1) }));
 
 const tbl = 'w-full border-collapse text-[12px]';
 const c = 'border border-line/25 px-2 py-1 text-left align-top';
 const h = `${c} bg-surface2 font-semibold`;
 
 export default function ReportPage() {
+  const { t: tx, locale } = useI18n();
   const { w, update, metrics: m, issues, recs } = useWorkspace();
   const [sid, setSid] = useState(w.activeScenarioId ?? w.scenarios[0]?.id ?? '');
   const sc = w.scenarios.find((s) => s.id === sid);
@@ -54,10 +64,10 @@ export default function ReportPage() {
     // A URL só é limpa dentro do timer: limpá-la antes re-executa este efeito e o cleanup cancelaria a impressão.
     const t = window.setTimeout(() => {
       setParams({}, { replace: true });
-      if (!demoBlocked('exportar')) printAs(`Relatório executivo - ${w.asIs.name}`);
+      if (!demoBlocked('exportar')) printAs(tx('rp.printTitle', { name: w.asIs.name }));
     }, 300);
     return () => window.clearTimeout(t);
-  }, [svgs, setParams, w.asIs.name]);
+  }, [svgs, setParams, w.asIs.name, tx]);
   useEffect(() => {
     if (!w.visited.report) update((d) => void (d.visited.report = nowIso()));
   }, [w.visited.report, update]);
@@ -67,7 +77,7 @@ export default function ReportPage() {
       try {
         const b = buildBpmn(w.asIs);
         const { renderAllSvgs } = await import('../../bpmn/render');
-        const out = await renderAllSvgs(b.xml, [{ id: '', label: 'Visão macro' }, ...b.stages.map((s) => ({ id: s.owner, label: `Etapa: ${s.stage}` }))], 'light');
+        const out = await renderAllSvgs(b.xml, [{ id: '', label: tr('rp.map.macro') }, ...b.stages.map((s) => ({ id: s.owner, label: tr('rp.map.stage', { stage: s.stage }) }))], 'light');
         if (alive) setSvgs(out);
       } catch {
         if (alive) setSvgs([]);
@@ -76,7 +86,7 @@ export default function ReportPage() {
     return () => {
       alive = false;
     };
-  }, [w.asIs]);
+  }, [w.asIs, locale]);
 
   const decided = recs.filter((r) => ['accepted', 'investigating'].includes(w.recDecisions[r.id]?.status ?? ''));
   const rejected = recs.filter((r) => w.recDecisions[r.id]?.status === 'rejected').length;
@@ -95,7 +105,7 @@ export default function ReportPage() {
       label: PAIR_LABEL[r.key] ?? r.label,
       asIs: r.asIs!,
       toBe: r.toBe!,
-      fmt: (v: number) => (r.unit === 'R$/mês' ? fmtBRL(v) : r.unit === 'horas' ? fmtHours(v) : `${fmtNum(v)} ${r.unit.replace('pessoa-hora', 'pessoa-h')}`),
+      fmt: (v: number) => (isCostUnit(r.unit) ? fmtBRL(v) : r.unit === 'horas' ? fmtHours(v) : `${fmtNum(v)} ${unitText(r.unit).replace(tr('rp.ph.long'), tr('rp.ph.short'))}`),
       change: r.reductionPct === null ? '—' : r.reductionPct > 0 ? `−${fmtPct(r.reductionPct, 1)}` : r.reductionPct < 0 ? `+${fmtPct(-r.reductionPct, 1)}` : '0%',
     }));
   const openActions = w.actions.filter((a) => a.status !== 'concluida' && a.status !== 'cancelada');
@@ -104,11 +114,11 @@ export default function ReportPage() {
   const pendingOwners = openActions.filter((a) => !a.owner || !a.due).length;
   // Mensagens-chave montadas só com valores calculados; o que falta não vira frase.
   const messages: string[] = [];
-  if (m.effortPeriodH.value !== null) messages.push(`O processo consome ${fmtNum(m.effortPeriodH.value)} pessoa-h por ${per}${m.totalCostPeriod.value !== null ? `, com custo estimado de ${fmtBRL(m.totalCostPeriod.value)}` : ''}.`);
-  if (m.lean.classifiedHours > 0 && m.lean.pct.W !== null) messages.push(`${fmtPct(m.lean.pct.W)} do tempo classificado é desperdício e ${fmtPct(m.lean.pct.NNVA)} é necessário sem agregar valor.`);
-  if (bn.flagged.length) messages.push(`${bn.flagged.length === 1 ? 'Um gargalo concentra' : `${bn.flagged.length} gargalos concentram`} ${fmtPct(bn.flagged.reduce((t, b) => t + b.share, 0))} de “${CRITERION_LABEL[w.bottleneck.criterion].toLowerCase()}”; o principal é “${name(bn.flagged[0].id)}”.`);
-  if (sc && biz?.netBenefitMonth != null) messages.push(`O cenário “${sc.name}” estima benefício líquido de ${fmtBRL(biz.netBenefitMonth)}/mês${biz.paybackMonths !== null ? `, payback de ${biz.paybackMonths === 0 ? 'imediato' : `${fmtNum(biz.paybackMonths, 1)} meses`}` : ''}${biz.roiPct !== null ? ` e ROI de ${fmtPct(biz.roiPct)} em ${biz.horizonMonths} meses` : ''} — estimativa a validar.`);
-  if (openActions.length) messages.push(`${openActions.length} ação(ões) em aberto no plano${pendingOwners ? `; ${pendingOwners} ainda sem responsável ou prazo definidos pela equipe` : ''}.`);
+  if (m.effortPeriodH.value !== null) messages.push(tx('rp.msg.effort', { effort: fmtNum(m.effortPeriodH.value), per, cost: m.totalCostPeriod.value !== null ? tx('rp.msg.effort.cost', { v: fmtBRL(m.totalCostPeriod.value) }) : '' }));
+  if (m.lean.classifiedHours > 0 && m.lean.pct.W !== null) messages.push(tx('rp.msg.lean', { w: fmtPct(m.lean.pct.W), n: fmtPct(m.lean.pct.NNVA) }));
+  if (bn.flagged.length) messages.push(tx(bn.flagged.length === 1 ? 'rp.msg.bn.one' : 'rp.msg.bn.many', { n: bn.flagged.length, pct: fmtPct(bn.flagged.reduce((acc, b) => acc + b.share, 0)), crit: CRITERION_LABEL[w.bottleneck.criterion].toLowerCase(), name: name(bn.flagged[0].id) }));
+  if (sc && biz?.netBenefitMonth != null) messages.push(tx('rp.msg.sc', { name: sc.name, net: fmtBRL(biz.netBenefitMonth), payback: biz.paybackMonths !== null ? tx('rp.msg.sc.payback', { v: pbText(biz.paybackMonths) }) : '', roi: biz.roiPct !== null ? tx('rp.msg.sc.roi', { pct: fmtPct(biz.roiPct), h: biz.horizonMonths }) : '' }));
+  if (openActions.length) messages.push(tx('rp.msg.actions', { n: openActions.length, pending: pendingOwners ? tx('rp.msg.actions.pending', { p: pendingOwners }) : '' }));
   let sn = 0;
   const next = () => ++sn;
 
@@ -116,10 +126,10 @@ export default function ReportPage() {
     <div className="mx-auto max-w-[900px] bg-surface px-4 py-6 text-ink print:max-w-none print:p-0" data-testid="report">
       <div className="no-print mb-4 flex flex-wrap items-end gap-3">
         <Link to={`/app/p/${w.id}/exportar`} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-brand">
-          <ArrowLeft className="h-4 w-4" /> Voltar
+          <ArrowLeft className="h-4 w-4" /> {tx('wz.back')}
         </Link>
         {w.scenarios.length > 0 && (
-          <Field label="Cenário TO-BE no relatório" className="min-w-[220px]">
+          <Field label={tx('rp.scenario')} className="min-w-[220px]">
             {(f) => (
               <Select {...f} value={sid} onChange={(e) => setSid(e.target.value)}>
                 {w.scenarios.map((s) => (
@@ -131,43 +141,43 @@ export default function ReportPage() {
             )}
           </Field>
         )}
-        <Button onClick={() => !demoBlocked('exportar') && printAs(`Relatório executivo - ${w.asIs.name}`)} disabled={svgs === null}>
-          <Printer className="h-4 w-4" /> Imprimir / salvar PDF
+        <Button onClick={() => !demoBlocked('exportar') && printAs(tx('rp.printTitle', { name: w.asIs.name }))} disabled={svgs === null}>
+          <Printer className="h-4 w-4" /> {tx('rp.print')}
         </Button>
-        <p className="w-full text-xs text-muted">Dica: no diálogo de impressão escolha “Salvar como PDF”, papel A4, e ative “Gráficos de plano de fundo”.</p>
+        <p className="w-full text-xs text-muted">{tx('rp.tip')}</p>
       </div>
 
       <header className="avoid-break border-b-2 border-brand pb-3 print:pb-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-brand">Relatório executivo de processo · {BRAND.name}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-brand">{tx('rp.kicker', { brand: BRAND.name })}</p>
         <h1 className="mt-1 text-2xl font-extrabold print:text-xl">{w.asIs.name}</h1>
         <p className="mt-1 text-sm text-ink2">
-          Gerado em {fmtDateTime(nowIso())} · AS-IS de {fmtDateTime(w.updatedAt)}
-          {sc && ` · TO-BE “${sc.name}” (versão de ${fmtDateTime(sc.updatedAt)})`} · {BRAND.name} v{BRAND.version}
+          {tx('rp.generated', { now: fmtDateTime(nowIso()), asis: fmtDateTime(w.updatedAt) })}
+          {sc && tx('rp.tobeVersion', { name: sc.name, date: fmtDateTime(sc.updatedAt) })} · {BRAND.name} v{BRAND.version}
         </p>
-        {w.isDemo && <p className="mt-2 rounded border border-amber/50 bg-amber/10 p-2 text-sm font-semibold">EXEMPLO FICTÍCIO — dados ilustrativos, não representam uma empresa real.</p>}
+        {w.isDemo && <p className="mt-2 rounded border border-amber/50 bg-amber/10 p-2 text-sm font-semibold">{tx('rp.demo')}</p>}
         <p className="mt-2 flex flex-wrap items-center gap-1 text-xs text-ink2">
-          Legenda: <BasisTag basis="informado" /> dado fornecido · <BasisTag basis="calculado" /> fórmula sobre dados · <BasisTag basis="estimado" /> depende de premissas · <BasisTag basis="a_validar" /> hipótese · <BasisTag basis="realizado" /> medido após implantação
+          {tx('rp.legend')} <BasisTag basis="informado" /> {tx('rp.legend.informado')} · <BasisTag basis="calculado" /> {tx('rp.legend.calculado')} · <BasisTag basis="estimado" /> {tx('rp.legend.estimado')} · <BasisTag basis="a_validar" /> {tx('rp.legend.a_validar')} · <BasisTag basis="realizado" /> {tx('rp.legend.realizado')}
         </p>
-        {errors > 0 && <p className="mt-2 text-sm font-semibold text-bad">Atenção: {errors} erro(s) de dados não corrigidos — indicadores podem estar incompletos.</p>}
+        {errors > 0 && <p className="mt-2 text-sm font-semibold text-bad">{tx('rp.errors', { n: errors })}</p>}
       </header>
 
-      <Section n={next()} title="Resumo executivo">
+      <Section n={next()} title={tx('rp.s1')}>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 print:grid-cols-4">
-          <Kpi label="Tempo decorrido" value={m.elapsed.status === 'ok' ? fmtHours(m.elapsed.hours) : 'não calculado'} sub="por execução" b="estimado" />
-          <Kpi label={`Esforço por ${per}`} value={m.effortPeriodH.value === null ? 'não calculado' : `${fmtNum(m.effortPeriodH.value)} pessoa-h`} b="estimado" />
-          <Kpi label={`Custo por ${per}`} value={m.totalCostPeriod.value === null ? 'não calculado' : fmtBRL(m.totalCostPeriod.value)} b="estimado" />
-          <Kpi label="Desperdício (Lean)" value={m.lean.classifiedHours > 0 ? fmtPct(m.lean.pct.W) : 'sem classificação'} sub="do tempo classificado" b="calculado" />
-          <Kpi label="Gargalos identificados" value={String(bn.flagged.length)} sub={`regra: ≥ ${w.bottleneck.thresholdPct}%`} b="calculado" />
-          <Kpi label="Economia estimada" value={biz?.netBenefitMonth != null ? `${fmtBRL(biz.netBenefitMonth)}/mês` : 'não calculada'} sub={sc ? 'benefício líquido do TO-BE' : 'sem cenário TO-BE'} b="estimado" />
-          <Kpi label="Payback" value={biz?.paybackMonths != null ? (biz.paybackMonths === 0 ? 'imediato' : `${fmtNum(biz.paybackMonths, 1)} meses`) : 'não calculado'} b="estimado" />
-          <Kpi label={`ROI em ${biz?.horizonMonths ?? 12} meses`} value={biz?.roiPct != null ? fmtPct(biz.roiPct) : 'não calculado'} b="estimado" />
+          <Kpi label={tx('rp.pair.elapsed')} value={m.elapsed.status === 'ok' ? fmtHours(m.elapsed.hours) : tx('rp.notCalc')} sub={tx('rp.perRun')} b="estimado" />
+          <Kpi label={tx('rp.k.effort', { per })} value={m.effortPeriodH.value === null ? tx('rp.notCalc') : tx('rp.personH', { v: fmtNum(m.effortPeriodH.value) })} b="estimado" />
+          <Kpi label={tx('rp.k.cost', { per })} value={m.totalCostPeriod.value === null ? tx('rp.notCalc') : fmtBRL(m.totalCostPeriod.value)} b="estimado" />
+          <Kpi label={tx('rp.k.waste')} value={m.lean.classifiedHours > 0 ? fmtPct(m.lean.pct.W) : tx('rp.noClass')} sub={tx('rp.k.ofClassified')} b="calculado" />
+          <Kpi label={tx('rp.k.bn')} value={String(bn.flagged.length)} sub={tx('rp.k.rule', { pct: w.bottleneck.thresholdPct })} b="calculado" />
+          <Kpi label={tx('rp.k.saving')} value={biz?.netBenefitMonth != null ? tx('rp.perMonth', { v: fmtBRL(biz.netBenefitMonth) }) : tx('rp.notCalcF')} sub={sc ? tx('rp.k.netTobe') : tx('rp.k.noTobe')} b="estimado" />
+          <Kpi label="Payback" value={biz?.paybackMonths != null ? pbText(biz.paybackMonths) : tx('rp.notCalc')} b="estimado" />
+          <Kpi label={tx('rp.k.roi', { h: biz?.horizonMonths ?? 12 })} value={biz?.roiPct != null ? fmtPct(biz.roiPct) : tx('rp.notCalc')} b="estimado" />
         </div>
         {messages.length > 0 && (
           <div className="avoid-break mt-3 print:mt-2">
-            <h3 className="text-[13px] font-semibold">Mensagens-chave</h3>
+            <h3 className="text-[13px] font-semibold">{tx('rp.keyMsgs')}</h3>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12px] print:space-y-0 print:text-[11px]">
-              {messages.map((t) => (
-                <li key={t}>{t}</li>
+              {messages.map((msg) => (
+                <li key={msg}>{msg}</li>
               ))}
             </ul>
           </div>
@@ -175,7 +185,7 @@ export default function ReportPage() {
         {/* Gargalos e próximos passos lado a lado, num bloco só: cabem inteiros na 1ª página. */}
         <div className="avoid-break mt-3 grid gap-3 sm:grid-cols-2 print:mt-2 print:grid-cols-2">
           <div>
-            <h3 className="text-[13px] font-semibold">Principais gargalos</h3>
+            <h3 className="text-[13px] font-semibold">{tx('rp.topBn')}</h3>
             {bn.flagged.length ? (
               <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[12px] print:space-y-0 print:text-[11px]">
                 {bn.flagged.slice(0, 3).map((b) => (
@@ -185,83 +195,83 @@ export default function ReportPage() {
                 ))}
               </ol>
             ) : (
-              <p className="mt-1 text-[12px] text-ink2 print:text-[11px]">{bn.reason ?? 'Nenhuma atividade acima do limiar.'}</p>
+              <p className="mt-1 text-[12px] text-ink2 print:text-[11px]">{bn.reason ?? tx('rp.noneAbove')}</p>
             )}
           </div>
           <div>
-            <h3 className="text-[13px] font-semibold">Próximos passos</h3>
+            <h3 className="text-[13px] font-semibold">{tx('rp.nextSteps')}</h3>
             {nextSteps.length ? (
               <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[12px] print:space-y-0 print:text-[11px]">
                 {nextSteps.map((a) => (
                   <li key={a.id}>
-                    {a.description} <span className="text-ink2">— {a.owner ?? 'responsável pendente'} · {a.due ? fmtDate(a.due) : 'prazo pendente'}</span>
+                    {a.description} <span className="text-ink2">— {a.owner ?? tx('rp.ownerPending')} · {a.due ? fmtDate(a.due) : tx('rp.duePending')}</span>
                   </li>
                 ))}
               </ol>
             ) : (
-              <p className="mt-1 text-[12px] text-ink2 print:text-[11px]">Nenhuma ação em aberto no plano.</p>
+              <p className="mt-1 text-[12px] text-ink2 print:text-[11px]">{tx('rp.noOpen')}</p>
             )}
           </div>
         </div>
       </Section>
 
-      <Section n={next()} title="Diagnóstico em gráficos" breakBefore>
-        <ReportFigure title={`Pareto — participação por atividade (${CRITERION_LABEL[w.bottleneck.criterion].toLowerCase()})`} note={`Em vermelho, gargalos pela regra (≥ ${w.bottleneck.thresholdPct}%, máx. 5). “acum.” = participação acumulada. Mostra concentração; não prova causa-raiz.`}>
+      <Section n={next()} title={tx('rp.s2')} breakBefore>
+        <ReportFigure title={tx('rp.pareto', { crit: CRITERION_LABEL[w.bottleneck.criterion].toLowerCase() })} note={tx('rp.paretoNote', { pct: w.bottleneck.thresholdPct })}>
           {pr.items.length ? (
             <HBars
-              label="Pareto"
-              rows={pr.items.slice(0, 8).map((x) => ({ label: name(x.id), value: x.share, display: fmtPct(x.share, 1), sub: `acum. ${fmtPct(x.cumulative)}`, color: flaggedIds.has(x.id) ? RC.lean.W : RC.bar }))}
+              label={tx('rp.paretoLabel')}
+              rows={pr.items.slice(0, 8).map((x) => ({ label: name(x.id), value: x.share, display: fmtPct(x.share, 1), sub: tx('rp.cum', { v: fmtPct(x.cumulative) }), color: flaggedIds.has(x.id) ? RC.lean.W : RC.bar }))}
             />
           ) : (
             <p className="text-[12px] text-ink2">{pr.reason}</p>
           )}
         </ReportFigure>
-        <ReportFigure title="Valor × desperdício (Lean) — base: duração classificada" note={m.counts.unclassified ? `${m.counts.unclassified} atividade(s) sem classificação.` : undefined}>
+        <ReportFigure title={tx('rp.leanTitle')} note={m.counts.unclassified ? tx('rp.unclassified', { n: m.counts.unclassified }) : undefined}>
           {m.lean.classifiedHours > 0 ? (
             <ShareBar
-              label="Distribuição Lean"
+              label={tx('rp.leanDist')}
               parts={(['VA', 'NNVA', 'W', 'U'] as const).map((k) => ({ label: LEAN_LABEL[k], value: m.lean.hours[k], color: RC.lean[k] }))}
             />
           ) : (
-            <p className="text-[12px] text-ink2">Sem classificação Lean com duração informada.</p>
+            <p className="text-[12px] text-ink2">{tx('rp.noLean')}</p>
           )}
         </ReportFigure>
-        <ReportFigure title="Tempo por etapa — horas de trabalho ativo, por classe Lean" note="Soma da duração ativa (uma ocorrência por atividade).">
+        <ReportFigure title={tx('rp.stageTime')} note={tx('rp.stageTimeNote')}>
           {m.byStage.some((g) => g.activeH > 0) ? (
             <StackedHBars
-              label="Tempo por etapa"
+              label={tx('rp.stageTimeLabel')}
               rows={m.byStage.map((g) => ({ label: g.key, values: g.lean, display: fmtHours(g.activeH) }))}
               parts={(['VA', 'NNVA', 'W', 'U'] as const).map((k) => ({ key: k, label: LEAN_LABEL[k], color: RC.lean[k] }))}
             />
           ) : (
-            <p className="text-[12px] text-ink2">Sem duração informada nas atividades.</p>
+            <p className="text-[12px] text-ink2">{tx('rp.noDuration')}</p>
           )}
         </ReportFigure>
-        <ReportFigure title="Esforço por responsável — pessoa-hora por execução" note="Ponderado pela frequência de cada atividade.">
+        <ReportFigure title={tx('rp.ownerEffort')} note={tx('rp.ownerEffortNote')}>
           {ownerEffort.length ? (
-            <HBars label="Esforço por responsável" rows={ownerEffort.map((g) => ({ label: g.key, value: g.effortExecH, display: `${fmtNum(g.effortExecH, 2)} pessoa-h` }))} />
+            <HBars label={tx('rp.ownerEffortLabel')} rows={ownerEffort.map((g) => ({ label: g.key, value: g.effortExecH, display: tx('rp.personH', { v: fmtNum(g.effortExecH, 2) }) }))} />
           ) : (
-            <p className="text-[12px] text-ink2">Sem duração e pessoas informadas por responsável.</p>
+            <p className="text-[12px] text-ink2">{tx('rp.noOwnerData')}</p>
           )}
         </ReportFigure>
       </Section>
 
       {sc && cmp && (
-        <Section n={next()} title={`Impacto estimado — AS-IS × TO-BE “${sc.name}”`} breakBefore>
-          <ReportFigure title="Comparação AS-IS × TO-BE por indicador" note={`Cada linha tem a própria escala. À direita, a variação do TO-BE em relação ao AS-IS.${cmp.business.volumeDiffers ? ' TO-BE normalizado para o volume do AS-IS.' : ''}`}>
-            {pairs.length ? <PairBars label="AS-IS × TO-BE" rows={pairs} /> : <p className="text-[12px] text-ink2">Sem indicadores comparáveis (faltam dados nos dois cenários).</p>}
+        <Section n={next()} title={tx('rp.impact', { name: sc.name })} breakBefore>
+          <ReportFigure title={tx('rp.cmpTitle')} note={tx('rp.cmpNote') + (cmp.business.volumeDiffers ? tx('rp.cmpNorm') : '')}>
+            {pairs.length ? <PairBars label="AS-IS × TO-BE" rows={pairs} /> : <p className="text-[12px] text-ink2">{tx('rp.noPairs')}</p>}
           </ReportFigure>
           {cases.some((x) => x.netBenefitMonth !== null) && (
-            <ReportFigure title="Cenários do business case — benefício líquido por mês" note="Ao lado do nome, o investimento de cada cenário (o payback usa esse valor). Conservador, base e otimista variam a realização do benefício e o investimento. Estimativas, não economia realizada.">
+            <ReportFigure title={tx('rp.casesTitle')} note={tx('rp.casesNote')}>
               <HBars
-                label="Cenários"
+                label={tx('rp.casesLabel')}
                 valueW={250}
                 rows={cases.map((x) => ({
                   // Investimento do cenário no rótulo: o payback de cada caso usa o próprio investimento.
                   label: x.investment === null ? CASE_LABEL[x.key] : `${CASE_LABEL[x.key]} — ${fmtBRL(x.investment)}`,
                   value: Math.max(0, x.netBenefitMonth ?? 0),
-                  display: x.netBenefitMonth === null ? '—' : `${fmtBRL(x.netBenefitMonth)}/mês`,
-                  sub: x.paybackMonths === null ? '· sem payback' : `· payback ${x.paybackMonths === 0 ? 'imediato' : `${fmtNum(x.paybackMonths, 1)} meses`}`,
+                  display: x.netBenefitMonth === null ? '—' : tx('rp.perMonth', { v: fmtBRL(x.netBenefitMonth) }),
+                  sub: x.paybackMonths === null ? tx('rp.noPayback') : tx('rp.paybackSub', { v: pbText(x.paybackMonths) }),
                   color: RC.toBe,
                 }))}
               />
@@ -270,36 +280,36 @@ export default function ReportPage() {
         </Section>
       )}
 
-      <Section n={next()} title="Processo e escopo" breakBefore>
+      <Section n={next()} title={tx('rp.s3')} breakBefore>
         <table className={tbl}>
           <tbody>
-            <Row k="Descrição" v={w.asIs.description ?? 'não informada'} />
-            <Row k="Área / dono" v={`${w.asIs.area ?? '—'} / ${w.asIs.processOwner ?? '—'}`} />
-            <Row k="Volume" v={w.asIs.volume !== undefined ? `${fmtNum(w.asIs.volume)} execuções/${per}` : 'não informado'} b="informado" />
-            <Row k="Etapas" v={w.asIs.stageOrder.join(' → ')} />
-            <Row k="Origem dos dados" v={w.source.kind === 'import' ? `Planilha ${w.source.fileName} (${fmtDate(w.source.importedAt)})` : w.source.kind === 'demo' ? 'Exemplo fictício' : 'Assistente guiado (informado pelo usuário)'} />
-            <Row k="Premissa de conversão" v={`1 dia = ${w.asIs.hoursPerDay} h de trabalho`} b="informado" />
+            <Row k={tx('rp.r.desc')} v={w.asIs.description ?? tx('rp.notInformedF')} />
+            <Row k={tx('rp.r.areaOwner')} v={`${w.asIs.area ?? '—'} / ${w.asIs.processOwner ?? '—'}`} />
+            <Row k={tx('as.rev.volume')} v={w.asIs.volume !== undefined ? tx('rp.runsPer', { v: fmtNum(w.asIs.volume), per }) : tx('rp.notInformed')} b="informado" />
+            <Row k={tx('as.rev.stages')} v={w.asIs.stageOrder.join(' → ')} />
+            <Row k={tx('rp.r.origin')} v={w.source.kind === 'import' ? tx('rp.r.originSheet', { file: w.source.fileName, date: fmtDate(w.source.importedAt) }) : w.source.kind === 'demo' ? tx('rp.r.originDemo') : tx('rp.r.originWizard')} />
+            <Row k={tx('rp.r.conv')} v={tx('rp.r.convVal', { h: w.asIs.hoursPerDay })} b="informado" />
           </tbody>
         </table>
       </Section>
 
-      <Section n={next()} title="Indicadores do processo atual (AS-IS)">
+      <Section n={next()} title={tx('rp.s4')}>
         <table className={tbl}>
           <thead>
             <tr>
-              <th className={h}>Indicador</th>
-              <th className={h}>Valor e base</th>
+              <th className={h}>{tx('rp.t.indicator')}</th>
+              <th className={h}>{tx('rp.t.valueBasis')}</th>
             </tr>
           </thead>
           <tbody>
-            <Row k="Atividades (tarefas · decisões)" v={`${m.counts.tasks} · ${m.counts.decisions}`} b="informado" />
-            <Row k="Soma das durações registradas" v={m.activeSumH.value === null ? 'não calculado (sem durações)' : `${fmtHours(m.activeSumH.value)} (${m.activeSumH.coverage.used}/${m.activeSumH.coverage.total} com duração)`} b="calculado" />
-            <Row k="Tempo decorrido estimado" v={m.elapsed.status === 'ok' ? `${fmtHours(m.elapsed.hours)} — ${m.elapsed.basis === 'sequencia_unica' ? 'sequência única' : 'caminho mais longo, sem retrabalho'}` : `não calculado: ${m.elapsed.reasons.join(' ')}`} b="estimado" />
-            <Row k="Esforço por execução" v={m.effortExecH.value === null ? 'não calculado (faltam pessoas/duração)' : `${fmtNum(m.effortExecH.value)} pessoa-h`} b="calculado" />
-            <Row k={`Esforço por ${per}`} v={m.effortPeriodH.value === null ? `não calculado: ${m.effortPeriodH.reason}` : `${fmtNum(m.effortPeriodH.value)} pessoa-h`} b="estimado" />
-            <Row k={`Custo estimado por ${per}`} v={m.totalCostPeriod.value === null ? `não calculado: ${m.totalCostPeriod.reason}` : fmtBRL(m.totalCostPeriod.value)} b="estimado" />
-            <Row k="Distribuição Lean (base: duração classificada)" v={m.lean.classifiedHours ? `${LEAN_LABEL.VA} ${fmtPct(m.lean.pct.VA)} · ${LEAN_LABEL.NNVA} ${fmtPct(m.lean.pct.NNVA)} · ${LEAN_LABEL.W} ${fmtPct(m.lean.pct.W)} · ${m.counts.unclassified} não classificada(s)` : 'sem classificação'} b="calculado" />
-            <Row k={`Retrabalho por ${per}`} v={m.rework.effortPeriodH === null ? `${m.counts.rework} atividade(s) marcadas; esforço não calculado` : `${fmtNum(m.rework.effortPeriodH)} pessoa-h`} b="estimado" />
+            <Row k={tx('rp.i.acts')} v={`${m.counts.tasks} · ${m.counts.decisions}`} b="informado" />
+            <Row k={tx('rp.i.sum')} v={m.activeSumH.value === null ? tx('rp.i.sumNone') : tx('rp.i.sumVal', { h: fmtHours(m.activeSumH.value), used: m.activeSumH.coverage.used, total: m.activeSumH.coverage.total })} b="calculado" />
+            <Row k={tx('rp.i.elapsed')} v={m.elapsed.status === 'ok' ? tx('rp.i.elapsedVal', { h: fmtHours(m.elapsed.hours), basis: m.elapsed.basis === 'sequencia_unica' ? tx('rp.i.single') : tx('rp.i.longest') }) : tx('rp.notCalcWhy', { why: m.elapsed.reasons.join(' ') })} b="estimado" />
+            <Row k={tx('rp.i.effortRun')} v={m.effortExecH.value === null ? tx('rp.i.effortNone') : tx('rp.personH', { v: fmtNum(m.effortExecH.value) })} b="calculado" />
+            <Row k={tx('rp.k.effort', { per })} v={m.effortPeriodH.value === null ? tx('rp.notCalcWhy', { why: m.effortPeriodH.reason }) : tx('rp.personH', { v: fmtNum(m.effortPeriodH.value) })} b="estimado" />
+            <Row k={tx('rp.i.estCost', { per })} v={m.totalCostPeriod.value === null ? tx('rp.notCalcWhy', { why: m.totalCostPeriod.reason }) : fmtBRL(m.totalCostPeriod.value)} b="estimado" />
+            <Row k={tx('rp.i.lean')} v={m.lean.classifiedHours ? tx('rp.i.leanVal', { va: `${LEAN_LABEL.VA} ${fmtPct(m.lean.pct.VA)}`, nnva: `${LEAN_LABEL.NNVA} ${fmtPct(m.lean.pct.NNVA)}`, w: `${LEAN_LABEL.W} ${fmtPct(m.lean.pct.W)}`, n: m.counts.unclassified }) : tx('rp.noClass')} b="calculado" />
+            <Row k={tx('rp.i.rework', { per })} v={m.rework.effortPeriodH === null ? tx('rp.i.reworkNone', { n: m.counts.rework }) : tx('rp.personH', { v: fmtNum(m.rework.effortPeriodH) })} b="estimado" />
           </tbody>
         </table>
         {m.assumptions.length > 0 && (
@@ -311,11 +321,11 @@ export default function ReportPage() {
         )}
       </Section>
 
-      <Section n={next()} title="Mapa do processo" breakBefore>
+      <Section n={next()} title={tx('rp.s5')} breakBefore>
         {svgs === null ? (
-          <p className="text-sm text-muted">Desenhando mapas…</p>
+          <p className="text-sm text-muted">{tx('rp.drawing')}</p>
         ) : svgs.length === 0 ? (
-          <p className="text-sm text-bad">Não foi possível desenhar os mapas neste navegador.</p>
+          <p className="text-sm text-bad">{tx('rp.drawFail')}</p>
         ) : (
           svgs.map((s, i) => (
             <figure key={i} className="avoid-break mb-4">
@@ -333,18 +343,18 @@ export default function ReportPage() {
         )}
       </Section>
 
-      <Section n={next()} title="Diagnóstico: gargalos e dados" breakBefore>
+      <Section n={next()} title={tx('rp.s6')} breakBefore>
         <p className="text-[12px] text-ink2">
-          Regra de gargalo: participação ≥ {w.bottleneck.thresholdPct}% em “{CRITERION_LABEL[w.bottleneck.criterion]}” (máx. 5). Indica concentração; não prova causa-raiz.
+          {tx('rp.bnRule', { pct: w.bottleneck.thresholdPct, crit: CRITERION_LABEL[w.bottleneck.criterion] })}
         </p>
         {bn.flagged.length ? (
           <table className={`${tbl} mt-2`}>
             <thead>
               <tr>
                 <th className={h}>#</th>
-                <th className={h}>Atividade</th>
-                <th className={h}>Etapa</th>
-                <th className={h}>Participação</th>
+                <th className={h}>{tx('rp.t.activity')}</th>
+                <th className={h}>{tx('rp.t.stage')}</th>
+                <th className={h}>{tx('rp.t.share')}</th>
               </tr>
             </thead>
             <tbody>
@@ -359,26 +369,26 @@ export default function ReportPage() {
             </tbody>
           </table>
         ) : (
-          <p className="mt-2 text-sm">{bn.reason ?? 'Nenhuma atividade acima do limiar.'}</p>
+          <p className="mt-2 text-sm">{bn.reason ?? tx('rp.noneAbove')}</p>
         )}
         {gaps.length > 0 && (
           <p className="mt-2 text-[12px] text-ink2">
-            Dados faltantes: {gaps.map((g) => `${g.label} (${g.missing}/${g.total})`).join('; ')}.
+            {tx('rp.gaps', { list: gaps.map((g) => `${g.label} (${g.missing}/${g.total})`).join('; ') })}
           </p>
         )}
       </Section>
 
-      <Section n={next()} title="Recomendações avaliadas">
-        <p className="text-[12px] text-ink2">Análise automática baseada em dados e regras (sem IA generativa). {rejected} recomendação(ões) rejeitada(s) não constam abaixo.</p>
+      <Section n={next()} title={tx('rp.s7')}>
+        <p className="text-[12px] text-ink2">{tx('rp.recIntro', { n: rejected })}</p>
         {decided.length ? (
           <table className={`${tbl} mt-2`}>
             <thead>
               <tr>
-                <th className={h}>Recomendação</th>
-                <th className={h}>Grupo</th>
-                <th className={h}>Evidência</th>
-                <th className={h}>Hipótese (a validar)</th>
-                <th className={h}>Situação</th>
+                <th className={h}>{tx('rp.t.rec')}</th>
+                <th className={h}>{tx('rp.t.group')}</th>
+                <th className={h}>{tx('rp.t.evidence')}</th>
+                <th className={h}>{tx('rp.t.hypothesis')}</th>
+                <th className={h}>{tx('rp.t.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -386,28 +396,28 @@ export default function ReportPage() {
                 <tr key={r.id}>
                   <td className={c}>{r.title}</td>
                   <td className={c}>{GROUP_LABEL[r.group]}</td>
-                  <td className={c}>{r.evidence.map((e) => `${e.kind === 'fato' ? 'Fato' : 'Inferência'}: ${e.text}`).join(' ')}</td>
+                  <td className={c}>{r.evidence.map((e) => `${e.kind === 'fato' ? tx('rp.fact') : tx('rp.inference')}: ${e.text}`).join(' ')}</td>
                   <td className={c}>{r.hypothesis}</td>
-                  <td className={c}>{w.recDecisions[r.id]?.status === 'accepted' ? 'Aceita' : 'Investigando'}</td>
+                  <td className={c}>{w.recDecisions[r.id]?.status === 'accepted' ? tx('rp.accepted') : tx('rp.investigating')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          <p className="mt-2 text-sm">Nenhuma recomendação aceita ou em investigação.</p>
+          <p className="mt-2 text-sm">{tx('rp.noRecs')}</p>
         )}
       </Section>
 
       {sc && cmp && (
         <>
-          <Section n={next()} title={`Mudanças propostas — TO-BE “${sc.name}”`} breakBefore>
+          <Section n={next()} title={tx('rp.changes', { name: sc.name })} breakBefore>
             {sc.changes.length ? (
               <table className={tbl}>
                 <thead>
                   <tr>
-                    <th className={h}>Mudança</th>
-                    <th className={h}>Justificativa</th>
-                    <th className={h}>Hipótese</th>
+                    <th className={h}>{tx('rp.t.change')}</th>
+                    <th className={h}>{tx('rp.t.justification')}</th>
+                    <th className={h}>{tx('rp.t.hyp')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -423,48 +433,48 @@ export default function ReportPage() {
                 </tbody>
               </table>
             ) : (
-              <p className="text-sm">Nenhuma mudança registrada.</p>
+              <p className="text-sm">{tx('rp.noChanges')}</p>
             )}
           </Section>
-          <Section n={next()} title="Comparação AS-IS × TO-BE">
+          <Section n={next()} title={tx('rp.cmpSection')}>
             <table className={tbl}>
               <thead>
                 <tr>
-                  <th className={h}>Indicador</th>
-                  <th className={h}>Unidade</th>
+                  <th className={h}>{tx('rp.t.indicator')}</th>
+                  <th className={h}>{tx('rp.t.unit')}</th>
                   <th className={h}>AS-IS</th>
                   <th className={h}>TO-BE</th>
-                  <th className={h}>Redução</th>
-                  <th className={h}>Base</th>
+                  <th className={h}>{tx('rp.t.reduction')}</th>
+                  <th className={h}>{tx('rp.t.basis')}</th>
                 </tr>
               </thead>
               <tbody>
                 {cmp.rows.map((r) => (
                   <tr key={r.key}>
                     <td className={c}>{r.label}</td>
-                    <td className={c}>{r.unit}</td>
-                    <td className={c}>{r.unit === 'R$/mês' ? fmtBRL(r.asIs) : r.unit === 'horas' ? fmtHours(r.asIs) : fmtNum(r.asIs)}</td>
-                    <td className={c}>{r.unit === 'R$/mês' ? fmtBRL(r.toBe) : r.unit === 'horas' ? fmtHours(r.toBe) : fmtNum(r.toBe)}</td>
+                    <td className={c}>{unitText(r.unit)}</td>
+                    <td className={c}>{isCostUnit(r.unit) ? fmtBRL(r.asIs) : r.unit === 'horas' ? fmtHours(r.asIs) : fmtNum(r.asIs)}</td>
+                    <td className={c}>{isCostUnit(r.unit) ? fmtBRL(r.toBe) : r.unit === 'horas' ? fmtHours(r.toBe) : fmtNum(r.toBe)}</td>
                     <td className={c}>{r.lowerIsBetter ? fmtPct(r.reductionPct, 1) : '—'}</td>
-                    <td className={c}>{r.basis}</td>
+                    <td className={c}>{basisText(r.basis)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {cmp.business.volumeDiffers && <p className="mt-1 text-[12px] text-ink2">Volumes diferentes: TO-BE normalizado para o volume do AS-IS.</p>}
+            {cmp.business.volumeDiffers && <p className="mt-1 text-[12px] text-ink2">{tx('rp.volDiffers')}</p>}
           </Section>
-          <Section n={next()} title="Business case (estimado)">
+          <Section n={next()} title={tx('rp.bc')}>
             <table className={tbl}>
               <tbody>
-                <Row k="Horas potencialmente liberadas" v={cmp.business.freedHoursMonth === null ? `não calculado: ${cmp.business.reasons.freed}` : `${fmtNum(cmp.business.freedHoursMonth)} pessoa-h/mês (capacidade, não caixa)`} b="estimado" />
-                <Row k="Benefício financeiro bruto" v={cmp.business.grossBenefitMonth === null ? `não calculado: ${cmp.business.reasons.gross}` : `${fmtBRL(cmp.business.grossBenefitMonth)}/mês`} b="estimado" />
-                <Row k="Custo recorrente novo" v={cmp.business.recurringCostPerMonth === null ? 'não informado' : `${fmtBRL(cmp.business.recurringCostPerMonth)}/mês`} b="informado" />
-                <Row k="Benefício líquido" v={cmp.business.netBenefitMonth === null ? `não calculado: ${cmp.business.reasons.net}` : `${fmtBRL(cmp.business.netBenefitMonth)}/mês`} b="estimado" />
-                <Row k="Investimento inicial" v={cmp.business.investment === null ? 'não informado' : fmtBRL(cmp.business.investment)} b="informado" />
-                <Row k="Payback" v={cmp.business.paybackMonths === null ? `não calculado: ${cmp.business.reasons.payback}` : cmp.business.paybackMonths === 0 ? 'imediato' : `${fmtNum(cmp.business.paybackMonths, 1)} meses`} b="estimado" />
-                <Row k={`ROI em ${cmp.business.horizonMonths} meses`} v={cmp.business.roiPct === null ? `não calculado: ${cmp.business.reasons.roi}` : fmtPct(cmp.business.roiPct)} b="estimado" />
-                <Row k="Confiança qualitativa" v={`${CONFIDENCE_LABEL[cmp.business.confidence.level]} — ${cmp.business.confidence.reasons.join(' ')}`} />
-                {sc.approvedTarget && <Row k="Meta aprovada" v={`${sc.approvedTarget.description}${sc.approvedTarget.value !== undefined ? `: ${fmtNum(sc.approvedTarget.value)} ${sc.approvedTarget.unit ?? ''}` : ''} (por ${sc.approvedTarget.approvedBy ?? '—'}, ${fmtDate(sc.approvedTarget.approvedAt)})`} />}
+                <Row k={tx('rp.bc.freed')} v={cmp.business.freedHoursMonth === null ? tx('rp.notCalcWhy', { why: cmp.business.reasons.freed }) : tx('rp.bc.freedVal', { v: fmtNum(cmp.business.freedHoursMonth) })} b="estimado" />
+                <Row k={tx('rp.bc.gross')} v={cmp.business.grossBenefitMonth === null ? tx('rp.notCalcWhy', { why: cmp.business.reasons.gross }) : tx('rp.perMonth', { v: fmtBRL(cmp.business.grossBenefitMonth) })} b="estimado" />
+                <Row k={tx('rp.bc.recurring')} v={cmp.business.recurringCostPerMonth === null ? tx('rp.notInformed') : tx('rp.perMonth', { v: fmtBRL(cmp.business.recurringCostPerMonth) })} b="informado" />
+                <Row k={tx('rp.bc.net')} v={cmp.business.netBenefitMonth === null ? tx('rp.notCalcWhy', { why: cmp.business.reasons.net }) : tx('rp.perMonth', { v: fmtBRL(cmp.business.netBenefitMonth) })} b="estimado" />
+                <Row k={tx('rp.bc.invest')} v={cmp.business.investment === null ? tx('rp.notInformed') : fmtBRL(cmp.business.investment)} b="informado" />
+                <Row k="Payback" v={cmp.business.paybackMonths === null ? tx('rp.notCalcWhy', { why: cmp.business.reasons.payback }) : pbText(cmp.business.paybackMonths)} b="estimado" />
+                <Row k={tx('rp.k.roi', { h: cmp.business.horizonMonths })} v={cmp.business.roiPct === null ? tx('rp.notCalcWhy', { why: cmp.business.reasons.roi }) : fmtPct(cmp.business.roiPct)} b="estimado" />
+                <Row k={tx('rp.bc.conf')} v={`${CONFIDENCE_LABEL[cmp.business.confidence.level]} — ${cmp.business.confidence.reasons.join(' ')}`} />
+                {sc.approvedTarget && <Row k={tx('rp.bc.target')} v={`${sc.approvedTarget.description}${sc.approvedTarget.value !== undefined ? `: ${fmtNum(sc.approvedTarget.value)} ${sc.approvedTarget.unit ?? ''}` : ''} ${tx('rp.bc.targetBy', { by: sc.approvedTarget.approvedBy ?? '—', date: fmtDate(sc.approvedTarget.approvedAt) })}`} />}
               </tbody>
             </table>
             {/* Bloco indivisível: a tabela de 3 cenários e as fórmulas ficam na mesma página. */}
@@ -472,9 +482,9 @@ export default function ReportPage() {
             <table className={`${tbl} mt-2`}>
               <thead>
                 <tr>
-                  <th className={h}>Caso</th>
-                  <th className={h}>Premissas</th>
-                  <th className={h}>Benefício líquido</th>
+                  <th className={h}>{tx('rp.t.case')}</th>
+                  <th className={h}>{tx('rp.t.assumptions')}</th>
+                  <th className={h}>{tx('rp.bc.net')}</th>
                   <th className={h}>Payback</th>
                 </tr>
               </thead>
@@ -483,54 +493,54 @@ export default function ReportPage() {
                   <tr key={x.key}>
                     <td className={c}>{CASE_LABEL[x.key]}</td>
                     <td className={c}>
-                      realização {fmtNum(x.realizationPct)}% · investimento {fmtNum(x.investmentPct)}%{x.investment !== null && ` (${fmtBRL(x.investment)})`}
+                      {tx('rp.bc.caseAssump', { r: fmtNum(x.realizationPct), i: fmtNum(x.investmentPct) })}{x.investment !== null && ` (${fmtBRL(x.investment)})`}
                     </td>
-                    <td className={c}>{x.netBenefitMonth === null ? '—' : `${fmtBRL(x.netBenefitMonth)}/mês`}</td>
-                    <td className={c}>{x.paybackMonths === null ? 'sem payback' : x.paybackMonths === 0 ? 'imediato' : `${fmtNum(x.paybackMonths, 1)} meses`}</td>
+                    <td className={c}>{x.netBenefitMonth === null ? '—' : tx('rp.perMonth', { v: fmtBRL(x.netBenefitMonth) })}</td>
+                    <td className={c}>{x.paybackMonths === null ? tx('rp.noPaybackPlain') : pbText(x.paybackMonths)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="mt-1 text-[12px] text-ink2">Fórmulas: benefício bruto = custo comparável AS-IS − TO-BE; líquido = bruto − custo recorrente; payback = investimento do cenário ÷ líquido mensal; ROI = (líquido × horizonte − investimento) ÷ investimento.</p>
+            <p className="mt-1 text-[12px] text-ink2">{tx('rp.formulas')}</p>
             </div>
           </Section>
-          <Section n={next()} title="Premissas, riscos e pontos a validar">
+          <Section n={next()} title={tx('rp.assump')}>
             <ul className="list-disc pl-5 text-[12px]">
               {sc.assumptions.map((a) => (
                 <li key={a.id}>
-                  {a.text} — <em>{a.status === 'a_validar' ? 'a validar' : a.status}</em>
+                  {a.text} — <em>{a.status === 'a_validar' ? tx('rp.toValidate') : a.status === 'validada' ? tx('rp.validated') : a.status === 'rejeitada' ? tx('rp.rejected') : a.status}</em>
                 </li>
               ))}
               {responsibilityChanges(w.asIs, sc.process).map((r) => (
                 <li key={r.activityId + r.kind}>
-                  Responsabilidade ({r.kind}): {r.activity}
+                  {tx('rp.resp', { kind: tx(`rp.resp.${r.kind}` as 'rp.resp.nova'), activity: r.activity })}
                   {r.from || r.to ? ` — ${r.from ?? '—'} → ${r.to ?? '—'}` : ''}
                 </li>
               ))}
-              {sc.dependencies && <li>Dependências: {sc.dependencies}</li>}
-              {sc.risks && <li>Riscos do cenário: {sc.risks}</li>}
+              {sc.dependencies && <li>{tx('rp.deps', { v: sc.dependencies })}</li>}
+              {sc.risks && <li>{tx('rp.scRisks', { v: sc.risks })}</li>}
               {w.risks.map((r) => (
                 <li key={r.id}>
-                  Risco: {r.description} ({r.status}){r.control ? ` — controle: ${r.control}` : ''}
+                  {tx('rp.risk', { desc: r.description, status: r.status === 'aberto' ? tx('rp.risk.aberto') : r.status === 'mitigando' ? tx('rp.risk.mitigando') : r.status === 'fechado' ? tx('rp.risk.fechado') : r.status })}{r.control ? tx('rp.riskControl', { v: r.control }) : ''}
                 </li>
               ))}
-              {!sc.assumptions.length && !sc.dependencies && !sc.risks && !w.risks.length && <li>Nenhuma premissa ou risco registrado.</li>}
+              {!sc.assumptions.length && !sc.dependencies && !sc.risks && !w.risks.length && <li>{tx('rp.noAssump')}</li>}
             </ul>
           </Section>
         </>
       )}
 
       {/* Sempre em página nova: o Safari ignora "não quebrar linha de tabela" e cortava uma ação ao meio. */}
-      <Section n={next()} title="Plano de ação" breakBefore>
+      <Section n={next()} title={tx('rp.plan')} breakBefore>
         {w.actions.length ? (
           <table className={tbl}>
             <thead>
               <tr>
-                <th className={h}>Ação</th>
-                <th className={h}>Responsável</th>
-                <th className={h}>Prazo</th>
-                <th className={h}>Situação</th>
-                <th className={h}>Indicador de sucesso</th>
+                <th className={h}>{tx('rp.t.action')}</th>
+                <th className={h}>{tx('rp.t.owner')}</th>
+                <th className={h}>{tx('rp.t.due')}</th>
+                <th className={h}>{tx('rp.t.status')}</th>
+                <th className={h}>{tx('rp.t.success')}</th>
               </tr>
             </thead>
             <tbody>
@@ -538,11 +548,11 @@ export default function ReportPage() {
                 <tr key={a.id}>
                   <td className={c}>
                     {a.description}
-                    {relatedProblemOf(a, w) && <span className="block text-[12px] text-ink2">Problema: {relatedProblemOf(a, w)}</span>}
-                    {a.status === 'concluida' && a.observedResult && <span className="block text-[12px]">Resultado observado: {a.observedResult}</span>}
+                    {relatedProblemOf(a, w) && <span className="block text-[12px] text-ink2">{tx('rp.problem', { v: relatedProblemOf(a, w) })}</span>}
+                    {a.status === 'concluida' && a.observedResult && <span className="block text-[12px]">{tx('rp.observed', { v: a.observedResult })}</span>}
                   </td>
-                  <td className={c}>{a.owner ?? 'pendente'}</td>
-                  <td className={c}>{a.due ? fmtDate(a.due) : 'pendente'}</td>
+                  <td className={c}>{a.owner ?? tx('rp.pending')}</td>
+                  <td className={c}>{a.due ? fmtDate(a.due) : tx('rp.pending')}</td>
                   <td className={c}>{ACTION_STATUS[a.status]}</td>
                   <td className={c}>{a.successIndicator ?? '—'}</td>
                 </tr>
@@ -550,19 +560,19 @@ export default function ReportPage() {
             </tbody>
           </table>
         ) : (
-          <p className="text-sm">Nenhuma ação registrada.</p>
+          <p className="text-sm">{tx('rp.noActions')}</p>
         )}
       </Section>
 
-      <Section n={next()} title="Resultados realizados">
+      <Section n={next()} title={tx('rp.results')}>
         {w.results.filter((r) => !r.noData).length ? (
           <table className={tbl}>
             <thead>
               <tr>
-                <th className={h}>Período</th>
-                <th className={h}>Indicador</th>
-                <th className={h}>Valor medido</th>
-                <th className={h}>Fonte</th>
+                <th className={h}>{tx('rp.t.period')}</th>
+                <th className={h}>{tx('rp.t.indicator')}</th>
+                <th className={h}>{tx('rp.t.measured')}</th>
+                <th className={h}>{tx('rp.t.source')}</th>
               </tr>
             </thead>
             <tbody>
@@ -573,7 +583,7 @@ export default function ReportPage() {
                     <td className={c}>{r.period}</td>
                     <td className={c}>{r.label ?? r.metric}</td>
                     <td className={c}>
-                      {fmtNum(r.value)} {r.unit} <Badge tone="ok">Realizado</Badge>
+                      {fmtNum(r.value)} {r.unit} <Badge tone="ok">{tx('rp.basis.realizadoBadge')}</Badge>
                     </td>
                     <td className={c}>{r.source ?? '—'}</td>
                   </tr>
@@ -581,12 +591,12 @@ export default function ReportPage() {
             </tbody>
           </table>
         ) : (
-          <p className="text-sm">Ainda não há resultados medidos. Benefícios acima são estimativas.</p>
+          <p className="text-sm">{tx('rp.noResults')}</p>
         )}
       </Section>
 
       <footer className="mt-6 border-t border-line/25 pt-2 text-xs text-muted">
-        Metodologia: cálculos determinísticos documentados no app (“Como calculamos”). Valores ausentes não são substituídos por zero. Diagramas BPMN gerados automaticamente e renderizados com bpmn-js (bpmn.io). {BRAND.name} não é afiliado ao PMI®.
+        {tx('rp.footer', { brand: BRAND.name })}
       </footer>
     </div>
   );
