@@ -10,7 +10,7 @@ import { nowIso, uid } from '../domain/units';
 import { validateProcess } from '../domain/validation';
 import { FIELDS, type FieldKey } from '../io/fields';
 import { ImportError, readImportFile, type ParsedFile } from '../io/parse';
-import { autoMap, findSheet, pickActivitySheet, rowsToProcess, type Mapping } from '../io/toProcess';
+import { autoMap, findCostSheet, findProcessSheet, pickActivitySheet, rowsToProcess, type Mapping } from '../io/toProcess';
 import { db } from '../storage/db';
 import { createWorkspace, downloadTemplateCsv, downloadTemplateXlsx } from '../state/actions';
 import { demoBlocked } from '../license/demo';
@@ -53,8 +53,8 @@ export default function ImportPage() {
       const idx = pickActivitySheet(parsed.sheets);
       setSheetIdx(idx);
       setMapping(autoMap(parsed.sheets[idx].headers).mapping);
-      const procSheet = findSheet(parsed.sheets, t('pg.imp.001'));
-      const nm = procSheet?.rows.find((r) => /nome do processo/i.test(String(r.values[0] ?? '')))?.values[1];
+      const procSheet = findProcessSheet(parsed.sheets);
+      const nm = procSheet?.rows.find((r) => /nome do processo|process name/i.test(String(r.values[0] ?? '')))?.values[1];
       setName(nm ? String(nm) : f.name.replace(/\.(xlsx|xlsm|csv|txt)$/i, ''));
       const existing = (await db.listWorkspaces()).find((w) => w.source.fileHash === parsed.hash);
       setDup(existing ?? null);
@@ -69,10 +69,10 @@ export default function ImportPage() {
 
   const result = useMemo(() => {
     if (!file || !sheet || step < 2) return null;
-    const r = rowsToProcess(sheet, mapping, { defaultUnit: unit, processName: name }, findSheet(file.sheets, t('pg.imp.001')), findSheet(file.sheets, t('pg.imp.003')));
+    const r = rowsToProcess(sheet, mapping, { defaultUnit: unit, processName: name }, findProcessSheet(file.sheets), findCostSheet(file.sheets));
     if (name.trim()) r.process.name = name.trim();
     return { ...r, validation: validateProcess(r.process) };
-  }, [file, sheet, mapping, unit, name, step, t]);
+  }, [file, sheet, mapping, unit, name, step]);
 
   const missingMinimal = FIELDS.filter((f) => f.minimal && f.key !== 'ordem' && mapping[f.key] === undefined);
   const blocking = result ? result.issues.filter((i) => i.severity === 'error').length + result.validation.filter((i) => i.severity === 'error').length : 0;

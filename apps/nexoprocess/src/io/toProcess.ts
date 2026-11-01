@@ -3,7 +3,8 @@
 import { newProcess, normalizeStages } from '../domain/factory';
 import type { Activity, DurationUnit, ElementType, LeanClass, Period, ProcessModel } from '../domain/types';
 import { parseLocaleNumber } from '../domain/units';
-import { CALC_HEADERS, FIELDS, normalizeHeader, PROCESS_FIELDS, type FieldKey } from './fields';
+import { CALC_HEADERS_EN, CALC_HEADERS_PT, EN_LABELS, FIELDS, normalizeHeader, PROCESS_EN_LABELS, PROCESS_FIELDS, processLabel, type FieldKey } from './fields';
+import { tr } from '../i18n';
 import type { ParsedSheet } from './parse';
 
 export type Mapping = Partial<Record<FieldKey, number>>;
@@ -15,7 +16,7 @@ export interface MappingResult {
   missingMinimal: FieldKey[];
 }
 
-const CALC_NORMALIZED = CALC_HEADERS.map(normalizeHeader);
+const CALC_NORMALIZED = [...CALC_HEADERS_PT, ...CALC_HEADERS_EN].map(normalizeHeader);
 
 export function autoMap(headers: string[]): MappingResult {
   const mapping: Mapping = {};
@@ -27,7 +28,7 @@ export function autoMap(headers: string[]): MappingResult {
     if (!n || CALC_NORMALIZED.includes(n)) return;
     let found: { key: FieldKey; exact: boolean } | undefined;
     for (const f of FIELDS) {
-      if (n === f.key || n === normalizeHeader(f.label)) {
+      if (n === f.key || n === normalizeHeader(f.label) || n === normalizeHeader(EN_LABELS[f.key])) {
         found = { key: f.key, exact: true };
         break;
       }
@@ -59,7 +60,7 @@ export function autoMap(headers: string[]): MappingResult {
 }
 
 export function pickActivitySheet(sheets: ParsedSheet[]): number {
-  const named = sheets.findIndex((s) => normalizeHeader(s.name) === 'atividades' && s.rows.length);
+  const named = sheets.findIndex((s) => ['atividades', 'activities'].includes(normalizeHeader(s.name)) && s.rows.length);
   if (named >= 0) return named;
   let best = 0;
   let bestScore = -1;
@@ -108,10 +109,10 @@ export function parseUnit(raw: string): DurationUnit | undefined | null {
 }
 export function parseLean(raw: string): LeanClass | undefined | null {
   const n = normalizeHeader(raw);
-  if (!n || ['nao_classificado', 'sem_classificacao', 'nc', 'na'].includes(n)) return undefined;
-  if (['agrega_valor', 'va', 'av', 'valor', 'agrega', 'value_added', 'value'].includes(n)) return 'VA';
-  if (['necessario', 'nnva', 'nav', 'necessario_sem_agregar_valor', 'necessario_sem_agregar', 'necessario_nao_agrega_valor', 'necessaria', 'business_value_added', 'bva'].includes(n)) return 'NNVA';
-  if (['desperdicio', 'w', 'waste', 'nao_agrega_valor', 'naoagrega', 'muda'].includes(n)) return 'W';
+  if (!n || ['nao_classificado', 'sem_classificacao', 'nc', 'na', 'not_classified', 'unclassified'].includes(n)) return undefined;
+  if (['agrega_valor', 'va', 'av', 'valor', 'agrega', 'value_added', 'value', 'adds_value'].includes(n)) return 'VA';
+  if (['necessario', 'nnva', 'nav', 'necessario_sem_agregar_valor', 'necessario_sem_agregar', 'necessario_nao_agrega_valor', 'necessaria', 'business_value_added', 'bva', 'necessary', 'required', 'necessary_but_adds_no_value'].includes(n)) return 'NNVA';
+  if (['desperdicio', 'w', 'waste', 'nao_agrega_valor', 'naoagrega', 'muda', 'no_value'].includes(n)) return 'W';
   return null;
 }
 export function parseBool(raw: string): boolean | undefined | null {
@@ -141,7 +142,7 @@ export interface ImportResult {
 
 export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: ImportOptions, processSheet?: ParsedSheet, costSheet?: ParsedSheet): ImportResult {
   const issues: RowIssue[] = [];
-  const p = newProcess(opts.processName || 'Processo importado');
+  const p = newProcess(opts.processName || tr('io.imp.processName'));
   if (processSheet) applyProcessSheet(p, processSheet, issues);
   if (costSheet) applyCostSheet(p, costSheet, issues);
   const get = (values: unknown[], k: FieldKey) => (mapping[k] === undefined ? '' : str(values[mapping[k]!]));
@@ -158,7 +159,7 @@ export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: Import
     const typeRaw = get(v, 'tipo_elemento');
     let type = parseType(typeRaw);
     if (type === null) {
-      issues.push({ row, field: 'tipo_elemento', severity: 'warning', message: `Tipo "${typeRaw}" não reconhecido; tratado como atividade. Use: início, atividade, decisão ou fim.` });
+      issues.push({ row, field: 'tipo_elemento', severity: 'warning', message: tr('io.imp.type', { raw: typeRaw }) });
       type = 'task';
     }
     const yesRaw = get(v, 'proxima_se_sim');
@@ -167,12 +168,12 @@ export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: Import
     if (!name && !stage) {
       // Linha sem nenhum campo mapeado preenchido = linha vazia do modelo: ignora sem alerta.
       const anyMapped = Object.values(mapping).some((i) => i !== undefined && str(v[i]) !== '');
-      if (anyMapped) issues.push({ row, severity: 'warning', message: 'Linha sem atividade nem etapa foi ignorada.' });
+      if (anyMapped) issues.push({ row, severity: 'warning', message: tr('io.imp.emptyRow') });
       return;
     }
     let id = get(v, 'id_atividade');
     if (id && usedIds.has(id)) {
-      issues.push({ row, field: 'id_atividade', severity: 'error', message: `Código "${id}" duplicado. Cada atividade precisa de um código único.` });
+      issues.push({ row, field: 'id_atividade', severity: 'error', message: tr('io.imp.dupId', { id }) });
     }
     if (!id) {
       let n = i + 1;
@@ -186,34 +187,34 @@ export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: Import
       const x = parseLocaleNumber(raw);
       if (x === undefined) return undefined;
       if (Number.isNaN(x)) {
-        issues.push({ row, field: k, severity: 'error', message: `${label}: "${raw}" não é um número.` });
+        issues.push({ row, field: k, severity: 'error', message: tr('io.imp.nan', { label, raw }) });
         return undefined;
       }
-      if (x < 0) issues.push({ row, field: k, severity: 'error', message: `${label}: valor negativo (${raw}).` });
+      if (x < 0) issues.push({ row, field: k, severity: 'error', message: tr('io.imp.neg', { label, raw }) });
       return x;
     };
     const unitRaw = get(v, 'unidade_duracao');
     let unit = parseUnit(unitRaw);
     if (unit === null) {
-      issues.push({ row, field: 'unidade_duracao', severity: 'error', message: `Unidade "${unitRaw}" não reconhecida. Use minutos, horas ou dias.` });
+      issues.push({ row, field: 'unidade_duracao', severity: 'error', message: tr('io.imp.unit', { raw: unitRaw }) });
       unit = opts.defaultUnit;
     }
-    const duration = num('duracao', 'Duração');
+    const duration = num('duracao', tr('io.lbl.duration'));
     if (!unit) {
       unit = opts.defaultUnit;
-      if (duration !== undefined) issues.push({ row, field: 'unidade_duracao', severity: 'info', message: `Unidade vazia: usada a unidade padrão escolhida (${opts.defaultUnit === 'min' ? 'minutos' : opts.defaultUnit === 'h' ? 'horas' : 'dias'}).` });
+      if (duration !== undefined) issues.push({ row, field: 'unidade_duracao', severity: 'info', message: tr('io.imp.unitEmpty', { unit: tr(opts.defaultUnit === 'min' ? 'io.v.unit.min' : opts.defaultUnit === 'h' ? 'io.v.unit.h' : 'io.v.unit.d') }) });
     }
     const leanRaw = get(v, 'classificacao_lean');
     let lean = parseLean(leanRaw);
     if (lean === null) {
-      issues.push({ row, field: 'classificacao_lean', severity: 'warning', message: `Classificação Lean "${leanRaw}" não reconhecida; ficou como não classificada.` });
+      issues.push({ row, field: 'classificacao_lean', severity: 'warning', message: tr('io.imp.lean', { raw: leanRaw }) });
       lean = undefined;
     }
     const bool = (k: FieldKey, label: string) => {
       const raw = get(v, k);
       const b = parseBool(raw);
       if (b === null) {
-        issues.push({ row, field: k, severity: 'warning', message: `${label}: "${raw}" não é sim/não; ignorado.` });
+        issues.push({ row, field: k, severity: 'warning', message: tr('io.imp.bool', { label, raw }) });
         return undefined;
       }
       return b;
@@ -221,36 +222,36 @@ export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: Import
     const ordRaw = get(v, 'ordem');
     let order = ordRaw ? parseLocaleNumber(ordRaw) : undefined;
     if (ordRaw && (order === undefined || Number.isNaN(order))) {
-      issues.push({ row, field: 'ordem', severity: 'warning', message: `Ordem "${ordRaw}" inválida; usada a posição da linha.` });
+      issues.push({ row, field: 'ordem', severity: 'warning', message: tr('io.imp.order', { raw: ordRaw }) });
       order = undefined;
     }
     const a: Activity = {
       id,
-      stage: stage || 'Sem etapa',
-      name: name || '(sem nome)',
+      stage: stage || tr('io.imp.noStage'),
+      name: name || tr('io.imp.noName'),
       type,
       order: order ?? i + 1,
       unit,
       duration,
-      wait: num('tempo_espera', 'Tempo de espera'),
-      minDuration: num('duracao_minima', 'Duração mínima'),
-      maxDuration: num('duracao_maxima', 'Duração máxima'),
-      people: num('quantidade_pessoas', 'Pessoas'),
+      wait: num('tempo_espera', tr('io.lbl.wait')),
+      minDuration: num('duracao_minima', tr('io.lbl.min')),
+      maxDuration: num('duracao_maxima', tr('io.lbl.max')),
+      people: num('quantidade_pessoas', tr('io.lbl.people')),
       owner: get(v, 'responsavel') || undefined,
       next: [],
       lean,
-      rework: bool('retrabalho', 'Retrabalho') || undefined,
-      frequencyPct: num('frequencia_pct', 'Frequência'),
-      critical: bool('atividade_critica', 'Crítica') || undefined,
-      volume: num('volume_periodo', 'Volume da atividade'),
-      costPerHour: num('custo_hora', 'Custo-hora'),
-      variableCost: num('custo_variavel', 'Custo variável'),
+      rework: bool('retrabalho', tr('io.lbl.rework')) || undefined,
+      frequencyPct: num('frequencia_pct', tr('io.lbl.freq')),
+      critical: bool('atividade_critica', tr('io.lbl.critical')) || undefined,
+      volume: num('volume_periodo', tr('io.lbl.volume')),
+      costPerHour: num('custo_hora', tr('io.lbl.cph')),
+      variableCost: num('custo_variavel', tr('io.lbl.var')),
       notes: get(v, 'observacoes') || undefined,
       sourceRow: row,
     };
-    if (!stage) issues.push({ row, field: 'etapa_macro', severity: 'warning', message: 'Etapa macro vazia: atividade agrupada em "Sem etapa".' });
-    if (!name) issues.push({ row, field: 'atividade', severity: 'error', message: 'Nome da atividade vazio.' });
-    if (a.frequencyPct !== undefined && (a.frequencyPct < 0 || a.frequencyPct > 100)) issues.push({ row, field: 'frequencia_pct', severity: 'error', message: 'Frequência deve estar entre 0 e 100.' });
+    if (!stage) issues.push({ row, field: 'etapa_macro', severity: 'warning', message: tr('io.imp.emptyStage', { stage: tr('io.imp.noStage') }) });
+    if (!name) issues.push({ row, field: 'atividade', severity: 'error', message: tr('io.imp.emptyName') });
+    if (a.frequencyPct !== undefined && (a.frequencyPct < 0 || a.frequencyPct > 100)) issues.push({ row, field: 'frequencia_pct', severity: 'error', message: tr('io.imp.freq') });
     const split = (s: string) => s.split(/[,;|\n]+/).map((x) => x.trim()).filter(Boolean);
     raws.push({ a, next: split(get(v, 'proxima_atividade')), yes: yesRaw, no: noRaw });
   });
@@ -268,12 +269,12 @@ export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: Import
     if (byId.has(ref)) return ref;
     const nm = byName.get(normalizeHeader(ref));
     if (nm?.length === 1) {
-      issues.push({ row, field, severity: 'info', message: `"${ref}" foi ligado à atividade de mesmo nome (código ${nm[0].id}).` });
+      issues.push({ row, field, severity: 'info', message: tr('io.imp.byName', { ref, id: nm[0].id }) });
       return nm[0].id;
     }
     const n = parseLocaleNumber(ref);
     if (n !== undefined && !Number.isNaN(n) && byOrder.get(n)?.length === 1) {
-      issues.push({ row, field, severity: 'info', message: `"${ref}" foi interpretado como a atividade de ordem ${n} (código ${byOrder.get(n)![0].id}).` });
+      issues.push({ row, field, severity: 'info', message: tr('io.imp.byOrder', { ref, n, id: byOrder.get(n)![0].id }) });
       return byOrder.get(n)![0].id;
     }
     return ref; // permanece inválida — a validação apontará
@@ -287,7 +288,7 @@ export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: Import
 
   const acts = raws.map((r) => r.a).sort((x, y) => x.order - y.order);
   const orders = acts.map((a) => a.order);
-  if (new Set(orders).size !== orders.length) issues.push({ row: 0, field: 'ordem', severity: 'warning', message: 'Há números de ordem repetidos; empates seguem a ordem das linhas.' });
+  if (new Set(orders).size !== orders.length) issues.push({ row: 0, field: 'ordem', severity: 'warning', message: tr('io.imp.dupOrder') });
 
   let flowInferred = false;
   if (!hasFlow && acts.length > 1) {
@@ -299,7 +300,7 @@ export function rowsToProcess(sheet: ParsedSheet, mapping: Mapping, opts: Import
       a.flowInferred = true;
     });
     if (acts.some((a) => a.type === 'decision'))
-      issues.push({ row: 0, severity: 'warning', message: 'Há decisões, mas a planilha não tem colunas de caminho (próxima se sim/não). Elas foram ligadas apenas à linha seguinte — revise as conexões.' });
+      issues.push({ row: 0, severity: 'warning', message: tr('io.imp.noPaths') });
   }
   // Atividades marcadas como início não seguem a ordem para trás etc.: nada mais é inferido.
   p.activities = acts;
@@ -313,10 +314,10 @@ function applyProcessSheet(p: ProcessModel, s: ParsedSheet, issues: RowIssue[]) 
   for (const r of s.rows) {
     const key = normalizeHeader(r.values[0]);
     const raw = str(r.values[1]);
-    const def = PROCESS_FIELDS.find((f) => normalizeHeader(f.label) === key || f.key === key);
+    const def = PROCESS_FIELDS.find((f) => normalizeHeader(f.label) === key || normalizeHeader(PROCESS_EN_LABELS[f.key]) === key || f.key === key);
     if (!def || !raw) continue;
     const n = parseLocaleNumber(raw);
-    const bad = () => issues.push({ row: r.rowNumber, severity: 'warning', message: `Aba Processo — "${def.label}": valor "${raw}" inválido; ignorado.` });
+    const bad = () => issues.push({ row: r.rowNumber, severity: 'warning', message: tr('io.imp.procSheet', { label: processLabel(def.key), raw }) });
     switch (def.key) {
       case 'nome_processo':
         p.name = raw;
@@ -369,12 +370,16 @@ function applyCostSheet(p: ProcessModel, s: ParsedSheet, issues: RowIssue[]) {
     if (!role || !raw) continue;
     const n = parseLocaleNumber(raw);
     if (n === undefined || Number.isNaN(n) || n < 0) {
-      issues.push({ row: r.rowNumber, severity: 'warning', message: `Custos por função — "${role}": valor "${raw}" inválido; ignorado.` });
+      issues.push({ row: r.rowNumber, severity: 'warning', message: tr('io.imp.costSheet', { role, raw }) });
       continue;
     }
     p.costPerHourByRole[role] = n;
   }
 }
+
+/** Abas do modelo, em PT ou EN (o arquivo pode vir de qualquer idioma do app). */
+export const findProcessSheet = (sheets: ParsedSheet[]) => findSheet(sheets, 'Processo') ?? findSheet(sheets, 'Process');
+export const findCostSheet = (sheets: ParsedSheet[]) => findSheet(sheets, 'Custos por função') ?? findSheet(sheets, 'Costs per role') ?? findSheet(sheets, 'Costs by role');
 
 export function findSheet(sheets: ParsedSheet[], name: string): ParsedSheet | undefined {
   return sheets.find((s) => normalizeHeader(s.name) === normalizeHeader(name));

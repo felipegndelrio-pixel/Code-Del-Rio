@@ -1,5 +1,6 @@
 // Leitura de XLSX/CSV inteiramente no navegador (nenhum envio a servidor).
 import type ExcelJS from 'exceljs';
+import { tr } from '../i18n';
 
 export interface ParsedSheet {
   name: string;
@@ -116,41 +117,41 @@ export async function sha256(data: ArrayBuffer): Promise<string> {
 export async function readImportFile(file: { name: string; size: number; arrayBuffer: () => Promise<ArrayBuffer> }): Promise<ParsedFile> {
   const lower = file.name.toLowerCase();
   if (file.size > MAX_IMPORT_BYTES)
-    throw new ImportError('Arquivo muito grande.', `O limite é ${MAX_IMPORT_BYTES / 1024 / 1024} MB para manter o processamento rápido no seu aparelho.`, 'Remova abas ou linhas que não fazem parte do processo e tente de novo.');
-  if (file.size === 0) throw new ImportError('O arquivo está vazio.', 'Não há dados para ler.', 'Confira se salvou a planilha antes de enviar.');
+    throw new ImportError(tr('io.err.big'), tr('io.err.big.why', { mb: MAX_IMPORT_BYTES / 1024 / 1024 }), tr('io.err.big.fix'));
+  if (file.size === 0) throw new ImportError(tr('io.err.empty'), tr('io.err.empty.why'), tr('io.err.empty.fix'));
   const buf = await file.arrayBuffer();
   const hash = await sha256(buf);
   const head = new Uint8Array(buf.slice(0, 4));
   const isZip = head[0] === 0x50 && head[1] === 0x4b;
   if (lower.endsWith('.xlsx') || lower.endsWith('.xlsm')) {
     if (!isZip)
-      throw new ImportError('O arquivo não parece ser um XLSX válido.', 'O conteúdo não corresponde ao formato do Excel moderno (.xlsx).', 'Abra no Excel/LibreOffice e use “Salvar como… → Pasta de trabalho do Excel (.xlsx)”, ou exporte como CSV.');
+      throw new ImportError(tr('io.err.notxlsx'), tr('io.err.notxlsx.why'), tr('io.err.notxlsx.fix'));
     let sheets: ParsedSheet[];
     try {
       sheets = await readWorkbook(buf);
     } catch {
-      throw new ImportError('Não foi possível ler a planilha.', 'O arquivo pode estar corrompido ou protegido por senha de abertura.', 'Salve uma nova cópia sem senha de abertura e tente de novo.');
+      throw new ImportError(tr('io.err.unreadable'), tr('io.err.unreadable.why'), tr('io.err.unreadable.fix'));
     }
-    if (!sheets.some((s) => s.rows.length)) throw new ImportError('Nenhuma linha de dados encontrada.', 'As abas visíveis não têm linhas abaixo do cabeçalho.', 'Preencha a aba “Atividades” do modelo (a partir da linha 2).');
+    if (!sheets.some((s) => s.rows.length)) throw new ImportError(tr('io.err.norows'), tr('io.err.norows.why'), tr('io.err.norows.fix'));
     checkRows(sheets);
     return { fileName: file.name, kind: 'xlsx', hash, sheets };
   }
   if (lower.endsWith('.csv') || lower.endsWith('.txt')) {
-    if (isZip) throw new ImportError('Este arquivo é um XLSX com extensão .csv.', 'O conteúdo é binário (zip).', 'Renomeie para .xlsx ou exporte de novo como CSV.');
+    if (isZip) throw new ImportError(tr('io.err.zipcsv'), tr('io.err.zipcsv.why'), tr('io.err.zipcsv.fix'));
     let text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
     // Planilhas salvas em Windows-1252 geram caracteres de substituição; tenta latin1.
     if (text.includes('�')) text = new TextDecoder('windows-1252').decode(buf);
     const sheet = readCsv(text, file.name);
-    if (!sheet.rows.length) throw new ImportError('Nenhuma linha de dados encontrada.', 'O CSV tem só o cabeçalho (ou está vazio).', 'Inclua uma linha por atividade abaixo do cabeçalho.');
+    if (!sheet.rows.length) throw new ImportError(tr('io.err.norows'), tr('io.err.csvnorows.why'), tr('io.err.csvnorows.fix'));
     checkRows([sheet]);
     return { fileName: file.name, kind: 'csv', hash, sheets: [sheet] };
   }
-  if (lower.endsWith('.xls')) throw new ImportError('Formato .xls (Excel 97-2003) não é suportado.', 'Esse formato antigo não pode ser lido com segurança no navegador.', 'Salve como .xlsx ou .csv e tente de novo.');
-  throw new ImportError('Formato de arquivo não suportado.', 'Aceitamos planilhas .xlsx e .csv.', 'Baixe o modelo oficial ou salve sua planilha em um desses formatos.');
+  if (lower.endsWith('.xls')) throw new ImportError(tr('io.err.xls'), tr('io.err.xls.why'), tr('io.err.xls.fix'));
+  throw new ImportError(tr('io.err.format'), tr('io.err.format.why'), tr('io.err.format.fix'));
 }
 
 function checkRows(sheets: ParsedSheet[]) {
   const max = Math.max(...sheets.map((s) => s.rows.length));
   if (max > MAX_IMPORT_ROWS)
-    throw new ImportError(`A planilha tem mais de ${MAX_IMPORT_ROWS} linhas.`, 'Mapas com milhares de atividades ficam ilegíveis e lentos.', 'Divida em processos menores (um por arquivo).');
+    throw new ImportError(tr('io.err.rows', { n: MAX_IMPORT_ROWS }), tr('io.err.rows.why'), tr('io.err.rows.fix'));
 }

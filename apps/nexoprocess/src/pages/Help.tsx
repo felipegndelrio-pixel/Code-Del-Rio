@@ -2,33 +2,35 @@ import { Link } from 'react-router-dom';
 import { Card, Callout } from '../components/ui';
 import { BRAND, COMMERCIAL } from '../config/brand';
 import { GLOSSARY } from '../config/glossary';
-import { FIELDS } from '../io/fields';
+import { fieldHelp, fieldLabel, FIELDS } from '../io/fields';
+import { useI18n } from '../i18n/I18nProvider';
 import { BackButton } from '../components/BackButton';
 import { SupportLink } from '../components/SupportLink';
 import { LICENSE } from '../license/config';
 
 export default function Help() {
+  const { t: tx } = useI18n();
   return (
     <div className="safe-x mx-auto max-w-4xl space-y-5 py-6">
       <div>
         <BackButton />
-        <h1 className="text-2xl font-bold">Ajuda</h1>
+        <h1 className="text-2xl font-bold">{tx('hp.title')}</h1>
       </div>
 
-      <Card title="Como funciona" subtitle="Jornada">
+      <Card title={tx('hp.how')} subtitle={tx('hp.how.sub')}>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-ink2">
-          <li>Descreva o processo atual (AS-IS) pelo assistente ou importando uma planilha.</li>
-          <li>Corrija os erros apontados na validação (os alertas podem ser aceitos).</li>
-          <li>Veja o mapa: clique em uma etapa para abrir atividades, decisões e retrabalho.</li>
-          <li>Leia o diagnóstico: tempo, esforço, desperdício e gargalos, com a regra de cada número.</li>
-          <li>Aceite, rejeite ou investigue as recomendações.</li>
-          <li>Monte o cenário futuro (TO-BE) — uma cópia; o AS-IS fica intacto.</li>
-          <li>Compare os cenários e gere o plano de ação.</li>
-          <li>Depois de implantar, registre os resultados reais e compare com o estimado.</li>
+          <li>{tx('hp.s1')}</li>
+          <li>{tx('hp.s2')}</li>
+          <li>{tx('hp.s3')}</li>
+          <li>{tx('hp.s4')}</li>
+          <li>{tx('hp.s5')}</li>
+          <li>{tx('hp.s6')}</li>
+          <li>{tx('hp.s7')}</li>
+          <li>{tx('hp.s8')}</li>
         </ol>
       </Card>
 
-      <Card title="Glossário" subtitle="Termos explicados">
+      <Card title={tx('hp.gloss')} subtitle={tx('hp.gloss.sub')}>
         <dl className="grid gap-3 sm:grid-cols-2">
           {Object.values(GLOSSARY).map((g) => (
             <div key={g.term}>
@@ -39,84 +41,82 @@ export default function Help() {
         </dl>
       </Card>
 
-      <Card title="Como calculamos" subtitle="Fórmulas">
+      <Card title={tx('hp.calc')} subtitle={tx('hp.calc.sub')}>
         <ul className="space-y-2 text-sm text-ink2">
-          <li><strong className="text-ink">Esforço (pessoa-hora)</strong> = duração em horas × pessoas trabalhando ao mesmo tempo.</li>
-          <li><strong className="text-ink">Esforço por execução</strong> = Σ esforço de cada atividade × frequência (sem frequência informada = 100%, e avisamos).</li>
-          <li><strong className="text-ink">Esforço por período</strong> = esforço por execução × volume do período (ou volume próprio da atividade).</li>
-          <li><strong className="text-ink">Custo de mão de obra</strong> = esforço no período × custo-hora (da atividade, senão da função, senão o padrão). Sem custo-hora, não há valor em R$.</li>
-          <li><strong className="text-ink">Custo total</strong> = mão de obra + custo variável × execuções — exceto quando você declara que o custo variável já inclui mão de obra (aí não somamos de novo).</li>
-          <li><strong className="text-ink">Distribuição Lean</strong> = horas de cada classe ÷ horas classificadas (base: duração, não quantidade).</li>
-          <li><strong className="text-ink">Soma das durações</strong> ≠ <strong className="text-ink">tempo decorrido</strong>: o tempo decorrido é o caminho mais longo do início ao fim, com esperas informadas e sem retrabalho.</li>
-          <li><strong className="text-ink">Gargalo</strong> = participação ≥ limiar (padrão 15%) no critério escolhido; máximo de 5. Indica concentração, não causa.</li>
-          <li><strong className="text-ink">Horas liberadas</strong> = esforço AS-IS − esforço TO-BE no mesmo volume. <strong className="text-ink">Benefício bruto</strong> = custo AS-IS − custo TO-BE. <strong className="text-ink">Líquido</strong> = bruto − custo recorrente novo.</li>
-          <li><strong className="text-ink">Payback</strong> = investimento ÷ benefício líquido mensal (positivo). <strong className="text-ink">ROI</strong> = (líquido mensal × horizonte − investimento) ÷ investimento × 100.</li>
-          <li><strong className="text-ink">Redução %</strong> = (antes − depois) ÷ antes × 100, só quando “antes” &gt; 0.</li>
-          <li><strong className="text-ink">Simulação</strong>: distribuição triangular (mínimo, mais provável, máximo), 1.500 iterações por padrão, semente fixa.</li>
+          <li><strong className="text-ink">{tx('hp.f1.b')}</strong>{tx('hp.f1.r')}</li>
+          <li><strong className="text-ink">{tx('hp.f2.b')}</strong>{tx('hp.f2.r')}</li>
+          <li><strong className="text-ink">{tx('hp.f3.b')}</strong>{tx('hp.f3.r')}</li>
+          <li><strong className="text-ink">{tx('hp.f4.b')}</strong>{tx('hp.f4.r')}</li>
+          <li><strong className="text-ink">{tx('hp.f5.b')}</strong>{tx('hp.f5.r')}</li>
+          <li><strong className="text-ink">{tx('hp.f6.b')}</strong>{tx('hp.f6.r')}</li>
+          <li><strong className="text-ink">{tx('hp.f7.b1')}</strong> ≠ <strong className="text-ink">{tx('hp.f7.b2')}</strong>{tx('hp.f7.r')}</li>
+          <li><strong className="text-ink">{tx('hp.f8.b')}</strong>{tx('hp.f8.r')}</li>
+          <li><strong className="text-ink">{tx('hp.f9.b1')}</strong>{tx('hp.f9.r1')} <strong className="text-ink">{tx('hp.f9.b2')}</strong>{tx('hp.f9.r2')} <strong className="text-ink">{tx('hp.f9.b3')}</strong>{tx('hp.f9.r3')}</li>
+          <li><strong className="text-ink">Payback</strong>{tx('hp.f10.r1')} <strong className="text-ink">ROI</strong>{tx('hp.f10.r2')}</li>
+          <li><strong className="text-ink">{tx('hp.f11.b')}</strong>{tx('hp.f11.r')} &gt; 0.</li>
+          <li><strong className="text-ink">{tx('hp.f12.b')}</strong>{tx('hp.f12.r')}</li>
         </ul>
-        <p className="mt-3 text-xs text-muted">Arredondamos apenas para exibir; os cálculos usam os valores originais. Detalhes técnicos em docs/CALCULOS.md no repositório.</p>
+        <p className="mt-3 text-xs text-muted">{tx('hp.calc.note')}</p>
       </Card>
 
-      <Card title="Campos da planilha" subtitle="Modelo de importação">
+      <Card title={tx('hp.fields')} subtitle={tx('hp.fields.sub')}>
         <ul className="grid gap-2 text-sm sm:grid-cols-2">
           {FIELDS.map((f) => (
             <li key={f.key}>
-              <strong className="text-ink">{f.label}</strong> {f.minimal && <span className="text-xs text-brand">(mínimo)</span>}
+              <strong className="text-ink">{fieldLabel(f)}</strong> {f.minimal && <span className="text-xs text-brand">({tx('hp.min')})</span>}
               <br />
-              <span className="text-ink2">{f.help}</span>
+              <span className="text-ink2">{fieldHelp(f)}</span>
             </li>
           ))}
         </ul>
       </Card>
 
-      <Card title="Privacidade e dados" subtitle="O que fica onde" id="privacidade">
+      <Card title={tx('hp.priv')} subtitle={tx('hp.priv.sub')} id="privacidade">
         <ul className="list-disc space-y-1 pl-5 text-sm text-ink2">
-          <li>Planilhas são lidas no seu navegador. O conteúdo não é enviado a servidores.</li>
-          <li>Processos, cenários, planos, resultados e rascunhos ficam no IndexedDB deste navegador (banco “nexoprocess”). No localStorage ficam a preferência de tema, uma cópia dos rascunhos em edição (para não perder nada ao recarregar) e quais dicas você já viu.</li>
-          <li>O site é entregue por uma hospedagem estática. Como em qualquer site, ela recebe as requisições dos arquivos do app (endereço IP, navegador, horário) — não o conteúdo dos seus processos.</li>
+          <li>{tx('hp.p1')}</li>
+          <li>{tx('hp.p2')}</li>
+          <li>{tx('hp.p3')}</li>
           {LICENSE.required ? (
             <li>
-              Acesso pela compra: para liberar o app, o e-mail digitado na entrada é conferido no nosso servidor. Lá ficam só o e-mail, a situação da compra (ativa ou cancelada), o produto, a transação e a data — dados que a Hotmart envia quando a
-              compra é aprovada, reembolsada ou cancelada. Nenhum conteúdo dos seus processos vai junto.
+              {tx('hp.access')}
             </li>
           ) : (
-            <li>Não há contas nem cadastro.</li>
+            <li>{tx('hp.nomember')}</li>
           )}
-          <li>Não há rastreadores de terceiros nem analytics no app.</li>
-          <li>Limpar os dados do navegador apaga os processos. Use “Baixar backup” em Meus processos.</li>
-          <li>Você pode apagar tudo a qualquer momento em Meus processos → Apagar dados locais.</li>
+          <li>{tx('hp.notrack')}</li>
+          <li>{tx('hp.clear')}</li>
+          <li>{tx('hp.erase')}</li>
         </ul>
         <p className="mt-3 text-sm">
-          Documentos completos:{' '}
+          {tx('hp.docs')}{' '}
           <Link to="/privacidade" className="font-semibold text-accent underline">
-            Política de Privacidade
+            {tx('hp.privacy')}
           </Link>{' '}
           ·{' '}
           <Link to="/termos" className="font-semibold text-accent underline">
-            Termos de Uso
+            {tx('hp.terms')}
           </Link>
         </p>
       </Card>
 
       {COMMERCIAL.contactEmail && (
-        <Card title="Suporte" subtitle="Fale com a gente" id="suporte">
+        <Card title={tx('hp.support')} subtitle={tx('hp.support.sub')} id="suporte">
           <p className="text-sm text-ink2">
-            <SupportLink prefix="Dúvidas, problemas de acesso ou sugestões: escreva para" />. Para agilizar, diga o e-mail usado na compra e o aparelho/navegador. Nunca envie seus processos por e-mail sem necessidade.
+            <SupportLink prefix={tx('hp.support.prefix')} />. {tx('hp.support.rest')}
           </p>
         </Card>
       )}
 
-      <Card title="Inteligência artificial" subtitle="Opcional, futuro">
+      <Card title={tx('hp.ai')} subtitle={tx('hp.ai.sub')}>
         <p className="text-sm text-ink2">
-          Hoje as recomendações são <strong>baseadas em regras transparentes</strong>, sem IA generativa. Uma integração opcional com provedor de IA pode ser adicionada no futuro, desde que: (1) a chave fique em um servidor, nunca no navegador; (2) nada seja enviado sem
-          seu consentimento explícito; (3) o produto continue funcionando sem ela.
+          {tx('hp.ai.a')}<strong>{tx('hp.ai.b')}</strong>{tx('hp.ai.c')}
         </p>
       </Card>
 
       <Callout tone="info">
-        O {BRAND.name} não é afiliado ao PMI® nem a fornecedores de ferramentas de processos. Diagramas renderizados com bpmn-js (bpmn.io) — a marca d’água do bpmn.io permanece visível conforme a licença.{' '}
+        {tx('hp.disclaimer', { brand: BRAND.name })}{' '}
         <Link to="/app" className="font-semibold text-brand">
-          Voltar ao app
+          {tx('hp.back')}
         </Link>
       </Callout>
     </div>

@@ -1,5 +1,6 @@
 // Dicionário de campos da planilha: um só lugar para o modelo XLSX/CSV,
 // a detecção automática de colunas e a ajuda contextual.
+import { tr, type MessageKey } from '../i18n';
 
 export type FieldKind = 'text' | 'number' | 'int' | 'pct' | 'type' | 'unit' | 'lean' | 'bool' | 'ref' | 'refs';
 export type FieldKey =
@@ -65,10 +66,46 @@ export const FIELDS: FieldDef[] = [
   { key: 'observacoes', label: 'Observações', kind: 'text', minimal: false, help: 'Qualquer contexto útil.', example: '', aliases: ['observacoes', 'obs', 'notas', 'comentarios', 'notes', 'observacao'], width: 30 },
 ];
 
+/** Cabeçalhos do modelo EN, estáticos: a importação reconhece planilhas PT e EN em qualquer idioma do app. */
+export const EN_LABELS: Record<FieldKey, string> = {
+  id_atividade: 'Code',
+  etapa_macro: 'Macro stage',
+  atividade: 'Activity',
+  ordem: 'Order',
+  tipo_elemento: 'Type',
+  duracao: 'Duration',
+  unidade_duracao: 'Unit',
+  responsavel: 'Owner',
+  quantidade_pessoas: 'People',
+  proxima_atividade: 'Next activity',
+  proxima_se_sim: 'Next if YES',
+  proxima_se_nao: 'Next if NO',
+  classificacao_lean: 'Lean classification',
+  tempo_espera: 'Wait time',
+  retrabalho: 'Is it rework?',
+  frequencia_pct: 'Frequency (%)',
+  atividade_critica: 'Critical?',
+  volume_periodo: 'Activity volume',
+  custo_hora: 'Hourly cost ($)',
+  custo_variavel: 'Variable cost per run ($)',
+  duracao_minima: 'Minimum duration',
+  duracao_maxima: 'Maximum duration',
+  observacoes: 'Notes',
+};
+
+/** Texto do campo no idioma ativo (a definição em FIELDS segue sendo o PT canônico). */
+export const fieldLabel = (f: Pick<FieldDef, 'key'>): string => tr(`io.f.${f.key}.label` as MessageKey);
+export const fieldHelp = (f: Pick<FieldDef, 'key'>): string => tr(`io.f.${f.key}.help` as MessageKey);
+export const fieldExample = (f: Pick<FieldDef, 'key'>): string => (FIELDS.find((x) => x.key === f.key)?.example ? tr(`io.f.${f.key}.ex` as MessageKey) : '');
+
 export const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((f) => [f.key, f])) as Record<FieldKey, FieldDef>;
 
 /** Cabeçalhos calculados do modelo oficial — ignorados na importação. */
-export const CALC_HEADERS = ['Duração em horas (calculado)', 'Esforço pessoa-h (calculado)', 'Custo por execução R$ (calculado)'];
+export const CALC_HEADERS_PT = ['Duração em horas (calculado)', 'Esforço pessoa-h (calculado)', 'Custo por execução R$ (calculado)'];
+export const CALC_HEADERS_EN = ['Duration in hours (calculated)', 'Effort person-h (calculated)', 'Cost per run $ (calculated)'];
+/** Cabeçalhos calculados no idioma ativo (modelo gerado) e, para ignorar na importação, nos dois idiomas. */
+export const calcHeaders = (): string[] => [tr('io.calc.1'), tr('io.calc.2'), tr('io.calc.3')];
+export const CALC_HEADERS = CALC_HEADERS_PT;
 
 export function normalizeHeader(s: unknown): string {
   return String(s ?? '')
@@ -80,6 +117,21 @@ export function normalizeHeader(s: unknown): string {
 }
 
 /** Campos do nível "Processo" (aba Processo do modelo). */
+export const PROCESS_EN_LABELS: Record<string, string> = {
+  nome_processo: 'Process name',
+  descricao: 'Description',
+  area: 'Area',
+  dono_processo: 'Process owner',
+  volume: 'Run volume',
+  periodo_volume: 'Volume period',
+  dias_operacao_mes: 'Operating days per month',
+  horas_por_dia: 'Working hours per day',
+  custo_hora_padrao: 'Default hourly cost ($)',
+  custo_variavel_inclui_mao_de_obra: 'Does variable cost already include labor?',
+};
+export const processLabel = (key: string): string => tr(`io.p.${key}.label` as MessageKey);
+export const processHelp = (key: string): string => tr(`io.p.${key}.help` as MessageKey);
+
 export const PROCESS_FIELDS = [
   { key: 'nome_processo', label: 'Nome do processo', help: 'Ex.: Processamento de pedido', kind: 'text' },
   { key: 'descricao', label: 'Descrição', help: 'Objetivo e escopo em uma frase', kind: 'text' },
