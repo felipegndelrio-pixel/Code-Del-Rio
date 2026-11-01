@@ -17,7 +17,7 @@ TO VALIDATE: legal name, tax ID and contact address of the seller (founder to pr
 
 ## 3. Access, renewal and revocation
 - The app checks your access with a signed token stored on your device and renews it in the background when you are online.
-- Access ends on this device if the purchase is refunded, charged back, or disputed and the dispute is not resolved in your favor.
+- Access ends at the next online license check after a refund, chargeback or unresolved dispute.
 - A partial refund keeps your access.
 - If we cannot verify your purchase automatically, the app asks you to contact support, and access can be granted manually.
 

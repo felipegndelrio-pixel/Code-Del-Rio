@@ -35,6 +35,7 @@ Em Settings → Variables and Secrets → Production. São só nomes; os valores
 | `VITE_EN_TERMS_URL` | URL pública dos Termos EN | texto (build), **só quando a página existir** |
 | `VITE_EN_PRIVACY_URL` | URL pública da Privacidade EN | idem |
 | `VITE_EN_REFUND_URL` | URL pública da política de reembolso EN | idem |
+| `LICENSE_TTL_DAYS` | **não criar** (FATO, captura do painel do fundador em 01/11/2026: a Production não tem essa variável; vale o padrão do servidor, 30 dias). Se criar com valor diferente de `LICENSE_OFFLINE_DAYS` (30), a landing passa a mentir. Se o fundador decidir TTL 7, mude **juntos**: a constante `LICENSE_OFFLINE_DAYS` (`scripts/lib/en-site.mjs`), o padrão do servidor (`api/_lib/handlers.ts` e `gumroad.ts`) e o teste (`tests/api/en-site.test.ts`) | — |
 | `GUMROAD_REVERIFY_AFTER_SEC` | opcional (padrão 86400) | texto |
 | `GUMROAD_ALLOW_TEST` | **não criar** (compra de teste desligada) | — |
 
