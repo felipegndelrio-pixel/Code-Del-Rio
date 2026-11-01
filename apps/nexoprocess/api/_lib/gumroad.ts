@@ -70,6 +70,18 @@ export interface GumroadPurchase {
 
 export type VerifyResult = { kind: 'ok'; purchase: GumroadPurchase } | { kind: 'not_found' } | { kind: 'unavailable'; reason: string };
 
+/**
+ * product_id no formato da Gumroad: base64url com padding "=" até comprimento múltiplo de 4
+ * (determinístico). Aceita a variável colada com ou sem "==". Fora do formato, devolve o valor
+ * aparado como veio (a API responde "não encontrado" e nada é concedido).
+ */
+export function gumroadProductIdForApi(raw: string): string {
+  const s = raw.trim();
+  const m = /^([A-Za-z0-9_-]{1,64})(={0,2})$/.exec(s);
+  if (!m || (m[2] ? s.length % 4 !== 0 : m[1].length % 4 === 1)) return s;
+  return m[1] + '='.repeat((4 - (m[1].length % 4)) % 4);
+}
+
 /** POST /v2/licenses/verify. Sem access_token (o endpoint não exige). Nunca lança. */
 export async function verifyGumroadLicense(productId: string, licenseKey: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<VerifyResult> {
   const ctrl = new AbortController();
@@ -78,7 +90,7 @@ export async function verifyGumroadLicense(productId: string, licenseKey: string
     const r = await fetchImpl(GUMROAD_VERIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: new URLSearchParams({ product_id: productId, license_key: licenseKey, increment_uses_count: 'false' }).toString(),
+      body: new URLSearchParams({ product_id: gumroadProductIdForApi(productId), license_key: licenseKey, increment_uses_count: 'false' }).toString(),
       signal: ctrl.signal,
     });
     if (r.status === 404) return { kind: 'not_found' };

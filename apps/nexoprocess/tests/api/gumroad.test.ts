@@ -11,6 +11,7 @@ import {
   handleGumroadPing,
   normalizeGumroadId,
   normalizeLicenseKey,
+  gumroadProductIdForApi,
   sameProductId,
   verifyGumroadLicense,
   type GumroadDeps,
@@ -162,6 +163,29 @@ describe('verifyGumroadLicense', () => {
     const slow = ((_u: unknown, init?: RequestInit) =>
       new Promise((_, rej) => init?.signal?.addEventListener('abort', () => rej(Object.assign(new Error('abort'), { name: 'AbortError' }))))) as typeof fetch;
     expect(await verifyGumroadLicense(PRODUCT, KEY, slow, 20)).toEqual({ kind: 'unavailable', reason: 'timeout' });
+  });
+});
+
+describe('verify envia o product_id normalizado (poka-yoke)', () => {
+  it('variável com e sem "==" → mesmo corpo enviado, com "=="', async () => {
+    const bodies: string[] = [];
+    for (const id of [PRODUCT, PRODUCT.replace(/=+$/, ''), ` ${PRODUCT} `]) {
+      const f = (async (_u: unknown, init?: RequestInit) => {
+        bodies.push(String(init?.body));
+        return new Response(JSON.stringify({ success: false }), { status: 404 });
+      }) as typeof fetch;
+      await verifyGumroadLicense(id, KEY, f, 1000);
+    }
+    expect(new Set(bodies).size).toBe(1);
+    expect(new URLSearchParams(bodies[0]).get('product_id')).toBe(PRODUCT);
+  });
+  it('gumroadProductIdForApi: padding até múltiplo de 4; inválido passa como veio (falha fechada na API)', () => {
+    expect(gumroadProductIdForApi('FO8TXN-dbxYaBdahG97Y-Q')).toBe('FO8TXN-dbxYaBdahG97Y-Q==');
+    expect(gumroadProductIdForApi('abcd')).toBe('abcd');
+    expect(gumroadProductIdForApi('abcde')).toBe('abcde'); // resto 1: impossível em base64
+    expect(gumroadProductIdForApi('abc=')).toBe('abc=');
+    expect(gumroadProductIdForApi('outro==')).toBe('outro==');
+    expect(gumroadProductIdForApi('')).toBe('');
   });
 });
 
