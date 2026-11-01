@@ -107,7 +107,8 @@ npx wrangler pages deploy dist --project-name nexoprocess --branch main --commit
 | E5 | Login PT de um comprador Hotmart ativo | Entra, como antes |
 | E6 | **Primeira venda real**: comprador entra com e-mail + chave | Entra. Se aparecer "couldn't activate it automatically", use o runbook §13 de `GUMROAD_ENTITLEMENT.md` |
 
-### 5.1 Verificações pós-deploy por comando (qualquer terminal; endereço fixo do projeto)
+### 5.1 Verificações pós-deploy por comando (qualquer terminal)
+**A VALIDAR:** `nexoprocess.pages.dev` é o endereço que consta em `DEPLOY_CLOUDFLARE.md`; o domínio de produção pode ser personalizado. Troque pelo domínio que o comprador realmente usa antes de rodar.
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" https://nexoprocess.pages.dev/entrar
 curl -s -w "\n%{http_code}\n" https://nexoprocess.pages.dev/api/gumroad-license

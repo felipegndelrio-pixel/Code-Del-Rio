@@ -70,3 +70,8 @@ Também em EN (v2): Formulário completo, Assistente de criação (inclui texto 
 - A VALIDAR: `CompareTab.tsx` compara `r.unit === 'R$/mês'` (texto PT); em EN a unidade é `$/month`, então custos podem sair sem formatação de moeda e a coluna de unidade mostra códigos em PT. O Relatório já usa `isCostUnit()`; a aba Comparar não foi alterada (fora do escopo desta sessão).
 - Ajuda (~93), XLSX/CSV e mensagens de banco/ações continuam pendentes. Páginas `ajuda`, `privacidade` e `termos` seguem em PT no EN (decisão legal: não traduzir no app).
 - Texto livre do Assistente: o EN aceita `by`, `owner:`, `then`, unidades em inglês; no PT as expressões são as de sempre (teste `assistant.test.ts`).
+
+## 10. Dívida técnica registrada (decisão do revisor, 01/11/2026)
+- **Bundle inicial 157,8 KB gzip (JS+CSS, 9 arquivos) contra a meta de 130 KB.** Aceito por agora: o `check-bundle` passa (a regra dura é a ENTRADA, 23,0 KB, limite 130 KB; a falha do inicial só ocorre acima de 400 KB, `plano-fases.md`). Linha de base antiga: 228,7 KB.
+- Caminho possível para chegar a ≤130 KB: carregar o dicionário PT sob demanda (chunk de ~32 KB gzip), como já é feito com o EN.
+- **Risco:** mexe no 1º render do PT (hoje síncrono, sem espera). Exige golden PT, e2e iPhone/Android e decisão do fundador. NÃO aplicar sem esse GO.
