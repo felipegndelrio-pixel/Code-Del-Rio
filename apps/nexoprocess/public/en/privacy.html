@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — NexoProcess</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/site.css">
+<!-- Gerado por scripts/build-en-site.mjs a partir de docs/legal-en. Não edite à mão. -->
+</head>
+<body data-draft="true">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="logo" href="./"><img src="/icons/favicon.svg" alt="" width="28" height="28"><span>NexoProcess</span></a>
+  <nav class="main" aria-label="Main"><a href="./">Home</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="refund.html">Refunds</a><a href="/entrar?lang=en">Sign in</a></nav>
+</div></header>
+<main id="main" class="wrap doc">
+<div class="draft" role="note"><strong>DRAFT.</strong> This text has not been reviewed by a lawyer and has open points marked “TO VALIDATE”. It is not the final policy.</div>
+<h1>NexoProcess — Privacy Policy (DRAFT v0.1 — not reviewed by a lawyer)</h1>
+<blockquote>DRAFT. Not for publication. Open points are marked <code>TO VALIDATE</code>.</blockquote>
+<p>Last updated: 01/11/2026 (draft)</p>
+<h2>1. Summary</h2>
+<p>Your process data stays on your device. We only handle the data needed to check your purchase.</p>
+<h2>2. What stays on your device</h2>
+<p>Stored in your browser (IndexedDB / localStorage): your processes, drafts, backups, preferences (theme, language), tips already seen, and the access token and license key used to keep you signed in. The app's service worker caches only app files, never your process data.</p>
+<p>Spreadsheets you import are read in memory. The file itself is not stored; only the extracted data, the file name and a hash are kept on your device.</p>
+<h2>3. What is sent to our server</h2>
+<p>| When | What is sent | Why | |---|---|---| | Sign in | The purchase e-mail and the license key | Verify the purchase with Gumroad and issue an access token | | Background renewal (at most once an hour, online only) | The access token and the license key | Check the purchase is still valid (refund, chargeback, dispute) |</p>
+<h2>4. What we keep on the server</h2>
+<p>A purchase record: e-mail, product, sale identifier, status (active or revoked), event and date. Server logs show the e-mail masked. Your processes and spreadsheets are <strong>not</strong> sent or stored.</p>
+<h2>5. Third parties</h2>
+<ul>
+<li><strong>Gumroad</strong> sells the product, holds the license key and checks the purchase. Payments are processed through Stripe by Gumroad. We do not receive card data.</li>
+<li><strong>Hosting provider</strong> (static files and the API) receives technical request metadata (IP, user agent, time, URL).</li>
+<li><strong>Database provider</strong> stores the purchase record.</li>
+<li>No analytics, advertising cookies or external fonts are used.</li>
+</ul>
+<p>TO VALIDATE: the exact legal name and privacy terms of each provider, and the data-processing agreements in place.</p>
+<h2>6. Your choices</h2>
+<ul>
+<li>Backup and restore your data in the app.</li>
+<li>&quot;Delete local data&quot; removes everything the app stored on the device, including the access token.</li>
+<li>To ask about or request deletion of your purchase record, contact support.</li>
+</ul>
+<h2>7. Legal bases and your rights</h2>
+<p>TO VALIDATE (lawyer): legal bases and rights text for buyers outside Brazil (for example GDPR in the EU/UK, CCPA/CPRA in California), international transfer wording, retention period, and who is the controller. The Brazilian LGPD text is in the Portuguese policy; it is not copied here.</p>
+<h2>8. Children</h2>
+<p>TO VALIDATE (lawyer).</p>
+<h2>9. Contact</h2>
+<p>Use the support e-mail shown in the app.</p>
+</main>
+<footer><div class="wrap"><p><a href="./">NexoProcess</a> · <a href="terms.html">Terms of Use</a> · <a href="privacy.html">Privacy Policy</a> · <a href="refund.html">Refund Policy</a> · <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a></p></div></footer>
+</body>
+</html>

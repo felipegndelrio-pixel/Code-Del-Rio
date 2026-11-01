@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { injectDist } from './scripts/lib/en-site.mjs';
 import tailwind from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
 import { viteSingleFile } from 'vite-plugin-singlefile';
@@ -71,6 +72,17 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       {
+        // Páginas estáticas EN (public/en): injeta o link de compra e o e-mail de suporte depois do build.
+        // Build de venda: valor ausente ou marcador que sobra FAZ O BUILD FALHAR. Demais builds: link "#checkout".
+        name: 'nexo-en-site',
+        apply: 'build',
+        enforce: 'post',
+        closeBundle() {
+          if (single) return;
+          injectDist(import.meta.dirname + '/dist', env, { sale: env.VITE_LICENSE_REQUIRED === 'true' });
+        },
+      },
+      {
         name: 'nexo-build-id',
         transformIndexHtml: (html) => html.replace('%NEXO_BUILD_ID%', buildId),
       },
@@ -83,9 +95,11 @@ export default defineConfig(({ mode }) => {
           // Somente o app shell estático. Os dados do usuário ficam no IndexedDB
           // do próprio navegador e não passam pelo service worker.
           globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+          // As páginas estáticas EN (/en/) não fazem parte do app shell: ficam fora do pré-cache.
+          globIgnores: ['en/**'],
           navigateFallback: 'index.html',
           // A API de licença (/api/*) nunca recebe o index.html do app shell.
-          navigateFallbackDenylist: [/^\/api\//],
+          navigateFallbackDenylist: [/^\/api\//, /^\/en(\/|$)/],
           runtimeCaching: [],
           cleanupOutdatedCaches: true,
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,

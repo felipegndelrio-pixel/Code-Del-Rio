@@ -31,6 +31,7 @@
     "nexo:build:preview-file": "npm run nexo:build:single",
     "nexo:lint": "eslint apps/nexoprocess",
     "nexo:test:unit": "vitest run -c apps/nexoprocess/vitest.config.ts",
+    "nexo:site:en": "node apps/nexoprocess/scripts/build-en-site.mjs",
     "nexo:check-bundle": "node apps/nexoprocess/scripts/check-bundle.mjs",
     "nexo:test:csp": "node apps/nexoprocess/scripts/test-csp.mjs",
     "nexo:test:csp:rotas": "node apps/nexoprocess/scripts/csp-routes.mjs",
