@@ -75,3 +75,7 @@ Também em EN (v2): Formulário completo, Assistente de criação (inclui texto 
 - **Bundle inicial 157,8 KB gzip (JS+CSS, 9 arquivos) contra a meta de 130 KB.** Aceito por agora: o `check-bundle` passa (a regra dura é a ENTRADA, 23,0 KB, limite 130 KB; a falha do inicial só ocorre acima de 400 KB, `plano-fases.md`). Linha de base antiga: 228,7 KB.
 - Caminho possível para chegar a ≤130 KB: carregar o dicionário PT sob demanda (chunk de ~32 KB gzip), como já é feito com o EN.
 - **Risco:** mexe no 1º render do PT (hoje síncrono, sem espera). Exige golden PT, e2e iPhone/Android e decisão do fundador. NÃO aplicar sem esse GO.
+
+## 11. Build de venda desta branch (decisão do revisor, 01/11/2026)
+- `scripts/check-sale-env.mjs` agora EXIGE `VITE_GUMROAD_CHECKOUT_URL`, `VITE_EN_TERMS_URL`, `VITE_EN_PRIVACY_URL` e `VITE_EN_REFUND_URL` (https, sem marcador `<>[]{}`/INSIRA/SEU/YOUR). Teste: `tests/api/check-sale-env.test.ts`.
+- Qualquer build de venda a partir desta branch (PT ou EN) precisa das 4 variáveis. A troca PT de sábado não é afetada: a folha de execução (v2.1, Passo Zero Z3) usa um clone limpo da TAG `v2.5.0-rc1` com conferência do SHA (FATO informado pelo revisor; não verificado por esta sessão).

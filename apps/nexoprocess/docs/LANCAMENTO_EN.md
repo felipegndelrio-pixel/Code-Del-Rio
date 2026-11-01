@@ -38,7 +38,7 @@ Em Settings → Variables and Secrets → Production. São só nomes; os valores
 | `GUMROAD_REVERIFY_AFTER_SEC` | opcional (padrão 86400) | texto |
 | `GUMROAD_ALLOW_TEST` | **não criar** (compra de teste desligada) | — |
 
-- `VITE_GUMROAD_CHECKOUT_URL` e `VITE_EN_*` **não** são exigidas pelo `check-sale-env`: se faltarem, o build passa e a tela EN fica sem o botão de compra ou sem os links. Confira na etapa 5 (E2).
+- **Build de venda a partir desta branch exige as 4 variáveis do EN** (`VITE_GUMROAD_CHECKOUT_URL`, `VITE_EN_TERMS_URL`, `VITE_EN_PRIVACY_URL`, `VITE_EN_REFUND_URL`; https, sem marcador): o `check-sale-env` recusa o build sem elas. Vale para qualquer build de venda daqui, PT ou EN. A troca PT de sábado usa a TAG `v2.5.0-rc1`, que não tem essa exigência. Crie as páginas legais EN antes de montar este build.
 - Mudou uma `VITE_*`? Só vale depois de **Deployments → Retry deployment** (entra no build). `GUMROAD_*` as functions leem a cada requisição.
 - As variáveis atuais (`LICENSE_PRIVATE_JWK`, `SUPABASE_*`, `HOTMART_*`, `VITE_LICENSE_*`, `VITE_SUPPORT_EMAIL`) continuam iguais.
 - Sem as `VITE_EN_*`, a tela EN simplesmente não mostra os links legais. Melhor publicar as páginas legais antes de vender (CDC/LGPD; nos EUA, A VALIDAR com assessoria).
@@ -83,7 +83,7 @@ Em Settings → Variables and Secrets → Production. São só nomes; os valores
 ### 4.1 Build e deploy: comandos prontos
 Caminho recomendado: **integração com o GitHub** (nenhum comando no terminal). Configuração já descrita em `DEPLOY_CLOUDFLARE.md`, Passo 3: branch de produção `main`, Root directory `apps/nexoprocess`, build `cd ../.. && npm ci && npm run nexo:build`, saída `dist`, `NODE_VERSION=22`. Variáveis só no painel.
 
-Se preferir publicar do computador (Windows, PowerShell, na raiz do repositório, com a árvore limpa). As três variáveis do `check-sale-env` e a `VITE_GUMROAD_CHECKOUT_URL` vêm do painel; copie cada valor para a sessão **no seu terminal**, nunca para este repositório:
+Se preferir publicar do computador (Windows, PowerShell, na raiz do repositório, com a árvore limpa). As sete variáveis do `check-sale-env` (as três de sempre mais as quatro do EN) vêm do painel; copie cada valor para a sessão **no seu terminal**, nunca para este repositório:
 ```powershell
 git checkout main; git pull --ff-only
 npm ci
