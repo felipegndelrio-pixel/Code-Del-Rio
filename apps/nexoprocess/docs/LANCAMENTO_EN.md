@@ -17,7 +17,7 @@ Ordem: sem pular etapas. Cada etapa tem um "pronto quando" verificável.
 
 1. Conta com recebimento via **Stripe**, conectado por você.
 2. Produto de **pagamento único**, US$ 39, com **license key ligada**: no editor de conteúdo do produto (aba Content), use o menu **Insert → License key** para inserir o bloco. FATO (código aberto da Gumroad, `antiwork/gumroad` 7d0b01c: `app/models/link.rb:1804-1813` e `ProductEdit/ContentTab/index.tsx`): não existe outra opção para ligar a licença.
-3. Anotar o **product_id** do produto (formato `xxxx==`). **Onde ele aparece na tela da Gumroad: A VALIDAR.** Ele vai na variável `GUMROAD_PRODUCT_ID`; com ou sem o `==` final o código aceita e normaliza.
+3. Anotar o **product_id** do produto. **FATO (fundador, 01/11/2026, com a Gumroad real):** 24 caracteres base64url terminando em `==` (22 depois de normalizado). A `license_key` é de 4 blocos de 8 hexadecimais maiúsculos separados por hífen (35 caracteres), e a licença foi ligada pelo bloco Insert → License key; a compra de teste gerou a chave no recibo. Valores reais ficam só no painel. **Onde ele aparece na tela da Gumroad: A VALIDAR.** Ele vai na variável `GUMROAD_PRODUCT_ID`; com ou sem o `==` final o código aceita e normaliza.
 4. Mensagem de entrega ao comprador:
    `Open https://<seu-domínio>/entrar?lang=en and sign in with this email and your license key.`
 5. **Não** é preciso Ping para lançar (ver §14 de `GUMROAD_ENTITLEMENT.md`).
@@ -39,7 +39,7 @@ Em Settings → Variables and Secrets → Production. São só nomes; os valores
 | `GUMROAD_ALLOW_TEST` | **não criar** (compra de teste desligada) | — |
 
 - **Build de venda a partir desta branch exige as 4 variáveis do EN** (`VITE_GUMROAD_CHECKOUT_URL`, `VITE_EN_TERMS_URL`, `VITE_EN_PRIVACY_URL`, `VITE_EN_REFUND_URL`; https, sem marcador): o `check-sale-env` recusa o build sem elas. Vale para qualquer build de venda daqui, PT ou EN. A troca PT de sábado usa a TAG `v2.5.0-rc1`, que não tem essa exigência. Crie as páginas legais EN antes de montar este build.
-- **A produção atual foi publicada por upload direto (wrangler).** As `VITE_*` do painel **não** valem nesse caminho: elas entram no build feito no seu computador (§4.1, via `Read-Host`). Mudou uma `VITE_*`? Refaça o build e o deploy. `GUMROAD_*`, `LICENSE_*` e `SUPABASE_*` ficam no painel e as functions leem a cada requisição.
+- **A produção atual foi publicada por upload direto (wrangler).** As `VITE_*` do painel **não** valem nesse caminho: elas entram no build feito no seu computador (§4.1, via `Read-Host`). Mudou uma `VITE_*`? Refaça o build e o deploy. `GUMROAD_*`, `LICENSE_*` e `SUPABASE_*` ficam no painel. **Variável do painel só vale a partir do PRÓXIMO deployment** (Cloudflare, docs de Pages: "altering the project settings will not be reflected until its next deployment… trigger a new deployment after changing any settings"). Depois de criar ou mudar qualquer variável, publique de novo (§4.1) e só então teste. A página de bindings diz que as variáveis valem em runtime, mas não diz que mudam sem novo deployment: tratar como **exigindo novo deployment** (A VALIDAR com um teste real, mudando uma variável e vendo se a function enxerga o valor novo sem republicar).
 - As variáveis atuais (`LICENSE_PRIVATE_JWK`, `SUPABASE_*`, `HOTMART_*`, `VITE_LICENSE_*`, `VITE_SUPPORT_EMAIL`) continuam iguais.
 - Sem as `VITE_EN_*`, a tela EN simplesmente não mostra os links legais. Melhor publicar as páginas legais antes de vender (CDC/LGPD; nos EUA, A VALIDAR com assessoria).
 
@@ -177,7 +177,7 @@ Prova o ciclo comprar → ativar → perder o acesso, com evidência real. Anote
 | Voltar da rc1 para a v2.4.5 | `DEPLOY_CLOUDFLARE.md`, "Troca inicial e retomada após rollback". Preserve o banco | Não destrutivo |
 | Desfazer o SQL de §3 | §3.2; normalmente desnecessário | Só a função nova |
 - Emergência sem banco: `LICENSE_ALLOWLIST` (ver `DEPLOY_CLOUDFLARE.md`).
-- Rollback do app **não** reverte variáveis. Se a causa foi uma `VITE_*` errada, refaça o build com o valor certo (§4.1) e publique de novo; se foi `GUMROAD_*`/`SUPABASE_*`, corrija no painel (as functions leem a cada requisição).
+- Rollback do app **não** reverte variáveis. Se a causa foi uma `VITE_*` errada, refaça o build com o valor certo (§4.1) e publique de novo; se foi `GUMROAD_*`/`SUPABASE_*`, corrija no painel **e publique de novo** (a variável só vale no próximo deployment).
 
 ## 7. O que ainda NÃO está pronto para EN (01/11/2026)
 

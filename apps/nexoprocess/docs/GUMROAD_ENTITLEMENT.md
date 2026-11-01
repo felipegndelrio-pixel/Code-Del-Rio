@@ -233,6 +233,8 @@ Fonte: fundador ("OK" às recomendações), repassado pelo revisor em 31/10/2026
 | D7 | `increment_uses_count=false` sempre; sem limite de ativações | `verifyGumroadLicense` (teste confere o corpo enviado) |
 | D8 | Não liberar a rede da sessão | ver "A VALIDAR na primeira venda" abaixo |
 
+**FATO (fundador, 01/11/2026, Gumroad real, sem valores):** `product_id` com 24 caracteres base64url terminando em `==` (22 depois de normalizado, cabe no schema); `license_key` com 4 blocos de 8 hexadecimais maiúsculos separados por hífen (35 caracteres); a licença foi ligada por Insert → License key e a compra de teste gerou a chave no recibo. Os fixtures dos testes (`product_id` de 24 caracteres com `==`, chave `XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX`) já têm exatamente esses formatos. O item 1 abaixo (formato do `sale_id`, `product_id` e `license_key`) fica confirmado para `product_id` e `license_key`; o `sale_id` e a resposta do `verify` seguem **A VALIDAR** na primeira venda real.
+
 **Atualização do fundador (31/10/2026): sem compra de teste real.** A primeira venda real será a validação. Fica **A VALIDAR na primeira venda**:
 1. O formato real do `sale_id`, do `product_id` (esperado: base64url com `==`) e da `license_key`.
 2. A resposta do `verify` para essa compra (`price` em centavos, `currency`, `email`).

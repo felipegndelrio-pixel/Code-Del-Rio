@@ -166,6 +166,17 @@ describe('verifyGumroadLicense', () => {
   });
 });
 
+describe('formatos confirmados na Gumroad real (fundador, 01/11/2026)', () => {
+  it('fixtures têm o formato real: product_id de 24 caracteres com "==" (22 normalizado) e license_key 4×8 hex maiúsculos', () => {
+    expect(PRODUCT).toHaveLength(24);
+    expect(PRODUCT.endsWith('==')).toBe(true);
+    expect(normalizeGumroadId(PRODUCT)).toHaveLength(22);
+    expect(KEY).toHaveLength(35);
+    expect(KEY).toMatch(/^([0-9A-F]{8}-){3}[0-9A-F]{8}$/);
+    expect(normalizeLicenseKey(KEY)).toBe(KEY);
+  });
+});
+
 describe('verify envia o product_id normalizado (poka-yoke)', () => {
   it('variável com e sem "==" → mesmo corpo enviado, com "=="', async () => {
     const bodies: string[] = [];
