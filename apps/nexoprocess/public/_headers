@@ -9,6 +9,13 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
 
+# Páginas estáticas EN (/en/): único lugar com script de terceiros (Cloudflare Web Analytics, snippet manual).
+# A regra acima (/*) soma o CSP do app; aqui ele é DESTACADO e substituído pelo CSP da landing, que só acrescenta o beacon.
+# O app (/app, /entrar, /…) continua com script-src 'self'. Diretivas justificadas em docs/security-headers.md.
+/en/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com/beacon.min.js; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+
 /sw.js
   Cache-Control: no-cache
 

@@ -40,7 +40,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npx vite build --config apps/nexoprocess/vite.config.ts && npx vite preview --config apps/nexoprocess/vite.config.ts --port 4180 --host 127.0.0.1 --strictPort',
+      command: 'VITE_CF_WA_TOKEN=abcdef0123456789abcdef0123456789 npx vite build --config apps/nexoprocess/vite.config.ts && npx vite preview --config apps/nexoprocess/vite.config.ts --port 4180 --host 127.0.0.1 --strictPort',
       cwd: '../..',
       url: 'http://127.0.0.1:4180',
       timeout: 180_000,

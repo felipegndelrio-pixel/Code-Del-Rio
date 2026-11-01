@@ -27,6 +27,10 @@
 <p>Spreadsheets you import are read in memory. The file itself is not stored; only the extracted data, the file name and a hash are kept on your device.</p>
 <h2>3. What is sent to our server</h2>
 <p>| When | What is sent | Why | |---|---|---| | Sign in | The purchase e-mail and the license key | Verify the purchase with Gumroad and issue an access token | | Background renewal (at most once an hour, online only) | The access token and the license key | Check the purchase is still valid (refund, chargeback, dispute) |</p>
+<h3>3.1 Website analytics (public pages only)</h3>
+<p>The public pages under <code>/en/</code> (the sales page and the legal pages) use <strong>Cloudflare Web Analytics</strong>, loaded as a script from Cloudflare. It measures visits and page performance. Per Cloudflare's documentation, it reports the page path, the referring site, the visitor's country, device type, browser and operating system, and page-load timings. Per the same documentation, it does not use cookies or <code>localStorage</code> and does not fingerprint visitors.</p>
+<p>The app itself (what you use after signing in) does <strong>not</strong> load this script and sends nothing to Cloudflare Web Analytics.</p>
+<p>TO VALIDATE (lawyer): whether visitors from the EU/UK must be excluded or asked for consent (Cloudflare offers an option to drop EU measurements), the legal basis, and Cloudflare's role as processor.</p>
 <h2>4. What we keep on the server</h2>
 <p>A purchase record: e-mail, product, sale identifier, status (active or revoked), event and date. Server logs show the e-mail masked. Your processes and spreadsheets are <strong>not</strong> sent or stored.</p>
 <h2>5. Third parties</h2>
@@ -34,7 +38,8 @@
 <li><strong>Gumroad</strong> sells the product, holds the license key and checks the purchase. Payments are processed through Stripe by Gumroad. We do not receive card data.</li>
 <li><strong>Hosting provider</strong> (static files and the API) receives technical request metadata (IP, user agent, time, URL).</li>
 <li><strong>Database provider</strong> stores the purchase record.</li>
-<li>No analytics, advertising cookies or external fonts are used.</li>
+<li><strong>Cloudflare</strong> provides the analytics on the public pages only (section 3.1).</li>
+<li>No advertising cookies or external fonts are used, and the app has no analytics.</li>
 </ul>
 <p>TO VALIDATE: the exact legal name and privacy terms of each provider, and the data-processing agreements in place.</p>
 <h2>6. Your choices</h2>
@@ -51,5 +56,6 @@
 <p>Use the support e-mail shown in the app.</p>
 </main>
 <footer><div class="wrap"><p><a href="./">NexoProcess</a> · <a href="terms.html">Terms of Use</a> · <a href="privacy.html">Privacy Policy</a> · <a href="refund.html">Refund Policy</a> · <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a></p></div></footer>
+{{CF_WA_SNIPPET}}
 </body>
 </html>

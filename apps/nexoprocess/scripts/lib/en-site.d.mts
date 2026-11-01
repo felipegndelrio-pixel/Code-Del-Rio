@@ -3,3 +3,9 @@ export function injectHtml(html: string, env: Record<string, string | undefined>
 export function injectDist(distDir: string, env: Record<string, string | undefined>, opts: { sale: boolean }): string[];
 export function draftPages(siteDir: string): string[];
 export const LICENSE_OFFLINE_DAYS: number;
+export const CF_BEACON: { script: string; connect: string };
+export const CF_SNIPPET_MARKER: string;
+export const LEGAL_FILES: string[];
+export function parseLegal(md: string): { status: string; body: string };
+export function isLegalDraft(md: string): boolean;
+export function legalGate(dir: string): string[];

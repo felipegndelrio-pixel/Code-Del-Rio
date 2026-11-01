@@ -10,7 +10,7 @@ test.use({ deviceScaleFactor: 2 });
 
 test('capturas da landing EN', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1500 });
-  await prepare(page);
+  await prepare(page, { allowBeacon: true });
   await page.addInitScript(() => localStorage.setItem('nexo-ui.lang', 'en'));
   await page.addInitScript(() => localStorage.setItem('nexo.theme', 'light'));
   await page.goto('/app');

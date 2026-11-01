@@ -57,6 +57,50 @@ try {
       }
     }
   }
+  // Cloudflare Web Analytics: só nas páginas estáticas /en/. O app não pode chamar terceiros; /en/ pode carregar o beacon (CSP própria).
+  const thirdParty = [];
+  page.on('request', (r) => {
+    if (/cloudflareinsights\.com/.test(r.url())) thirdParty.push(`${new URL(page.url()).pathname} → ${r.url()}`);
+  });
+  await page.route('**://*.cloudflareinsights.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/javascript', body: 'window.__beacon = true;' }),
+  );
+  for (const r of APP_ROUTES) await go(r); // de novo, agora vigiando terceiros
+  const appCalls = thirdParty.splice(0);
+  if (appCalls.length) violations.push(`app chamou o Cloudflare Web Analytics: ${appCalls.join('; ')}`);
+  // Controle negativo: mesmo que alguém coloque o snippet no app, a CSP do app bloqueia (script-src 'self').
+  await page.goto(server.base + '/entrar');
+  const beforeNeg = violations.length;
+  const appBeaconBlocked = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const el = document.createElement('script');
+        el.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+        el.onload = () => resolve(false);
+        el.onerror = () => resolve(true);
+        document.head.appendChild(el);
+      }),
+  );
+  await page.waitForTimeout(300);
+  const negReports = violations.splice(beforeNeg); // violações geradas por este controle são esperadas
+  if (!appBeaconBlocked || negReports.length === 0) violations.push('a CSP do app NÃO bloqueou/registrou o beacon do Cloudflare Web Analytics');
+  else console.log(`Controle negativo: o app bloqueou o beacon (${negReports.length} violação esperada)`);
+  const enPages = ['/en/', '/en/terms.html', '/en/privacy.html', '/en/refund.html'];
+  let beaconPages = 0;
+  for (const r of enPages) {
+    await page.goto(server.base + r);
+    await page.waitForLoadState('networkidle');
+    const hasTag = await page.locator('script[data-cf-beacon]').count();
+    if (!hasTag) continue; // dist sem token (build não-venda): sem beacon, nada a provar
+    beaconPages += 1;
+    const ran = await page.evaluate(() => Boolean(window.__beacon));
+    if (!ran) violations.push(`${r}: o beacon foi bloqueado (CSP de /en/ não o permite)`);
+    if ((await page.locator('script').count()) !== 1) violations.push(`${r}: esperado exatamente 1 <script> (o beacon)`);
+    visited.push(r);
+  }
+  console.log(`Páginas /en/ com o beacon permitido pela CSP: ${beaconPages}/${enPages.length}${beaconPages ? '' : ' (dist sem VITE_CF_WA_TOKEN: nada a provar)'}`);
+  if (process.env.NEXO_REQUIRE_BEACON === '1' && beaconPages !== enPages.length) violations.push(`esperado beacon em ${enPages.length} páginas /en/, achei ${beaconPages}`);
+
   const swControlled = await page.evaluate(() => Boolean(navigator.serviceWorker?.controller));
   const before = violations.length;
 

@@ -1,8 +1,9 @@
 // Gera as páginas legais EN (public/en/terms.html, privacy.html, refund.html) a partir de docs/legal-en/*.md.
-// Enquanto o texto tiver "TO VALIDATE" ou "DRAFT", a página mostra uma faixa DRAFT e traz data-draft="true";
+// Cada .md tem um cabeçalho "status: draft|approved". Enquanto o status não for approved OU o texto tiver "TO VALIDATE"/"DRAFT", a página mostra uma faixa DRAFT e traz data-draft="true";
 // o check-sale-env recusa o build de venda com qualquer página assim (poka-yoke contra publicar rascunho).
 // Uso: npm run nexo:site:en  (a saída é versionada).
 import { readFileSync, writeFileSync } from 'node:fs';
+import { isLegalDraft, parseLegal } from './lib/en-site.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const PAGES = [
@@ -82,6 +83,7 @@ export function page({ title, body, draft }) {
 ${draft ? '<div class="draft" role="note"><strong>DRAFT.</strong> This text has not been reviewed by a lawyer and has open points marked “TO VALIDATE”. It is not the final policy.</div>\n' : ''}${body}
 </main>
 <footer><div class="wrap"><p><a href="./">NexoProcess</a> · <a href="terms.html">Terms of Use</a> · <a href="privacy.html">Privacy Policy</a> · <a href="refund.html">Refund Policy</a> · <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a></p></div></footer>
+{{CF_WA_SNIPPET}}
 </body>
 </html>
 `;
@@ -90,8 +92,8 @@ ${draft ? '<div class="draft" role="note"><strong>DRAFT.</strong> This text has 
 if (process.argv[1] && new URL(`file://${process.argv[1]}`).href === import.meta.url) {
   for (const p of PAGES) {
     const md = readFileSync(`${ROOT}docs/legal-en/${p.md}`, 'utf8');
-    const draft = /TO VALIDATE|DRAFT/.test(md);
-    writeFileSync(`${ROOT}public/en/${p.out}`, page({ title: p.title, body: mdToHtml(md), draft }));
+    const draft = isLegalDraft(md);
+    writeFileSync(`${ROOT}public/en/${p.out}`, page({ title: p.title, body: mdToHtml(parseLegal(md).body), draft }));
     console.log(`${p.out}: ${draft ? 'DRAFT (o build de venda será recusado)' : 'sem marcadores de rascunho'}`);
   }
 }

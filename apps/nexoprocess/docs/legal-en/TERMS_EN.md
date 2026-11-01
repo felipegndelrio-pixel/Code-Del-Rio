@@ -1,3 +1,6 @@
+---
+status: draft
+---
 # NexoProcess — Terms of Use (DRAFT v0.1 — not reviewed by a lawyer)
 
 > DRAFT. Not for publication. Open points are marked `TO VALIDATE`.
@@ -13,7 +16,8 @@ TO VALIDATE: legal name, tax ID and contact address of the seller (founder to pr
 - A **one-time payment** of US$ 39, sold through Gumroad. TO VALIDATE: final price, taxes shown at checkout, and whether Gumroad acts as the seller of record for your purchase.
 - After payment you receive a **license key**. You sign in with the **e-mail used in the purchase** and the license key.
 - The license is personal. You may use it on your own devices. TO VALIDATE: whether a device limit applies (the system does not currently count activations; `increment_uses_count` is off).
-- TO VALIDATE: whether the license is for a specific version or includes future updates, and for how long. Do not promise updates until decided.
+- **Updates:** fixes and improvements to v1 are included. Larger future versions may have their own rules.
+  TO VALIDATE (lawyer): wording for what counts as a “larger version” and for how long v1 fixes are provided.
 
 ## 3. Access, renewal and revocation
 - The app checks your access with a signed token stored on your device and renews it in the background when you are online.

@@ -4,7 +4,7 @@ import { prepare } from './helpers';
 // Landing EN em telas pequenas: sem rolagem lateral, texto legível e alvos de toque ≥ 44 px nos botões principais.
 for (const path of ['/en/', '/en/terms.html', '/en/privacy.html', '/en/refund.html']) {
   test(`landing EN no celular: ${path}`, async ({ page }) => {
-    await prepare(page);
+    await prepare(page, { allowBeacon: true }); // beacon do Cloudflare Web Analytics respondido por stub (sem rede no teste)
     await page.goto(path);
     await page.waitForLoadState('networkidle');
     const w = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));

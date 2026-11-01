@@ -19,7 +19,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 | `style-src` | `'self' 'unsafe-inline'` | **Único motivo medido:** o SVG do mapa no relatório é inserido como HTML (`ReportPage.tsx`, decisão B da Fase 2) e traz atributos `style=` (325 na demonstração). React e bpmn-js aplicam estilo via CSSOM, o que a CSP permite: sem `'unsafe-inline'`, mapa, gráficos, assistente e exportações não geram nenhuma violação. Não há nonce no fluxo atual (site estático). | Varredura com `style-src 'self'`: violações só no relatório (§3 do diagnóstico) |
 | `img-src` | `'self' data: blob:` | `data:`: CSS do bpmn-js (`content:url("data:image/svg+xml…")`). `blob:`: exportação PNG, em que o SVG vira `blob:`, depois `<img>` e por fim canvas (`bpmn/render.ts`). | Exportação PNG sem violação em `nexo:test:csp:rotas` |
 | `font-src` | `'self'` | Fontes IBM Plex servidas como `.woff2` do próprio bundle. Saiu `data:`: nenhuma fonte embutida. | CSS do build só referencia `/assets/*.woff2` |
-| `connect-src` | `'self'` | O app só chama a própria origem: o precache do service worker e, no build de venda, `/api/license` (mesma origem, sem domínio extra). | — |
+| `connect-src` | `'self'` (app) | O app só chama a própria origem: o precache do service worker e, no build de venda, `/api/license` (mesma origem, sem domínio extra). | — |
 | `worker-src` | `'self'` | O único worker é o service worker (`/sw.js`). **Sem `blob:`:** jszip e exceljs **não** criam workers; as menções a `importScripts` nos chunks `zip-*` e `xlsx-*` são polyfills de `setImmediate` que só testam se estão num worker. | Nenhum `new Worker` no bundle; ZIP e XLSX exportados sem violação |
 | `manifest-src` | `'self'` | Manifesto do PWA (`/manifest.webmanifest`). | — |
 | `object-src` | `'none'` | Bloqueia `<object>`/`<embed>` (plugins, PDF/Flash/Java embutidos). | — |
@@ -32,6 +32,17 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 - `X-Frame-Options: DENY` é redundante com `frame-ancestors`, mas protege navegadores antigos.
 - `Referrer-Policy` é repetida em `<meta name="referrer">` para valer também no arquivo único, que não tem cabeçalhos.
 - `Permissions-Policy` desliga câmera, microfone, geolocalização e pagamento, que o app não usa.
+
+## Exceção: páginas estáticas `/en/` (Cloudflare Web Analytics)
+
+A landing de venda EN e as páginas legais (`public/en/`) são o **único** lugar com script de terceiros: o beacon do Cloudflare Web Analytics (snippet manual). A regra `/en/*` do `_headers` destaca (`! Content-Security-Policy`) o CSP do app e usa outro, idêntico exceto por duas diretivas:
+
+| Diretiva | Valor em `/en/*` | Por quê |
+|---|---|---|
+| `script-src` | `'self' https://static.cloudflareinsights.com/beacon.min.js` | O snippet manual carrega o beacon desse endereço exato (FATO: docs da Cloudflare, FAQ do Web Analytics). Nada de `'unsafe-inline'`. |
+| `connect-src` | `'self' https://cloudflareinsights.com` | O snippet manual envia os dados para `cloudflareinsights.com` (a injeção automática usaria a própria origem, e não é usada). |
+
+O app (`/*`, exceto `/en/`) mantém `script-src 'self'` e `connect-src 'self'`. Evidência: `tests/api/vercel-headers.test.ts` (o CSP do app não cita o beacon; o de `/en/` difere só nessas duas diretivas) e `scripts/csp-routes.mjs` com `wrangler pages dev` (beacon permitido nas 4 páginas `/en/`, bloqueado no app por um controle negativo, app sem nenhum pedido ao beacon). A Pages soma as regras que casam e junta valores iguais com vírgula; por isso o CSP do app é destacado em `/en/*`, em vez de somar dois CSP (o navegador aplicaria os dois).
 
 ## Por que a CSP fica só no cabeçalho (sem `<meta>`)
 

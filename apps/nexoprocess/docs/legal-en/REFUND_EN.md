@@ -1,3 +1,6 @@
+---
+status: draft
+---
 # NexoProcess — Refund Policy (DRAFT v0.1 — not reviewed by a lawyer)
 
 > DRAFT. Not for publication. Open points are marked `TO VALIDATE`.

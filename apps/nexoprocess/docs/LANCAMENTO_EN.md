@@ -36,10 +36,11 @@ Em Settings → Variables and Secrets → Production. São só nomes; os valores
 | `VITE_EN_PRIVACY_URL` | URL pública da Privacidade EN | idem |
 | `VITE_EN_REFUND_URL` | URL pública da política de reembolso EN | idem |
 | `LICENSE_TTL_DAYS` | **não criar** (FATO, captura do painel do fundador em 01/11/2026: a Production não tem essa variável; vale o padrão do servidor, 30 dias). Se criar com valor diferente de `LICENSE_OFFLINE_DAYS` (30), a landing passa a mentir. Se o fundador decidir TTL 7, mude **juntos**: a constante `LICENSE_OFFLINE_DAYS` (`scripts/lib/en-site.mjs`), o padrão do servidor (`api/_lib/handlers.ts` e `gumroad.ts`) e o teste (`tests/api/en-site.test.ts`) | — |
+| `VITE_CF_WA_TOKEN` | token do **Cloudflare Web Analytics** (só letras e números; vem do snippet que o painel mostra). Público (vai no HTML da landing). Ver §6.2 | texto (build), **obrigatório no build de venda** |
 | `GUMROAD_REVERIFY_AFTER_SEC` | opcional (padrão 86400) | texto |
 | `GUMROAD_ALLOW_TEST` | **não criar** (compra de teste desligada) | — |
 
-- **Build de venda a partir desta branch exige as 4 variáveis do EN** (`VITE_GUMROAD_CHECKOUT_URL`, `VITE_EN_TERMS_URL`, `VITE_EN_PRIVACY_URL`, `VITE_EN_REFUND_URL`; https, sem marcador): o `check-sale-env` recusa o build sem elas. Vale para qualquer build de venda daqui, PT ou EN. A troca PT de sábado usa a TAG `v2.5.0-rc1`, que não tem essa exigência. Crie as páginas legais EN antes de montar este build.
+- **Build de venda a partir desta branch exige as 5 variáveis do EN** (`VITE_GUMROAD_CHECKOUT_URL`, `VITE_EN_TERMS_URL`, `VITE_EN_PRIVACY_URL`, `VITE_EN_REFUND_URL`, `VITE_CF_WA_TOKEN`; as 4 primeiras https, sem marcador) **e os 3 textos legais com `status: approved`** (§6.3): o `check-sale-env` recusa o build sem elas. Vale para qualquer build de venda daqui, PT ou EN. A troca PT de sábado usa a TAG `v2.5.0-rc1`, que não tem essa exigência. Crie as páginas legais EN antes de montar este build.
 - **A produção atual foi publicada por upload direto (wrangler).** As `VITE_*` do painel **não** valem nesse caminho: elas entram no build feito no seu computador (§4.1, via `Read-Host`). Mudou uma `VITE_*`? Refaça o build e o deploy. `GUMROAD_*`, `LICENSE_*` e `SUPABASE_*` ficam no painel. **Variável do painel só vale a partir do PRÓXIMO deployment** (Cloudflare, docs de Pages: "altering the project settings will not be reflected until its next deployment… trigger a new deployment after changing any settings"). Depois de criar ou mudar qualquer variável, publique de novo (§4.1) e só então teste. A página de bindings diz que as variáveis valem em runtime, mas não diz que mudam sem novo deployment: tratar como **exigindo novo deployment** (A VALIDAR com um teste real, mudando uma variável e vendo se a function enxerga o valor novo sem republicar).
 - As variáveis atuais (`LICENSE_PRIVATE_JWK`, `SUPABASE_*`, `HOTMART_*`, `VITE_LICENSE_*`, `VITE_SUPPORT_EMAIL`) continuam iguais.
 - Sem as `VITE_EN_*`, a tela EN simplesmente não mostra os links legais. Melhor publicar as páginas legais antes de vender (CDC/LGPD; nos EUA, A VALIDAR com assessoria).
@@ -94,7 +95,7 @@ git checkout main
 git status --short          # tem de ficar vazio
 git rev-parse HEAD          # anote: é o SHA publicado
 
-# 2) As 7 variáveis do build de venda, digitadas na própria sessão
+# 2) As 8 variáveis do build de venda, digitadas na própria sessão
 $env:VITE_LICENSE_PUBLIC_JWK       = Read-Host 'VITE_LICENSE_PUBLIC_JWK (linha publica)'
 $env:VITE_HOTMART_CHECKOUT_URL     = Read-Host 'VITE_HOTMART_CHECKOUT_URL'
 $env:VITE_SUPPORT_EMAIL            = Read-Host 'VITE_SUPPORT_EMAIL'
@@ -102,6 +103,7 @@ $env:VITE_GUMROAD_CHECKOUT_URL     = Read-Host 'VITE_GUMROAD_CHECKOUT_URL'
 $env:VITE_EN_TERMS_URL             = Read-Host 'VITE_EN_TERMS_URL'
 $env:VITE_EN_PRIVACY_URL           = Read-Host 'VITE_EN_PRIVACY_URL'
 $env:VITE_EN_REFUND_URL            = Read-Host 'VITE_EN_REFUND_URL'
+$env:VITE_CF_WA_TOKEN              = Read-Host 'VITE_CF_WA_TOKEN (Cloudflare Web Analytics)'
 
 # 3) Build de venda (roda o check-sale-env; recusa se faltar variavel) e orcamento do bundle
 npm ci
@@ -113,7 +115,7 @@ $GIT_COMMIT = git rev-parse HEAD
 cd apps/nexoprocess
 npx wrangler pages deploy dist --project-name nexoprocess --branch main --commit-hash $GIT_COMMIT --commit-dirty=false
 ```
-- Os textos entre aspas em `Read-Host` são só os rótulos que aparecem no terminal; **você digita o valor ali**. Nenhum valor fica no histórico do repositório. As 7 variáveis são públicas (vão para o JavaScript do app); nenhuma é segredo.
+- Os textos entre aspas em `Read-Host` são só os rótulos que aparecem no terminal; **você digita o valor ali**. Nenhum valor fica no histórico do repositório. As 8 variáveis são públicas (vão para o JavaScript do app); nenhuma é segredo.
 - **A VALIDAR:** o caminho do clone (`$env:USERPROFILE`) e o endereço do repositório (`DEPLOY_CLOUDFLARE.md` cita outro dono: `felipedelrii/Code-Del-Rio`). Use o endereço que você realmente usa.
 - **A VALIDAR (nunca executado por esta sessão):** estes comandos não foram rodados; esta sessão não tem acesso à Cloudflare.
 - `nexo:check-bundle` falha só se a **entrada** passar de 130 KB gzip ou se pacotes pesados entrarem no inicial (hoje: entrada 23 KB, inicial 157,8 KB, passa).
@@ -182,19 +184,56 @@ Prova o ciclo comprar → ativar → perder o acesso, com evidência real. Anote
 
 ## 6.1 Landing de venda e páginas legais EN (estáticas, em `public/en/`)
 
-- **O que é:** `/en/` (venda), `/en/terms.html`, `/en/privacy.html`, `/en/refund.html`. HTML estático, mesmas fontes e identidade do app, sem script, sem analytics e sem recurso externo. Copy escrita por Sonnet, marcada "copy por Sonnet; revisar": **revise antes de publicar**. Capturas são do demo EN, rotuladas "Sample data".
+- **O que é:** `/en/` (venda), `/en/terms.html`, `/en/privacy.html`, `/en/refund.html`. HTML estático, mesmas fontes e identidade do app, sem recurso externo, e **um único script: o beacon do Cloudflare Web Analytics** (§6.2), só aqui. Copy escrita por Sonnet, marcada "copy por Sonnet; revisar": **revise antes de publicar**. Capturas são do demo EN, rotuladas "Sample data".
 - **Link de compra:** o `nexo:build:venda` troca `{{GUMROAD_CHECKOUT_URL}}` por `VITE_GUMROAD_CHECKOUT_URL` e `{{SUPPORT_EMAIL}}` por `VITE_SUPPORT_EMAIL`. **O build FALHA se faltar a variável ou sobrar qualquer marcador `{{…}}`** (verificado: sem o link, o build para com "VITE_GUMROAD_CHECKOUT_URL ausente").
-- **Páginas legais em RASCUNHO:** vêm de `docs/legal-en/*.md` e mostram faixa **DRAFT** enquanto houver "TO VALIDATE"/"DRAFT". Enquanto houver faixa, o `check-sale-env` **recusa o build de venda** (verificado). Para liberar: resolva os "TO VALIDATE" (revisão jurídica), rode `npm run nexo:site:en` e faça commit.
-- **As 3 variáveis legais passam a ser** `VITE_EN_TERMS_URL=https://<domínio>/en/terms.html`, `VITE_EN_PRIVACY_URL=https://<domínio>/en/privacy.html`, `VITE_EN_REFUND_URL=https://<domínio>/en/refund.html`. **Domínio: A VALIDAR** (decisão sua).
+- **Páginas legais em RASCUNHO:** vêm de `docs/legal-en/*.md` e mostram faixa **DRAFT** enquanto o `status` não for `approved` ou houver "TO VALIDATE"/"DRAFT". Enquanto isso, o `check-sale-env` **recusa o build de venda** (verificado). **A revisão jurídica NÃO ocorreu.** Como liberar: §6.3.
+- **As 3 variáveis legais passam a ser** `VITE_EN_TERMS_URL=https://<domínio>/en/terms`, `VITE_EN_PRIVACY_URL=https://<domínio>/en/privacy`, `VITE_EN_REFUND_URL=https://<domínio>/en/refund` — **sem `.html`**: no `wrangler pages dev` (mesma lógica do Pages), `/en/terms.html` responde 308 para `/en/terms`; usar o endereço final evita o redirecionamento (**A VALIDAR no Pages real**). **Domínio: A VALIDAR** (decisão sua).
 - **Reembolso:** a página diz 7 dias (**A VALIDAR**). Tem de bater com a configuração da Gumroad.
-- **Link para a landing:** use `/en/` com barra final. Se o Pages redireciona `/en` → `/en/`: **A VALIDAR** (não testável no `vite preview`).
+- **Link para a landing:** use `/en/` com barra final. No `wrangler pages dev`, `/en` responde 308 para `/en/` (verificado local); no Pages real: **A VALIDAR**.
+- **Verificado localmente com `wrangler pages dev` (cabeçalhos reais de `public/_headers`):** `/en/` e `/en/*` recebem **um só** CSP (o do app é destacado), o app mantém `script-src 'self'`; `/en/assets/*` mantém o cache de 1 dia. Isso também mostra que o estático `/en/` é servido antes do fallback do app. **Pages real: A VALIDAR.**
 - **Verificado localmente (Chromium, `vite preview`):** /en/ e as 3 páginas abrem estáticas (não o app), sem erro de console, sem recurso externo, sem violação axe (claro/escuro); o service worker não devolve o app no lugar delas; desktop, iPhone-390, 320 px e Android sem rolagem horizontal. **NÃO verificado:** servir pelo Cloudflare Pages real (ordem estático × fallback SPA), Safari/Android reais.
 - **Refazer as capturas:** rodar `tests/e2e/shots-en-landing.spec.ts` com `SHOTS_EN_OUT=<pasta>` e converter para WebP 1200x760 (PIL) em `public/en/assets/`.
+
+### 6.2 Cloudflare Web Analytics (só na landing `/en/`)
+
+**O que o fundador decidiu:** medir visitas na landing e nas páginas legais `/en/`, e **só nelas**. O app não carrega script de terceiros.
+
+**Como o beacon entra (FATO, docs da Cloudflare, Web Analytics):** há dois modos. (1) *Injeção automática*: a Cloudflare insere o script em **todas as páginas da zona** que passam pelo proxy dela (a menos que Rules limitem), **inclusive o app**. (2) *Snippet manual*: só as páginas que contêm o snippet. **Escolha deste repositório: snippet manual, só em `public/en/*.html`.** A documentação que li não descreve um passo específico "Pages" para a injeção automática; **A VALIDAR** no seu painel.
+
+**O que você precisa fazer:**
+1. Painel da Cloudflare → Analytics & Logs → Web Analytics → adicionar o site (hostname do domínio da landing). Copie só o **token** do snippet mostrado (`data-cf-beacon='{"token": "…"}'`).
+2. **NÃO ligue a "injeção automática" (one-click)** para esse hostname: ela colocaria o script também no app. A CSP do app bloqueia o script (verificado), mas o objetivo é não haver tentativa.
+3. Informe o token como `VITE_CF_WA_TOKEN` no build de venda (§4.1). Sem ele, o build **falha** (verificado).
+4. (Decisão sua, **A VALIDAR com assessoria**) a Cloudflare oferece excluir visitantes da UE da medição. A política de privacidade hoje marca isso como "TO VALIDATE".
+
+**CSP/_headers (FATO verificado no `wrangler pages dev`):** `/en/*` destaca (`! Content-Security-Policy`) o CSP do app e define o seu, que só acrescenta `script-src https://static.cloudflareinsights.com/beacon.min.js` e `connect-src https://cloudflareinsights.com` (o snippet manual envia para `cloudflareinsights.com`; na injeção automática seria a própria origem). O espelho `vercel.json` usa duas regras disjuntas. Nada muda para o app.
+
+**O que a Cloudflare diz que coleta (docs):** caminho da página, referência, país, tipo de dispositivo, navegador, sistema operacional e tempos de carregamento; sem cookies e sem `localStorage`; sem fingerprint por IP/User-Agent. A página de privacidade EN descreve isso (rascunho; **A VALIDAR** com assessoria).
+
+**Provas automáticas:** `tests/api/en-site.test.ts` (1 script por página `/en/`, domínio do beacon, nada no código do app), `tests/api/vercel-headers.test.ts` (CSP do app sem o beacon), `tests/e2e/landing-en.spec.ts` (beacon pedido só em `/en/`; app sem script de terceiros) e `scripts/csp-routes.mjs` (CSP real: beacon permitido em `/en/`, bloqueado no app).
+
+### 6.3 Como liberar os textos legais (DRAFT → aprovado)
+
+Cada `docs/legal-en/{TERMS,PRIVACY,REFUND}_EN.md` começa com:
+
+```
+---
+status: draft
+---
+```
+
+O build de venda só passa (`check-sale-env`) quando **os três** têm `status: approved` **e** nenhum contém "TO VALIDATE" ou "DRAFT" (inclusive no título). Passos, feitos **por você** (ou por esta sessão, só quando você mandar):
+1. Resolver cada "TO VALIDATE" no `.md` (decisão sua ou de assessoria jurídica). **A revisão jurídica NÃO ocorreu.**
+2. Trocar `status: draft` por `status: approved` e tirar "DRAFT" do título e da frase de rodapé.
+3. Rodar `npm run nexo:site:en` (regenera `public/en/*.html` sem a faixa DRAFT) e fazer o commit.
+4. Rodar o build de venda (§4.1). Se algo faltar, a mensagem cita o arquivo.
+
+Aprovar é uma decisão de conteúdo e de risco; o código só confere que foi tomada de forma explícita.
 
 ## 7. O que ainda NÃO está pronto para EN (01/11/2026)
 
 - **Interface EN: feita** (Ajuda, templates XLSX/CSV com importação PT↔EN, mensagens de banco/rascunho/ações). Limitação: o CSV continua com `;` e vírgula decimal. Privacidade e Termos dentro do app (`Legal.tsx`) seguem em PT; o texto legal EN fica nas páginas estáticas (§6.1).
-- **Landing EN e páginas legais EN:** criadas (§6.1), mas as legais estão em **RASCUNHO** ("TO VALIDATE") e o build de venda continua recusado até a revisão jurídica.
+- **Landing EN e páginas legais EN:** criadas (§6.1), mas as legais estão em **RASCUNHO** ("TO VALIDATE") e o build de venda continua recusado até você aprovar (§6.3). **A revisão jurídica NÃO ocorreu.**
 - **Safari do iPhone e Android reais:** NÃO verificados (impressão/PDF e telas só no Chromium); só depois do deploy (etapa 5).
 - **Textos EN** são rascunho, sem revisão nativa; privacidade/Ajuda precisam de revisão jurídica.
 - **Bundle inicial 157,8 KB gzip** (meta 130 KB): dívida técnica aceita; ver `HANDOFF_EN.md` §10.

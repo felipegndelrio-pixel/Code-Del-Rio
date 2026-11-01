@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { prepare } from './helpers';
 
+const TOKEN = 'abcdef0123456789abcdef0123456789';
+
 // Landing de venda EN e páginas legais: arquivos estáticos em /en/ (public/en). Sem JavaScript, sem recurso
 // externo; o Pages serve o arquivo antes do fallback do app, e o service worker não pode devolver o app no lugar.
 const PAGES = [
@@ -13,7 +15,7 @@ const PAGES = [
 
 for (const p of PAGES) {
   test(`landing EN: ${p.path} abre estática, sem erro, sem recurso externo e sem violação axe (claro e escuro)`, async ({ page }) => {
-    const { errors, external } = await prepare(page);
+    const { errors, external, beacon } = await prepare(page, { allowBeacon: true });
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
       const resp = await page.goto(p.path);
@@ -26,12 +28,30 @@ for (const p of PAGES) {
       expect(axe.violations.map((v) => `${scheme}: ${v.id} ${v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
     }
     expect(errors).toEqual([]);
-    expect(external).toEqual([]);
+    expect(external).toEqual([]); // nada externo, exceto o beacon do Cloudflare Web Analytics (permitido só aqui, por allowBeacon)
+    // O build de teste leva o token (playwright.config.ts): a página tem exatamente 1 script, o beacon, e o pediu.
+    await expect(page.locator('script')).toHaveCount(1);
+    await expect(page.locator('script[data-cf-beacon]')).toHaveAttribute('src', 'https://static.cloudflareinsights.com/beacon.min.js');
+    expect(await page.locator('script[data-cf-beacon]').getAttribute('data-cf-beacon')).toContain(TOKEN);
+    expect(beacon.filter((u) => u.endsWith('/beacon.min.js')).length).toBeGreaterThan(0);
   });
 }
 
+test('o app NUNCA carrega o Web Analytics: rotas do app sem script de terceiros e sem pedido ao beacon (mesmo permitido em /en/)', async ({ page }) => {
+  const { external, beacon, errors } = await prepare(page); // sem allowBeacon: qualquer pedido externo falha o teste
+  for (const path of ['/', '/entrar', '/app', '/app/novo', '/app/ajuda']) {
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('script[data-cf-beacon]'), path).toHaveCount(0);
+    expect(await page.locator('script[src^="http"]').count(), path).toBe(0);
+  }
+  expect(beacon).toEqual([]);
+  expect(external).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test('landing EN: conteúdo, links de compra e entrada, imagens carregadas', async ({ page }) => {
-  await prepare(page);
+  await prepare(page, { allowBeacon: true });
   await page.goto('/en/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('From process spreadsheet to improvement plan.');
   for (const h of ['How it works', 'What is inside', 'Who it is for', 'Pricing', 'Questions']) await expect(page.getByRole('heading', { level: 2, name: h })).toBeVisible();
@@ -60,7 +80,7 @@ test('landing EN: conteúdo, links de compra e entrada, imagens carregadas', asy
 });
 
 test('páginas legais EN mostram a faixa DRAFT enquanto houver "TO VALIDATE"', async ({ page }) => {
-  await prepare(page);
+  await prepare(page, { allowBeacon: true });
   for (const f of ['terms', 'privacy', 'refund']) {
     await page.goto(`/en/${f}.html`);
     await expect(page.getByRole('note')).toContainText('DRAFT');
@@ -70,7 +90,7 @@ test('páginas legais EN mostram a faixa DRAFT enquanto houver "TO VALIDATE"', a
 });
 
 test('service worker não devolve o app no lugar de /en/ (nem de /en/*.html)', async ({ page }) => {
-  await prepare(page);
+  await prepare(page, { allowBeacon: true });
   await page.goto('/app');
   await page.evaluate(async () => {
     const reg = await navigator.serviceWorker.ready;

@@ -1,5 +1,7 @@
 # HANDOFF EN — próxima sessão
 
+> **AVISO LEGAL (K4): a revisão jurídica dos textos EN (Termos, Privacidade, Reembolso) NÃO ocorreu.** Os três estão em `status: draft` com pontos "TO VALIDATE"; nenhuma frase do repositório afirma o contrário. Não há advogado recorrente: a aprovação é decisão do fundador (`LANCAMENTO_EN.md` §6.3).
+
 Versão 2, 01/11/2026 (v1 no mesmo dia; v2 acrescenta Formulário, Assistente e Relatório/PDF). Branch `wip/en-foundation`. Autor: sessão de engenharia EN (Sonnet).
 
 ## 1. Estado da branch
@@ -91,3 +93,10 @@ Também em EN (v2): Formulário completo, Assistente de criação (inclui texto 
 - **CSV:** `;` e vírgula decimal (limitação conhecida); CSV do plano EN usa datas ISO.
 - **`DEMO_MESSAGE`:** não usada.
 - **J:** landing e legais estáticas em `public/en/` (ver `LANCAMENTO_EN.md` §6.1). Nada publicado.
+
+## 14. Rodada K (01/11/2026): atualizações, analytics, aprovação legal
+- **K1:** "fixes and improvements to v1 are included; larger future versions may have their own rules" na landing (Pricing e FAQ) e nos Termos (com TO VALIDATE (lawyer) sobre o que é "versão maior").
+- **K2:** Cloudflare Web Analytics em modo manual, só em `public/en/*.html` (marcador `{{CF_WA_SNIPPET}}`, token em `VITE_CF_WA_TOKEN`, obrigatório no build de venda). CSP própria só em `/en/*`; app inalterado. Não ligar a injeção automática no painel (cobriria o app). Ver `LANCAMENTO_EN.md` §6.2 e `docs/security-headers.md`.
+- **K3:** aprovação legal explícita: `status: approved` em cada `docs/legal-en/*.md` + nenhum "TO VALIDATE"/"DRAFT"; `check-sale-env` confere (`LANCAMENTO_EN.md` §6.3).
+- **K4:** nenhuma frase sugere revisão jurídica feita (ver aviso no topo).
+- Build de venda a partir desta branch: 5 variáveis EN (as 4 anteriores + `VITE_CF_WA_TOKEN`), 3 textos aprovados, páginas geradas sem faixa DRAFT.
