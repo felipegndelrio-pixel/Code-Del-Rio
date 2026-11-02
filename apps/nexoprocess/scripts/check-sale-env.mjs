@@ -5,17 +5,29 @@
 // A partir da branch wip/en-foundation, TODO build de venda (PT ou EN) exige também as 5 variáveis do EN (4 de venda/legais + VITE_CF_WA_TOKEN) e os 3 textos legais aprovados: sem elas a
 // entrada EN sairia sem botão de compra e sem links legais, em silêncio. A troca PT de sábado usa a TAG v2.5.0-rc1, que não tem esta exigência.
 import { fileURLToPath } from 'node:url';
+import { jwkFingerprint, jwkImportProblem, jwkProblems, parseJwkText } from '../src/license/jwk.mjs';
 import { draftPages, legalGate } from './lib/en-site.mjs';
 
 const errors = [];
-let jwk = null;
-try {
-  jwk = JSON.parse(process.env.VITE_LICENSE_PUBLIC_JWK ?? '');
-} catch {
-  /* tratado abaixo */
+// Chave pública do build: JSON (sem aspas "inteligentes": o app a lê com JSON.parse), kty EC, crv P-256, x e y de 43 caracteres
+// base64url, SEM "d", e precisa importar no WebCrypto. Uma cópia à mão com 1 caractere a menos passava no build e o navegador
+// recusava todos os tokens ("device could not validate").
+let publicFingerprint = null;
+{
+  const name = 'VITE_LICENSE_PUBLIC_JWK';
+  const { jwk, error } = parseJwkText(process.env[name], { lenientQuotes: false });
+  if (error === 'vazia') errors.push(`${name} ausente (use a linha pública de scripts/license-keys.mjs).`);
+  else if (error) errors.push(`${name}: ${error}.`);
+  else {
+    const problems = jwkProblems(jwk, 'public');
+    if (problems.length) errors.push(`${name} inválida: ${problems.join('; ')}. Copie a linha pública de scripts/license-keys.mjs inteira, sem editar.`);
+    else {
+      const imp = await jwkImportProblem(jwk, 'public');
+      if (imp) errors.push(`${name} inválida: ${imp}. Copie a linha pública de scripts/license-keys.mjs inteira, sem editar.`);
+      else publicFingerprint = await jwkFingerprint(jwk);
+    }
+  }
 }
-if (!jwk || jwk.kty !== 'EC' || jwk.crv !== 'P-256' || !jwk.x || !jwk.y) errors.push('VITE_LICENSE_PUBLIC_JWK ausente ou inválida (use a linha pública de scripts/license-keys.mjs).');
-else if (jwk.d) errors.push('VITE_LICENSE_PUBLIC_JWK contém a parte PRIVADA ("d"). Use só a linha pública.');
 if (!/^https:\/\/\S+$/.test(process.env.VITE_HOTMART_CHECKOUT_URL ?? '')) errors.push('VITE_HOTMART_CHECKOUT_URL ausente ou sem https:// (link do checkout da Hotmart).');
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((process.env.VITE_SUPPORT_EMAIL ?? '').trim())) errors.push('VITE_SUPPORT_EMAIL ausente ou inválido (e-mail de suporte mostrado ao comprador).');
 // EN (Gumroad): https e sem marcador de preenchimento ("<...>", "[...]", "{...}", "INSIRA", "SEU").
@@ -39,3 +51,5 @@ if (errors.length) {
   process.exit(1);
 }
 console.log('OK: variáveis do build de venda presentes (acesso pela compra e modo demo ligados).');
+console.log(`Impressão digital da chave pública deste build (8 hex do SHA-256 de x seguido de y): ${publicFingerprint}`);
+console.log('Confira com a da chave privada que o servidor usa (LANCAMENTO_EN, "Conferir o par de chaves"). Se forem diferentes, NÃO publique.');

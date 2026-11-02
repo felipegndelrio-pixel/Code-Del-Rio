@@ -2,8 +2,9 @@
 // revogação por reverificação. Desenho e fontes: docs/GUMROAD_ENTITLEMENT.md.
 // Regras fixas: increment_uses_count=false sempre (D7); o payload do Ping nunca é
 // confiável (não é assinado); a license_key nunca é gravada nem vai para log (C5).
+import { privateJwkProblem } from '../../src/license/jwk.mjs';
 import { normalizeEmail, signToken, verifyToken } from '../../src/license/token.js';
-import { maskEmail, safeEqual } from './handlers.js';
+import { maskEmail, notConfigured as notConfiguredBase, safeEqual } from './handlers.js';
 import { readBodyLimited } from './hotmart.js';
 import type { LicenseStore } from './store.js';
 
@@ -193,6 +194,9 @@ export interface GumroadDeps {
   timeoutMs?: number;
   now?: () => number;
   missing?: string[];
+  /** LICENSE_PRIVATE_JWK presente mas inválida (e o motivo, sem valores). */
+  invalid?: string[];
+  invalidDetail?: string[];
 }
 
 const json = (status: number, body: unknown) =>
@@ -208,13 +212,11 @@ const MANUAL = {
 };
 const UNAVAILABLE = { error: 'falha_verificacao', message: 'We could not verify your license right now. Please try again shortly.' };
 
-function notConfigured(route: string, missing: string[] | undefined) {
-  const faltando = missing?.length ? missing : undefined;
-  console.error(`${route}: não configurado${faltando ? ` — faltando: ${faltando.join(', ')}` : ''}`);
-  return json(503, { error: 'nao_configurado', ...(faltando ? { faltando } : {}) });
+function notConfigured(route: string, missing: string[] | undefined, bad?: { invalid?: string[]; detail?: string[] }) {
+  return notConfiguredBase(route, missing, undefined, bad);
 }
 
-export function gumroadDepsFromEnv(env: Record<string, string | undefined>, base: { store: LicenseStore | null; privateJwk: JsonWebKey | null; ttlDays?: number; missing?: string[] }): GumroadDeps {
+export function gumroadDepsFromEnv(env: Record<string, string | undefined>, base: { store: LicenseStore | null; privateJwk: JsonWebKey | null; ttlDays?: number; missing?: string[]; invalid?: string[]; invalidDetail?: string[] }): GumroadDeps {
   const productId = env.GUMROAD_PRODUCT_ID?.trim() || null;
   const reverify = Number(env.GUMROAD_REVERIFY_AFTER_SEC);
   return {
@@ -235,7 +237,10 @@ export function gumroadDepsFromEnv(env: Record<string, string | undefined>, base
  */
 export async function handleGumroadLicense(req: Request, deps: GumroadDeps): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'metodo' });
-  if (!deps.store || !deps.privateJwk || !deps.productId) return notConfigured('/api/gumroad-license', deps.missing);
+  if (!deps.store || !deps.privateJwk || !deps.productId) return notConfigured('/api/gumroad-license', deps.missing, { invalid: deps.invalid, detail: deps.invalidDetail });
+  // Forma certa não basta: a chave precisa importar e assinar (par x,y,d coerente). Senão, 503 em vez de um token que o aparelho recusará.
+  const badKey = await privateJwkProblem(deps.privateJwk);
+  if (badKey) return notConfigured('/api/gumroad-license', deps.missing, { invalid: ['LICENSE_PRIVATE_JWK'], detail: [badKey] });
   const text = await req.text();
   if (text.length > 4096) return json(413, { error: 'grande_demais' });
   let body: { email?: unknown; token?: unknown; license_key?: unknown };

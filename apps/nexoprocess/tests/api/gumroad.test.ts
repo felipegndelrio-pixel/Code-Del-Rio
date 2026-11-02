@@ -17,6 +17,7 @@ import {
   type GumroadDeps,
   type GumroadPurchase,
 } from '../../api/_lib/gumroad';
+import { licenseDepsFromEnv } from '../../api/_lib/handlers';
 import type { GrantResult, LicenseRecord, LicenseStatus, LicenseStore, PurchaseState } from '../../api/_lib/store';
 import { signToken, verifyToken } from '../../src/license/token';
 
@@ -490,5 +491,54 @@ describe('supabaseStore.purchaseState', () => {
     expect(await mk('null').purchaseState!('gumroad', 'T1')).toBeNull();
     await expect(mk('{"status":1}').purchaseState!('gumroad', 'T1')).rejects.toThrow('inesperada');
     await expect(mk('x', 500).purchaseState!('gumroad', 'T1')).rejects.toThrow('HTTP 500');
+  });
+});
+
+describe('LICENSE_PRIVATE_JWK inválida em /api/gumroad-license', () => {
+  const cut = (s: string) => s.slice(0, s.length - 1);
+  const call = (over: Partial<GumroadDeps>) => handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), deps(fakeStore().store, gumroad(ok(officialPurchase())).fetchImpl, over));
+
+  it('deps do ambiente: forma errada vira invalida/detalhe e 503; nada é assinado nem gravado', async () => {
+    const env = { GUMROAD_PRODUCT_ID: PRODUCT, SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k' };
+    for (const [bad, expected] of [
+      [{ ...priv, x: cut(priv.x as string) }, 'x tem 42 caracteres (esperado 43)'],
+      [{ ...priv, y: cut(priv.y as string) }, 'y tem 42 caracteres (esperado 43)'],
+      [{ ...priv, d: cut(priv.d as string) }, 'd tem 42 caracteres (esperado 43)'],
+    ] as const) {
+      const d = gumroadDepsFromEnv(env, licenseDepsFromEnv({ ...env, LICENSE_PRIVATE_JWK: JSON.stringify(bad) }));
+      const f = fakeStore();
+      const r = await handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), { ...d, store: f.store, fetchImpl: gumroad(ok(officialPurchase())).fetchImpl });
+      const b = (await r.json()) as { error: string; faltando?: string[]; invalida?: string[]; detalhe?: string[] };
+      expect(r.status).toBe(503);
+      expect(b).toMatchObject({ error: 'nao_configurado', invalida: ['LICENSE_PRIVATE_JWK'], detalhe: [expected] });
+      expect(b.faltando).toBeUndefined();
+      expect(f.calls).toEqual([]);
+      for (const v of [priv.x, priv.y, priv.d]) expect(JSON.stringify(b)).not.toContain(v as string);
+    }
+  });
+
+  it('forma certa mas "d" de outro par → 503, nada gravado, nenhuma chamada à Gumroad', async () => {
+    const other = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const o = await crypto.subtle.exportKey('jwk', other.privateKey);
+    const f = fakeStore();
+    const g = gumroad(ok(officialPurchase()));
+    const r = await handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), deps(f.store, g.fetchImpl, { privateJwk: { kty: priv.kty, crv: priv.crv, x: priv.x, y: priv.y, d: o.d } }));
+    const b = (await r.json()) as { invalida?: string[]; detalhe?: string[] };
+    expect(r.status).toBe(503);
+    expect(b.invalida).toEqual(['LICENSE_PRIVATE_JWK']);
+    expect(b.detalhe?.[0]).toMatch(/não corresponde|não foi aceita/);
+    expect(g.calls).toHaveLength(0);
+    expect(f.calls).toEqual([]);
+  });
+
+  it('chave privada válida continua emitindo token (200)', async () => {
+    expect((await call({})).status).toBe(200);
+  });
+
+  it('GUMROAD_PRODUCT_ID ausente + chave inválida → lista as duas (faltando e invalida)', async () => {
+    const d = gumroadDepsFromEnv({ SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k' }, licenseDepsFromEnv({ SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', LICENSE_PRIVATE_JWK: '{"kty":"EC"}' }));
+    const r = await handleGumroadLicense(req({ email: 'customer@example.com', license_key: KEY }), d);
+    expect(r.status).toBe(503);
+    expect(await r.json()).toMatchObject({ faltando: ['GUMROAD_PRODUCT_ID'], invalida: ['LICENSE_PRIVATE_JWK'] });
   });
 });

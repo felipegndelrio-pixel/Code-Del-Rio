@@ -121,6 +121,23 @@ npx wrangler pages deploy dist --project-name nexoprocess --branch main --commit
 - `nexo:check-bundle` falha só se a **entrada** passar de 130 KB gzip ou se pacotes pesados entrarem no inicial (hoje: entrada 23 KB, inicial 157,8 KB, passa).
 - **Alternativa (A VALIDAR): integração com o GitHub.** Só serve num projeto Pages **novo** (um projeto de Direct Upload não aceita Git depois), com domínio e variáveis refeitos, e o build do painel (`npm run nexo:build`) **não** roda o `check-sale-env`. Não recomendada para este lançamento.
 
+### 4.2 Conferir o par de chaves (antes do deploy)
+
+**Por que existe:** no staging, a `VITE_LICENSE_PUBLIC_JWK` foi copiada à mão com 1 caractere a menos (`x` ou `y` com 42 em vez de 43). O build passou, o servidor assinou e o navegador recusou o token ("device could not validate"). Agora há três travas:
+1. **Build de venda (`check-sale-env`)** recusa a `VITE_LICENSE_PUBLIC_JWK` se: não for JSON (aspas "inteligentes" incluídas), `kty` não for `EC`, `crv` não for `P-256`, `x` ou `y` não tiverem 43 caracteres base64url, tiver `d` (parte privada) ou o WebCrypto não a importar. A mensagem diz qual campo e quantos caracteres (nunca imprime o valor).
+2. **Servidor:** se a `LICENSE_PRIVATE_JWK` for inválida (mesmas regras, com `d` de 43) ou o `d` não pertencer a `x,y` (teste de assinatura), `/api/license` e `/api/gumroad-license` respondem **503** com `"invalida": ["LICENSE_PRIVATE_JWK"]` e `"detalhe": ["x tem 42 caracteres (esperado 43)"]`, em vez de assinar. Nada de valor vai na resposta nem no log.
+3. **Impressão digital:** `scripts/license-keys.mjs` e o fim do `nexo:build:venda` imprimem a mesma impressão digital: **8 hex do SHA-256 de `x` seguido de `y`** (os dois textos base64url, em UTF-8). Ela é igual na pública e na privada do mesmo par.
+
+**Comparar antes de publicar:** a impressão digital que o build de venda mostra (da pública) tem de ser igual à da privada que o servidor usa. O painel da Cloudflare não mostra o valor de um secret; calcule a da privada a partir de onde você guardou a linha (a saída do `license-keys.mjs`). No PowerShell (Windows PowerShell 5.1 ou 7); o valor digitado aparece na tela, então use o terminal só seu e feche-o depois:
+
+```powershell
+$j = (Read-Host 'LICENSE_PRIVATE_JWK (linha inteira)') | ConvertFrom-Json
+$h = [Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($j.x + $j.y))
+-join ($h[0..3] | ForEach-Object { $_.ToString('x2') })
+```
+
+Se os 8 caracteres forem diferentes dos do build, **não publique**: a pública do build e a privada do servidor não são o mesmo par. **A VALIDAR:** este comando PowerShell não foi executado por esta sessão (sem PowerShell no ambiente); o cálculo equivalente foi conferido em Node e em Python (vetor fixo `e2655e92`). Se o PowerShell mostrar outra coisa para a mesma chave, avise antes de confiar nele.
+
 ## 5. Verificação no iPhone (Safari)
 
 | # | Teste | Esperado |

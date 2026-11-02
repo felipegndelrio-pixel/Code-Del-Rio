@@ -100,3 +100,8 @@ Também em EN (v2): Formulário completo, Assistente de criação (inclui texto 
 - **K3:** aprovação legal explícita: `status: approved` em cada `docs/legal-en/*.md` + nenhum "TO VALIDATE"/"DRAFT"; `check-sale-env` confere (`LANCAMENTO_EN.md` §6.3).
 - **K4:** nenhuma frase sugere revisão jurídica feita (ver aviso no topo).
 - Build de venda a partir desta branch: 5 variáveis EN (as 4 anteriores + `VITE_CF_WA_TOKEN`), 3 textos aprovados, páginas geradas sem faixa DRAFT.
+
+## 15. Poka-yoke das chaves de licença (02/11/2026)
+- `src/license/jwk.mjs` é a fonte única das regras (EC, P-256, x/y/d de 43 base64url, pública sem `d`, importação WebCrypto, teste de assinatura da privada, impressão digital). Usada por `check-sale-env`, pelas rotas de licença e por `license-keys.mjs`.
+- 503 de configuração agora traz `invalida` e `detalhe` (sem valores) além de `faltando`. Mudança de contrato: antes a privada inválida aparecia dentro de `faltando` com um texto; o teste foi atualizado.
+- Ver `LANCAMENTO_EN.md` §4.2 (comparação da impressão digital antes do deploy).

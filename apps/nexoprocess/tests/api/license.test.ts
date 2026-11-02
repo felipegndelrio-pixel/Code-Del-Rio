@@ -296,7 +296,49 @@ describe('armazenamento', () => {
 });
 
 describe('configuração pelo painel (diagnóstico do 503)', () => {
-  const body = async (r: Response) => (await r.json()) as { error: string; faltando?: string[] };
+  const body = async (r: Response) => (await r.json()) as { error: string; faltando?: string[]; invalida?: string[]; detalhe?: string[] };
+
+  const envOf = (jwk: unknown) => ({ SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', LICENSE_PRIVATE_JWK: typeof jwk === 'string' ? jwk : JSON.stringify(jwk) });
+  const cut = (s: string) => s.slice(0, s.length - 1);
+
+  it('LICENSE_PRIVATE_JWK inválida → 503 com invalida/detalhe (sem valores), nunca assina', async () => {
+    const mixed = { ...priv, d: cut(priv.d as string) };
+    for (const [jwk, expected] of [
+      [{ ...priv, x: cut(priv.x as string) }, 'x tem 42 caracteres (esperado 43)'],
+      [{ ...priv, y: cut(priv.y as string) }, 'y tem 42 caracteres (esperado 43)'],
+      [mixed, 'd tem 42 caracteres (esperado 43)'],
+      [pub, 'd ausente'],
+      ['{quebrada', 'não é JSON válido (cole a linha inteira, de { até })'],
+    ] as const) {
+      const r = await handleLicense(post('/api/license', { email: 'a@b.co' }), licenseDepsFromEnv(envOf(jwk)));
+      const b = await body(r);
+      expect(r.status).toBe(503);
+      expect(b.invalida).toEqual(['LICENSE_PRIVATE_JWK']);
+      expect(b.detalhe).toEqual([expected]);
+      expect(b.faltando).toBeUndefined();
+      const text = JSON.stringify(b);
+      for (const v of [priv.x, priv.y, priv.d, cut(priv.d as string)]) expect(text).not.toContain(v as string);
+    }
+  });
+
+  it('forma certa mas "d" de outro par → 503 invalida (teste de assinatura), em vez de assinar', async () => {
+    const other = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const otherPriv = await crypto.subtle.exportKey('jwk', other.privateKey);
+    const mixed = { kty: priv.kty, crv: priv.crv, x: priv.x, y: priv.y, d: otherPriv.d };
+    const r = await handleLicense(post('/api/license', { email: 'a@b.co' }), { ...licenseDepsFromEnv(envOf(mixed)), store: memoryStore({ 'a@b.co': 'active' }) });
+    expect(r.status).toBe(503);
+    const b = await body(r);
+    expect(b.invalida).toEqual(['LICENSE_PRIVATE_JWK']);
+    expect(b.detalhe?.[0]).toMatch(/não corresponde|não foi aceita/);
+  });
+
+  it('chave privada válida continua funcionando (token assinado)', async () => {
+    const env = envOf({ kty: priv.kty, crv: priv.crv, x: priv.x, y: priv.y, d: priv.d });
+    const deps = { ...licenseDepsFromEnv(env), store: memoryStore({ 'a@b.co': 'active' }) };
+    expect(deps.invalid).toBeUndefined();
+    const r = await handleLicense(post('/api/license', { email: 'a@b.co' }), deps);
+    expect(r.status).toBe(200);
+  });
 
   it('503 lista os nomes das variáveis que faltam, sem expor valores', async () => {
     const r = await handleLicense(post('/api/license', { email: 'a@b.co' }), licenseDepsFromEnv({}));
@@ -304,7 +346,8 @@ describe('configuração pelo painel (diagnóstico do 503)', () => {
     expect((await body(r)).faltando).toEqual(['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'LICENSE_PRIVATE_JWK']);
     const r2 = await handleLicense(post('/api/license', { email: 'a@b.co' }), licenseDepsFromEnv({ SUPABASE_URL: 'https://x.supabase.co', LICENSE_PRIVATE_JWK: '{quebrada' }));
     const b2 = await body(r2);
-    expect(b2.faltando).toEqual(['SUPABASE_SERVICE_ROLE_KEY', 'LICENSE_PRIVATE_JWK (inválida: cole a linha inteira, de { até })']);
+    expect(b2.faltando).toEqual(['SUPABASE_SERVICE_ROLE_KEY']);
+    expect(b2).toMatchObject({ invalida: ['LICENSE_PRIVATE_JWK'] });
     expect(JSON.stringify(b2)).not.toContain('x.supabase.co');
     const w = await handleWebhook(post('/api/hotmart-webhook', {}), webhookDepsFromEnv({ SUPABASE_URL: 'u', SUPABASE_SERVICE_ROLE_KEY: 'k' }));
     expect((await body(w)).faltando).toEqual(['HOTMART_HOTTOK']);

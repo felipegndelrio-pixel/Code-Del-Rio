@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { generateKeyPairSync } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -53,6 +53,58 @@ describe('check-sale-env', () => {
     expect(run({ VITE_EN_PRIVACY_URL: 'https://<seu-dominio>/privacy' }).code).toBe(1);
     expect(run({ VITE_EN_REFUND_URL: 'https://INSIRA.com/refund' }).code).toBe(1);
     expect(run({ VITE_GUMROAD_CHECKOUT_URL: 'https://[produto]' }).code).toBe(1);
+  });
+  describe('VITE_LICENSE_PUBLIC_JWK (cópia à mão com caractere a menos passava no build)', () => {
+    const k = JSON.parse(pub) as Record<string, string>;
+    const cut = (v: string) => v.slice(0, v.length - 1);
+    const jwk = (o: Record<string, unknown>) => JSON.stringify({ ...k, ...o });
+    it('x ou y com 42 caracteres → falha dizendo qual e quantos, sem imprimir o valor', () => {
+      for (const [field, over] of [['x', { x: cut(k.x) }], ['y', { y: cut(k.y) }]] as const) {
+        const r = run({ VITE_LICENSE_PUBLIC_JWK: jwk(over) });
+        expect(r.code, field).toBe(1);
+        expect(r.out).toContain(`${field} tem 42 caracteres (esperado 43)`);
+        expect(r.out).toContain('VITE_LICENSE_PUBLIC_JWK');
+        expect(r.out).not.toContain(k[field]);
+      }
+    });
+    it('44 caracteres, caractere fora do alfabeto, kty/crv errados → falham', () => {
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: jwk({ y: k.y + 'A' }) }).out).toContain('y tem 44 caracteres');
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: jwk({ x: k.x.slice(0, 42) + '+' }) }).out).toContain('x tem caracteres fora');
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: jwk({ kty: 'RSA' }) }).out).toContain('kty deve ser "EC"');
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: jwk({ crv: 'P-384' }) }).out).toContain('crv deve ser "P-256"');
+    });
+    it('com a parte privada ("d") → falha; ausente, vazia, não-JSON e aspas inteligentes → falham', () => {
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: jwk({ d: 'A'.repeat(43) }) }).out).toContain('contém "d"');
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: undefined }).out).toMatch(/VITE_LICENSE_PUBLIC_JWK ausente/);
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: '' }).out).toMatch(/VITE_LICENSE_PUBLIC_JWK ausente/);
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: '{quebrada' }).out).toMatch(/não é JSON válido/);
+      expect(run({ VITE_LICENSE_PUBLIC_JWK: pub.replace(/"/g, '\u201C') }).out).toMatch(/aspas “inteligentes”/);
+    });
+    it('43 caracteres mas fora da curva (caractere trocado) → o WebCrypto recusa', () => {
+      const r = run({ VITE_LICENSE_PUBLIC_JWK: jwk({ x: (k.x[0] === 'A' ? 'B' : 'A') + k.x.slice(1) }) });
+      expect(r.code).toBe(1);
+      expect(r.out).toContain('não formam um ponto válido da curva P-256');
+    });
+    it('chave correta → passa e imprime a impressão digital (8 hex do SHA-256 de x||y)', () => {
+      const r = run({});
+      expect(r.code).toBe(0);
+      const fp = createHash('sha256').update(k.x + k.y).digest('hex').slice(0, 8);
+      expect(r.out).toContain(`(8 hex do SHA-256 de x seguido de y): ${fp}`);
+      expect(r.out).toContain('NÃO publique');
+    });
+  });
+  it('license-keys.mjs imprime as duas linhas e a impressão digital, igual à da pública', () => {
+    const r = spawnSync(process.execPath, ['apps/nexoprocess/scripts/license-keys.mjs'], { encoding: 'utf8', cwd: new URL('../../../../', import.meta.url).pathname });
+    expect(r.status).toBe(0);
+    const lines = r.stdout.split('\n');
+    const privJwk = JSON.parse(lines[lines.findIndex((l) => l.startsWith('LICENSE_PRIVATE_JWK')) + 1]) as Record<string, string>;
+    const pubJwk = JSON.parse(lines[lines.findIndex((l) => l.startsWith('VITE_LICENSE_PUBLIC_JWK')) + 1]) as Record<string, string>;
+    for (const v of [privJwk.x, privJwk.y, privJwk.d, pubJwk.x, pubJwk.y]) expect(v).toHaveLength(43);
+    expect(privJwk.d).toBeDefined();
+    expect(pubJwk.d).toBeUndefined();
+    const fp = createHash('sha256').update(pubJwk.x + pubJwk.y).digest('hex').slice(0, 8);
+    expect(createHash('sha256').update(privJwk.x + privJwk.y).digest('hex').slice(0, 8)).toBe(fp);
+    expect(r.stdout).toContain(`: ${fp}\n`);
   });
   it('as exigências do PT continuam: e-mail de suporte inválido → falha', () => {
     expect(run({ VITE_SUPPORT_EMAIL: 'x' }).code).toBe(1);

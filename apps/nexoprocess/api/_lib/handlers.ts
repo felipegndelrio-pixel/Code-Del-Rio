@@ -1,4 +1,5 @@
 // Lógica das rotas, sem dependência da Vercel: Request → Response (testável).
+import { jwkProblems, parseJwkText, privateJwkProblem } from '../../src/license/jwk.mjs';
 import { normalizeEmail, signToken, verifyToken } from '../../src/license/token.js';
 import { parseHotmartText, readBodyLimited, redactPayload } from './hotmart.js';
 import { storeFromEnv, supabaseServiceKey, supabaseUrl, type Env, type LicenseStore } from './store.js';
@@ -11,6 +12,9 @@ export interface LicenseDeps {
   now?: () => number;
   /** Nomes das variáveis que faltam (para o 503 dizer o que configurar). Nunca valores. */
   missing?: string[];
+  /** Variáveis presentes mas inválidas (hoje só LICENSE_PRIVATE_JWK) e o motivo, sem valores. */
+  invalid?: string[];
+  invalidDetail?: string[];
 }
 
 export interface WebhookDeps {
@@ -34,15 +38,14 @@ export function safeEqual(a: string, b: string): boolean {
 /** a***@dominio.com — e-mail mascarado para log. */
 export const maskEmail = (e: string) => e.replace(/^(.).*(@.*)$/, '$1***$2');
 
-function parseJwk(raw: string | undefined): JsonWebKey | null {
-  if (!raw) return null;
-  try {
-    // Colado do celular, o JSON pode vir com aspas "inteligentes" (“ ”): normaliza antes.
-    const k = JSON.parse(raw.trim().replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')) as JsonWebKey;
-    return k.kty === 'EC' && k.d ? k : null;
-  } catch {
-    return null;
-  }
+/** Lê a LICENSE_PRIVATE_JWK. Inválida (JSON, kty/crv, x/y/d de 43 caracteres) → null + motivos, sem valores. */
+function readPrivateJwk(raw: string | undefined): { jwk: JsonWebKey | null; problems: string[] } {
+  if (!raw) return { jwk: null, problems: [] };
+  // Colado do celular, o JSON pode vir com aspas "inteligentes" (“ ”): o servidor normaliza antes.
+  const { jwk, error } = parseJwkText(raw, { lenientQuotes: true });
+  if (error) return { jwk: null, problems: [error] };
+  const problems = jwkProblems(jwk, 'private');
+  return problems.length ? { jwk: null, problems } : { jwk: jwk as JsonWebKey, problems: [] };
 }
 
 /** Variáveis de armazenamento que faltam (vazio se o Supabase ou a lista fixa estiverem completos). */
@@ -52,9 +55,15 @@ function missingStore(env: Env): string[] {
 }
 
 export const licenseDepsFromEnv = (env: Env): LicenseDeps => {
-  const privateJwk = parseJwk(env.LICENSE_PRIVATE_JWK);
-  const missing = [...missingStore(env), ...(env.LICENSE_PRIVATE_JWK ? (privateJwk ? [] : ['LICENSE_PRIVATE_JWK (inválida: cole a linha inteira, de { até })']) : ['LICENSE_PRIVATE_JWK'])];
-  return { store: storeFromEnv(env), privateJwk, ttlDays: Number(env.LICENSE_TTL_DAYS) || 30, missing };
+  const { jwk: privateJwk, problems } = readPrivateJwk(env.LICENSE_PRIVATE_JWK);
+  const missing = [...missingStore(env), ...(env.LICENSE_PRIVATE_JWK ? [] : ['LICENSE_PRIVATE_JWK'])];
+  return {
+    store: storeFromEnv(env),
+    privateJwk,
+    ttlDays: Number(env.LICENSE_TTL_DAYS) || 30,
+    missing,
+    ...(problems.length ? { invalid: ['LICENSE_PRIVATE_JWK'], invalidDetail: problems } : {}),
+  };
 };
 
 export const webhookDepsFromEnv = (env: Env): WebhookDeps => ({
@@ -65,10 +74,12 @@ export const webhookDepsFromEnv = (env: Env): WebhookDeps => ({
 });
 
 /** 503 que diz o que configurar (nomes, nunca valores) e registra no log da função. */
-function notConfigured(route: string, missing: string[] | undefined, message?: string) {
+export function notConfigured(route: string, missing: string[] | undefined, message?: string, bad?: { invalid?: string[]; detail?: string[] }) {
   const faltando = missing?.length ? missing : undefined;
-  console.error(`${route}: não configurado${faltando ? ` — faltando: ${faltando.join(', ')}` : ''}`);
-  return json(503, { error: 'nao_configurado', ...(message ? { message } : {}), ...(faltando ? { faltando } : {}) });
+  const invalida = bad?.invalid?.length ? bad.invalid : undefined;
+  const detalhe = invalida && bad?.detail?.length ? bad.detail : undefined;
+  console.error(`${route}: não configurado${faltando ? ` — faltando: ${faltando.join(', ')}` : ''}${invalida ? ` — inválida: ${invalida.join(', ')}${detalhe ? ` (${detalhe.join('; ')})` : ''}` : ''}`);
+  return json(503, { error: 'nao_configurado', ...(message ? { message } : {}), ...(faltando ? { faltando } : {}), ...(invalida ? { invalida } : {}), ...(detalhe ? { detalhe } : {}) });
 }
 
 /**
@@ -86,7 +97,10 @@ const NOT_FOUND = { error: 'sem_licenca', message: 'Não encontramos uma compra 
  */
 export async function handleLicense(req: Request, deps: LicenseDeps): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'metodo' });
-  if (!deps.store || !deps.privateJwk) return notConfigured('/api/license', deps.missing, 'A ativação ainda não está configurada.');
+  if (!deps.store || !deps.privateJwk) return notConfigured('/api/license', deps.missing, 'A ativação ainda não está configurada.', { invalid: deps.invalid, detail: deps.invalidDetail });
+  // Forma certa não basta: a chave precisa importar e assinar. Com par inconsistente, 503 em vez de assinar um token que o aparelho recusará.
+  const badKey = await privateJwkProblem(deps.privateJwk);
+  if (badKey) return notConfigured('/api/license', deps.missing, 'A ativação ainda não está configurada.', { invalid: ['LICENSE_PRIVATE_JWK'], detail: [badKey] });
   const text = await req.text();
   if (text.length > 4096) return json(413, { error: 'grande_demais' });
   let body: { email?: unknown; token?: unknown };
