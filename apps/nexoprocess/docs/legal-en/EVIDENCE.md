@@ -6,9 +6,9 @@ Legend: **PROVADO** = the code or schema shows it; **POLÍTICA** = a commitment,
 
 ## Result
 
-- **1 sentence contradicted by the code:** §2 "backups" stored in the browser (U1).
-- **1 sentence true only after a founder action:** §3.1 "Visits from the EU are not measured" (U2).
-- **1 sentence imprecise:** §4 "status (active or revoked)" (U3).
+- **U1 (§2 "backups" stored in the browser): contradicted by the code. FIXED 04/11/2026**: the word was removed from the text.
+- **U2 (§3.1 "Visits from the EU are not measured"): true only after a founder action.** Decision 04/11/2026: sentence kept (founder decision D-L10). **Pre-sale requirement: turn the Cloudflare EU option on and check it before the first sale** (`docs/LANCAMENTO_EN.md` §6.2, item 4).
+- **U3 (§4 "status (active or revoked)"): imprecise. FIXED 04/11/2026**: text now says "status".
 - **4 items are commitments, not code facts:** retention 5 years, 30-day reply, legal bases, children (P1–P4). **2 items depend on third-party docs, not re-read today** (V1–V2).
 - Everything else is PROVADO.
 
@@ -25,7 +25,7 @@ Legend: **PROVADO** = the code or schema shows it; **POLÍTICA** = a commitment,
 |---|---|---|
 | processes | `db.createObjectStore('workspaces')` (`src/storage/db.ts:51`) | PROVADO |
 | drafts | `createObjectStore('drafts')` (`db.ts:52`); form drafts in localStorage with prefix (`src/storage/localDraft.ts:9,17`) | PROVADO |
-| **backups** | Nothing stores a backup in the browser. A backup is a JSON **file the user downloads** (`db.ts:257-266`, `exportBackup`); IndexedDB has only the two stores above (`db.ts:51-52`). | **NÃO COMPROVADO (U1)** |
+| ~~backups~~ (removed from the text) | Nothing stores a backup in the browser. A backup is a JSON **file the user downloads** (`db.ts:257-266`, `exportBackup`); IndexedDB has only the two stores above (`db.ts:51-52`). | **CORRIGIDO (U1)** |
 | preferences: theme | `localStorage 'nexo.theme'` (`src/state/theme.ts:4,22`) | PROVADO |
 | preferences: language | `localStorage 'nexo-ui.lang'` (`src/i18n/locale.ts:13`) | PROVADO |
 | tips already seen | `'nexo.dica.instalar'` (`src/components/InstallHint.tsx:10,27`); tour flags (`src/components/Tour.tsx:25,35`) | PROVADO |
@@ -59,7 +59,7 @@ Legend: **PROVADO** = the code or schema shows it; **POLÍTICA** = a commitment,
 | e-mail, product, sale id | `email`, `product_id`, `transaction_id` (`api/_lib/schema-purchases.sql:15-18`) | PROVADO |
 | amount and currency paid (PRIVACY §4) | `amount numeric(14,2)`, `currency text` (`schema-purchases.sql:25,27`); filled from the sale (`api/_lib/store.ts:14-16,74-76`) | PROVADO |
 | event and date | `last_event`, `last_event_occurred_at`, `updated_at` (`schema-purchases.sql:28-30`) | PROVADO |
-| **"status (active or revoked)"** | `status` has nine values (`active`, `partially_refunded`, `refund_pending_approval`, `refunded`, `chargeback_warning`, `charged_back`, `cancelled`, `expired`, `payment_failed`) plus boolean `access_active` (`schema-purchases.sql:19-24,26`) | **Imprecise (U3)** |
+| **"status"** (was "active or revoked") | `status` has nine values (`active`, `partially_refunded`, `refund_pending_approval`, `refunded`, `chargeback_warning`, `charged_back`, `cancelled`, `expired`, `payment_failed`) plus boolean `access_active` (`schema-purchases.sql:19-24,26`) | **CORRIGIDO (U3)** |
 | Server logs show the e-mail masked | `maskEmail` (`api/_lib/handlers.ts:39`); every Gumroad log line with an e-mail uses it (`api/_lib/gumroad.ts:268,272,280,283,293`). The ping logs a `who` value (`gumroad.ts:354,357`): not re-checked that it is masked | PROVADO for the license route; ping `who`: A VALIDAR |
 | Processes/spreadsheets are not sent or stored | No endpoint accepts them (only `functions/api/*.ts` license/ping/webhook routes); schema has no such column | PROVADO |
 | "kept while the license is valid and up to 5 years for tax and accounting" (D-L8) | No job deletes rows; nothing enforces 5 years | **POLÍTICA (P1)** |
@@ -92,10 +92,10 @@ Legend: **PROVADO** = the code or schema shows it; **POLÍTICA** = a commitment,
 | Controller = the seller named in the Terms | Terms §1 | PROVADO (text) |
 | Not intended for children under 16 (D-L11) | No age gate in the app | **POLÍTICA (P4)** |
 
-## Open decisions for the founder
+## Decisions taken (04/11/2026, authority delegated by the founder)
 
-1. **U1:** remove the word "backups" from §2 (recommended), or say instead that backups are files you download and the app keeps no copy.
-2. **U2:** keep the sentence only if the Cloudflare EU option is switched on before sales; re-check after switching.
-3. **U3:** change "status (active or revoked)" to "status" (recommended), or "access status".
-4. **V1, V2:** open the Cloudflare Web Analytics docs and the Gumroad payments page and confirm.
-5. **P1-P4** are commitments; keep only what the founder can honour.
+1. U1: removed "backups" from §2.
+2. U2: sentence kept; turning on the Cloudflare EU option is a pre-sale requirement, checked by the founder.
+3. U3: "status" only.
+4. V1, V2: the founder should open the Cloudflare Web Analytics docs and the Gumroad payments page and confirm (not re-read today).
+5. P1-P4 are commitments; keep only what the founder can honour.

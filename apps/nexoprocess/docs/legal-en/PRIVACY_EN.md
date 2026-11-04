@@ -9,7 +9,7 @@ Last updated: 04/11/2026
 Your process data stays on your device. We only handle the data needed to check your purchase and to count visits to our public pages.
 
 ## 2. What stays on your device
-Stored in your browser (IndexedDB / localStorage): your processes, drafts, backups, preferences (theme, language), tips already seen, and the access token and license key used to keep you signed in. The app's service worker caches only app files, never your process data.
+Stored in your browser (IndexedDB / localStorage): your processes, drafts, preferences (theme, language), tips already seen, and the access token and license key used to keep you signed in. The app's service worker caches only app files, never your process data.
 
 Spreadsheets you import are read in memory. The file itself is not stored; only the extracted data, the file name and a hash are kept on your device.
 
@@ -27,7 +27,7 @@ The app itself (what you use after signing in) does **not** load this script and
 Visits from the EU are not measured.
 
 ## 4. What we keep on the server
-A purchase record: e-mail, product, sale identifier, status (active or revoked), amount and currency paid, event and date. Server logs show the e-mail masked. Your processes and spreadsheets are **not** sent or stored. Purchase records are kept while the license is valid and for up to 5 years for tax and accounting.
+A purchase record: e-mail, product, sale identifier, status, amount and currency paid, event and date. Server logs show the e-mail masked. Your processes and spreadsheets are **not** sent or stored. Purchase records are kept while the license is valid and for up to 5 years for tax and accounting.
 
 ## 5. Third parties
 - **Gumroad** sells the product, holds the license key and checks the purchase.
