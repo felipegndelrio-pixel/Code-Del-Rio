@@ -192,9 +192,14 @@ describe('aprovação do texto legal (K3)', () => {
     expect(p.join('\n')).not.toMatch(/REFUND_EN/);
     expect(legalGate(tmp()).length).toBe(3); // arquivos ausentes
   });
-  it('o repositório hoje: os 3 textos estão em draft (nada aprovado sem o fundador)', () => {
-    const real = legalGate(new URL('../../docs/legal-en', import.meta.url).pathname);
-    for (const f of LEGAL_FILES) expect(real.join('\n')).toContain(f);
+  it('o repositório hoje: os 3 textos estão approved, sem TO VALIDATE/DRAFT e com o contato pelo marcador do build', () => {
+    const dir = new URL('../../docs/legal-en', import.meta.url).pathname;
+    expect(legalGate(dir)).toEqual([]);
+    for (const f of LEGAL_FILES) {
+      const md = readFileSync(join(dir, f), 'utf8');
+      expect(md).toContain('{{SUPPORT_EMAIL}}');
+      expect(md).not.toMatch(/\bCPF\b/);
+    }
   });
 });
 
@@ -204,10 +209,10 @@ describe('copy da landing: atualizações (K1)', () => {
     expect(h).toContain('Fixes and improvements to v1 are included; larger future versions may have their own rules');
     expect(h).toContain('<summary>Are updates included?</summary>');
   });
-  it('os Termos dizem o mesmo e mantêm TO VALIDATE (lawyer) no que é jurídico', () => {
+  it('os Termos (D-L4) dizem que as correções da v1 valem enquanto a v1 for oferecida, sem prazo fixo', () => {
     const md = readFileSync(new URL('../../docs/legal-en/TERMS_EN.md', import.meta.url), 'utf8');
-    expect(md).toMatch(/fixes and improvements to v1 are included\. Larger future versions may have their own rules/);
-    expect(md).toMatch(/TO VALIDATE \(lawyer\): wording for what counts as a “larger version”/);
+    expect(md).toContain('v1 fixes and improvements are included while v1 is offered. No fixed period is guaranteed.');
   });
+
 });
 

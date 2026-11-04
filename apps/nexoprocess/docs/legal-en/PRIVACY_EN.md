@@ -1,11 +1,9 @@
 ---
-status: draft
+status: approved
 ---
-# NexoProcess — Privacy Policy (DRAFT v0.1 — not reviewed by a lawyer)
+# NexoProcess — Privacy Policy
 
-> DRAFT. Not for publication. Open points are marked `TO VALIDATE`.
-
-Last updated: 01/11/2026 (draft)
+Last updated: 04/11/2026
 
 ## 1. Summary
 Your process data stays on your device. We only handle the data needed to check your purchase.
@@ -26,30 +24,30 @@ The public pages under `/en/` (the sales page and the legal pages) use **Cloudfl
 
 The app itself (what you use after signing in) does **not** load this script and sends nothing to Cloudflare Web Analytics.
 
-TO VALIDATE (lawyer): whether visitors from the EU/UK must be excluded or asked for consent (Cloudflare offers an option to drop EU measurements), the legal basis, and Cloudflare's role as processor.
+Visits from the EU are not measured.
 
 ## 4. What we keep on the server
-A purchase record: e-mail, product, sale identifier, status (active or revoked), event and date. Server logs show the e-mail masked. Your processes and spreadsheets are **not** sent or stored.
+A purchase record: e-mail, product, sale identifier, status (active or revoked), amount and currency paid, event and date. Server logs show the e-mail masked. Your processes and spreadsheets are **not** sent or stored. Purchase records are kept while the license is valid and for up to 5 years for tax and accounting.
 
 ## 5. Third parties
-- **Gumroad** sells the product, holds the license key and checks the purchase. Payments are processed through Stripe by Gumroad. We do not receive card data.
-- **Hosting provider** (static files and the API) receives technical request metadata (IP, user agent, time, URL).
-- **Database provider** stores the purchase record.
-- **Cloudflare** provides the analytics on the public pages only (section 3.1).
+- **Gumroad** sells the product, holds the license key and checks the purchase.
+- **Stripe** (through Gumroad) processes payments. We do not receive card data.
+- **Cloudflare** hosts the app and the API (it receives technical request metadata: IP, user agent, time, URL) and provides the analytics on the public pages only (section 3.1).
+- **Supabase** stores the purchase record (database).
 - No advertising cookies or external fonts are used, and the app has no analytics.
-
-TO VALIDATE: the exact legal name and privacy terms of each provider, and the data-processing agreements in place.
 
 ## 6. Your choices
 - Backup and restore your data in the app.
-- "Delete local data" removes everything the app stored on the device, including the access token.
-- To ask about or request deletion of your purchase record, contact support.
+- "Delete local data" removes your projects and drafts from the device, and also the access token and the license key.
+- To ask about or request deletion of your purchase record, see section 7.
 
-## 7. Legal bases and your rights
-TO VALIDATE (lawyer): legal bases and rights text for buyers outside Brazil (for example GDPR in the EU/UK, CCPA/CPRA in California), international transfer wording, retention period, and who is the controller. The Brazilian LGPD text is in the Portuguese policy; it is not copied here.
+## 7. Controller, legal bases and your rights
+Controller: the seller named in the Terms (Felipe Del Rio, an individual based in Brazil). Contact: {{SUPPORT_EMAIL}}
+
+You may ask for access, correction, deletion and objection by e-mail to {{SUPPORT_EMAIL}}. We reply within 30 days. Legal bases: contract (the license) and legitimate interest (cookieless analytics on the public pages).
 
 ## 8. Children
-TO VALIDATE (lawyer).
+Not intended for children under 16.
 
 ## 9. Contact
-Use the support e-mail shown in the app.
+{{SUPPORT_EMAIL}}

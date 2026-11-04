@@ -1,23 +1,20 @@
 ---
-status: draft
+status: approved
 ---
-# NexoProcess — Terms of Use (DRAFT v0.1 — not reviewed by a lawyer)
+# NexoProcess — Terms of Use
 
-> DRAFT. Not for publication. Open points are marked `TO VALIDATE`.
-
-Last updated: 01/11/2026 (draft)
+Last updated: 04/11/2026
 
 ## 1. What NexoProcess is
 NexoProcess is a web app (installable as a PWA) to map, measure and improve business processes. By using it you agree to these Terms.
 
-TO VALIDATE: legal name, tax ID and contact address of the seller (founder to provide). Support e-mail: the address configured in the app.
+Sold by Felipe Del Rio, an individual based in Brazil. Contact: {{SUPPORT_EMAIL}}
 
 ## 2. What you buy
-- A **one-time payment** of US$ 39, sold through Gumroad. TO VALIDATE: final price, taxes shown at checkout, and whether Gumroad acts as the seller of record for your purchase.
+- US$ 39, one-time. Taxes may be added at checkout by Gumroad.
 - After payment you receive a **license key**. You sign in with the **e-mail used in the purchase** and the license key.
-- The license is personal. You may use it on your own devices. TO VALIDATE: whether a device limit applies (the system does not currently count activations; `increment_uses_count` is off).
-- **Updates:** fixes and improvements to v1 are included. Larger future versions may have their own rules.
-  TO VALIDATE (lawyer): wording for what counts as a “larger version” and for how long v1 fixes are provided.
+- The license is personal. No fixed device limit for personal use. Excessive or shared use may lead to the key being disabled.
+- **Updates:** v1 fixes and improvements are included while v1 is offered. No fixed period is guaranteed.
 
 ## 3. Access, renewal and revocation
 - The app checks your access with a signed token stored on your device and renews it in the background when you are online.
@@ -39,13 +36,13 @@ See the Refund Policy.
 ## 7. No guarantee of results
 NexoProcess gives calculations and suggestions based on the data you enter. Results depend on that data. We do not guarantee any business outcome, saving or financial result. The software is provided "as is".
 
-TO VALIDATE (lawyer): limitation of liability and disclaimer wording. It differs by jurisdiction (US states, UK, EU). No wording is proposed here.
+To the extent permitted by law, our total liability is limited to the amount you paid. Nothing here limits rights that cannot be limited by law.
 
 ## 8. Changes to these Terms
-We may update these Terms. The date above shows the latest version. TO VALIDATE (lawyer): how changes must be notified to existing buyers.
+Changes are posted here with a new date. They do not reduce rights for purchases already made.
 
-## 9. Governing law and disputes
-TO VALIDATE (lawyer): governing law, venue, and consumer-rights wording for buyers outside Brazil. Nothing is stated here on purpose.
+## 9. Governing law
+Brazilian law applies, without removing mandatory consumer rights of your country of residence.
 
 ## 10. Contact
-Use the support e-mail shown in the app.
+{{SUPPORT_EMAIL}}

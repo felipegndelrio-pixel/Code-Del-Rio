@@ -130,9 +130,9 @@ describe('check-sale-env', () => {
     expect(r.out).toMatch(/rascunho/);
     expect(r.out).toContain('terms.html');
   });
-  it('as páginas legais versionadas hoje ainda são rascunho: o build de venda real é recusado até o fundador validar', () => {
+  it('as páginas legais versionadas hoje estão aprovadas (D-L1…D-L13): o gate legal e o gate de rascunho aceitam os 3 textos', () => {
     const r = run({ NEXO_EN_SITE_DIR: undefined, NEXO_LEGAL_DIR: undefined });
-    expect(r.code).toBe(1);
-    expect(r.out).toContain('terms.html');
+    expect(r.code).toBe(0);
+    expect(r.out).not.toMatch(/rascunho|Texto legal EN não aprovado/);
   });
 });

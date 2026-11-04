@@ -79,13 +79,16 @@ test('landing EN: conteúdo, links de compra e entrada, imagens carregadas', asy
   await expect(page.getByText(/not from generative AI/)).toBeVisible();
 });
 
-test('páginas legais EN mostram a faixa DRAFT enquanto houver "TO VALIDATE"', async ({ page }) => {
+test('páginas legais EN aprovadas: sem faixa DRAFT, indexáveis e sem "TO VALIDATE"', async ({ page }) => {
   await prepare(page, { allowBeacon: true });
   for (const f of ['terms', 'privacy', 'refund']) {
     await page.goto(`/en/${f}.html`);
-    await expect(page.getByRole('note')).toContainText('DRAFT');
-    await expect(page.locator('body')).toHaveAttribute('data-draft', 'true');
-    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+    await expect(page.getByRole('note')).toHaveCount(0);
+    await expect(page.locator('body')).not.toHaveAttribute('data-draft', 'true');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index,follow');
+    const text = await page.locator('main').innerText();
+    expect(text).not.toMatch(/TO VALIDATE|\bDRAFT\b|not reviewed/);
+    expect(text).not.toContain('{{');
   }
 });
 

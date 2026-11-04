@@ -4,22 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy Policy — NexoProcess</title>
-<meta name="robots" content="noindex">
+<meta name="robots" content="index,follow">
 <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/site.css">
 <!-- Gerado por scripts/build-en-site.mjs a partir de docs/legal-en. Não edite à mão. -->
 </head>
-<body data-draft="true">
+<body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="wrap">
   <a class="logo" href="./"><img src="/icons/favicon.svg" alt="" width="28" height="28"><span>NexoProcess</span></a>
   <nav class="main" aria-label="Main"><a href="./">Home</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="refund.html">Refunds</a><a href="/entrar?lang=en">Sign in</a></nav>
 </div></header>
 <main id="main" class="wrap doc">
-<div class="draft" role="note"><strong>DRAFT.</strong> This text has not been reviewed by a lawyer and has open points marked “TO VALIDATE”. It is not the final policy.</div>
-<h1>NexoProcess — Privacy Policy (DRAFT v0.1 — not reviewed by a lawyer)</h1>
-<blockquote>DRAFT. Not for publication. Open points are marked <code>TO VALIDATE</code>.</blockquote>
-<p>Last updated: 01/11/2026 (draft)</p>
+<h1>NexoProcess — Privacy Policy</h1>
+<p>Last updated: 04/11/2026</p>
 <h2>1. Summary</h2>
 <p>Your process data stays on your device. We only handle the data needed to check your purchase.</p>
 <h2>2. What stays on your device</h2>
@@ -30,30 +28,30 @@
 <h3>3.1 Website analytics (public pages only)</h3>
 <p>The public pages under <code>/en/</code> (the sales page and the legal pages) use <strong>Cloudflare Web Analytics</strong>, loaded as a script from Cloudflare. It measures visits and page performance. Per Cloudflare's documentation, it reports the page path, the referring site, the visitor's country, device type, browser and operating system, and page-load timings. Per the same documentation, it does not use cookies or <code>localStorage</code> and does not fingerprint visitors.</p>
 <p>The app itself (what you use after signing in) does <strong>not</strong> load this script and sends nothing to Cloudflare Web Analytics.</p>
-<p>TO VALIDATE (lawyer): whether visitors from the EU/UK must be excluded or asked for consent (Cloudflare offers an option to drop EU measurements), the legal basis, and Cloudflare's role as processor.</p>
+<p>Visits from the EU are not measured.</p>
 <h2>4. What we keep on the server</h2>
-<p>A purchase record: e-mail, product, sale identifier, status (active or revoked), event and date. Server logs show the e-mail masked. Your processes and spreadsheets are <strong>not</strong> sent or stored.</p>
+<p>A purchase record: e-mail, product, sale identifier, status (active or revoked), amount and currency paid, event and date. Server logs show the e-mail masked. Your processes and spreadsheets are <strong>not</strong> sent or stored. Purchase records are kept while the license is valid and for up to 5 years for tax and accounting.</p>
 <h2>5. Third parties</h2>
 <ul>
-<li><strong>Gumroad</strong> sells the product, holds the license key and checks the purchase. Payments are processed through Stripe by Gumroad. We do not receive card data.</li>
-<li><strong>Hosting provider</strong> (static files and the API) receives technical request metadata (IP, user agent, time, URL).</li>
-<li><strong>Database provider</strong> stores the purchase record.</li>
-<li><strong>Cloudflare</strong> provides the analytics on the public pages only (section 3.1).</li>
+<li><strong>Gumroad</strong> sells the product, holds the license key and checks the purchase.</li>
+<li><strong>Stripe</strong> (through Gumroad) processes payments. We do not receive card data.</li>
+<li><strong>Cloudflare</strong> hosts the app and the API (it receives technical request metadata: IP, user agent, time, URL) and provides the analytics on the public pages only (section 3.1).</li>
+<li><strong>Supabase</strong> stores the purchase record (database).</li>
 <li>No advertising cookies or external fonts are used, and the app has no analytics.</li>
 </ul>
-<p>TO VALIDATE: the exact legal name and privacy terms of each provider, and the data-processing agreements in place.</p>
 <h2>6. Your choices</h2>
 <ul>
 <li>Backup and restore your data in the app.</li>
-<li>&quot;Delete local data&quot; removes everything the app stored on the device, including the access token.</li>
-<li>To ask about or request deletion of your purchase record, contact support.</li>
+<li>&quot;Delete local data&quot; removes your projects and drafts from the device, and also the access token and the license key.</li>
+<li>To ask about or request deletion of your purchase record, see section 7.</li>
 </ul>
-<h2>7. Legal bases and your rights</h2>
-<p>TO VALIDATE (lawyer): legal bases and rights text for buyers outside Brazil (for example GDPR in the EU/UK, CCPA/CPRA in California), international transfer wording, retention period, and who is the controller. The Brazilian LGPD text is in the Portuguese policy; it is not copied here.</p>
+<h2>7. Controller, legal bases and your rights</h2>
+<p>Controller: the seller named in the Terms (Felipe Del Rio, an individual based in Brazil). Contact: {{SUPPORT_EMAIL}}</p>
+<p>You may ask for access, correction, deletion and objection by e-mail to {{SUPPORT_EMAIL}}. We reply within 30 days. Legal bases: contract (the license) and legitimate interest (cookieless analytics on the public pages).</p>
 <h2>8. Children</h2>
-<p>TO VALIDATE (lawyer).</p>
+<p>Not intended for children under 16.</p>
 <h2>9. Contact</h2>
-<p>Use the support e-mail shown in the app.</p>
+<p>{{SUPPORT_EMAIL}}</p>
 </main>
 <footer><div class="wrap"><p><a href="./">NexoProcess</a> · <a href="terms.html">Terms of Use</a> · <a href="privacy.html">Privacy Policy</a> · <a href="refund.html">Refund Policy</a> · <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a></p></div></footer>
 {{CF_WA_SNIPPET}}

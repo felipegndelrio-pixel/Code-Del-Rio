@@ -203,7 +203,7 @@ Prova o ciclo comprar → ativar → perder o acesso, com evidência real. Anote
 
 - **O que é:** `/en/` (venda), `/en/terms.html`, `/en/privacy.html`, `/en/refund.html`. HTML estático, mesmas fontes e identidade do app, sem recurso externo, e **um único script: o beacon do Cloudflare Web Analytics** (§6.2), só aqui. Copy escrita por Sonnet, marcada "copy por Sonnet; revisar": **revise antes de publicar**. Capturas são do demo EN, rotuladas "Sample data".
 - **Link de compra:** o `nexo:build:venda` troca `{{GUMROAD_CHECKOUT_URL}}` por `VITE_GUMROAD_CHECKOUT_URL` e `{{SUPPORT_EMAIL}}` por `VITE_SUPPORT_EMAIL`. **O build FALHA se faltar a variável ou sobrar qualquer marcador `{{…}}`** (verificado: sem o link, o build para com "VITE_GUMROAD_CHECKOUT_URL ausente").
-- **Páginas legais em RASCUNHO:** vêm de `docs/legal-en/*.md` e mostram faixa **DRAFT** enquanto o `status` não for `approved` ou houver "TO VALIDATE"/"DRAFT". Enquanto isso, o `check-sale-env` **recusa o build de venda** (verificado). **A revisão jurídica NÃO ocorreu.** Como liberar: §6.3.
+- **Páginas legais:** vêm de `docs/legal-en/*.md`. Hoje os três textos estão `status: approved` (decisões D-L1…D-L13 do fundador, 04/11/2026; **sem revisão por advogado**). Se algum voltar a `draft` ou ganhar "TO VALIDATE"/"DRAFT", a página mostra a faixa DRAFT e o `check-sale-env` recusa o build de venda. O contato vem do marcador `{{SUPPORT_EMAIL}}` (o build falha se sobrar marcador).
 - **As 3 variáveis legais passam a ser** `VITE_EN_TERMS_URL=https://<domínio>/en/terms`, `VITE_EN_PRIVACY_URL=https://<domínio>/en/privacy`, `VITE_EN_REFUND_URL=https://<domínio>/en/refund` — **sem `.html`**: no `wrangler pages dev` (mesma lógica do Pages), `/en/terms.html` responde 308 para `/en/terms`; usar o endereço final evita o redirecionamento (**A VALIDAR no Pages real**). **Domínio: A VALIDAR** (decisão sua).
 - **Reembolso:** a página diz 7 dias (**A VALIDAR**). Tem de bater com a configuração da Gumroad.
 - **Link para a landing:** use `/en/` com barra final. No `wrangler pages dev`, `/en` responde 308 para `/en/` (verificado local); no Pages real: **A VALIDAR**.
@@ -221,7 +221,7 @@ Prova o ciclo comprar → ativar → perder o acesso, com evidência real. Anote
 1. Painel da Cloudflare → Analytics & Logs → Web Analytics → adicionar o site (hostname do domínio da landing). Copie só o **token** do snippet mostrado (`data-cf-beacon='{"token": "…"}'`).
 2. **NÃO ligue a "injeção automática" (one-click)** para esse hostname: ela colocaria o script também no app. A CSP do app bloqueia o script (verificado), mas o objetivo é não haver tentativa.
 3. Informe o token como `VITE_CF_WA_TOKEN` no build de venda (§4.1). Sem ele, o build **falha** (verificado).
-4. (Decisão sua, **A VALIDAR com assessoria**) a Cloudflare oferece excluir visitantes da UE da medição. A política de privacidade hoje marca isso como "TO VALIDATE".
+4. **Ação sua (D-L10):** na Cloudflare, ligue a opção de excluir visitantes da UE da medição. A Privacidade já afirma "Visits from the EU are not measured"; **só fica verdadeiro depois que você ligar**. A VALIDAR no painel.
 
 **CSP/_headers (FATO verificado no `wrangler pages dev`):** `/en/*` destaca (`! Content-Security-Policy`) o CSP do app e define o seu, que só acrescenta `script-src https://static.cloudflareinsights.com/beacon.min.js` e `connect-src https://cloudflareinsights.com` (o snippet manual envia para `cloudflareinsights.com`; na injeção automática seria a própria origem). O espelho `vercel.json` usa duas regras disjuntas. Nada muda para o app.
 
@@ -250,7 +250,7 @@ Aprovar é uma decisão de conteúdo e de risco; o código só confere que foi t
 ## 7. O que ainda NÃO está pronto para EN (01/11/2026)
 
 - **Interface EN: feita** (Ajuda, templates XLSX/CSV com importação PT↔EN, mensagens de banco/rascunho/ações). Limitação: o CSV continua com `;` e vírgula decimal. Privacidade e Termos dentro do app (`Legal.tsx`) seguem em PT; o texto legal EN fica nas páginas estáticas (§6.1).
-- **Landing EN e páginas legais EN:** criadas (§6.1), mas as legais estão em **RASCUNHO** ("TO VALIDATE") e o build de venda continua recusado até você aprovar (§6.3). **A revisão jurídica NÃO ocorreu.**
+- **Landing EN e páginas legais EN:** criadas (§6.1); legais aprovadas pelo fundador em 04/11/2026 (sem revisão por advogado). Pendente: ligar a exclusão da UE na Cloudflare (§6.2, item 4).
 - **Safari do iPhone e Android reais:** NÃO verificados (impressão/PDF e telas só no Chromium); só depois do deploy (etapa 5).
 - **Textos EN** são rascunho, sem revisão nativa; privacidade/Ajuda precisam de revisão jurídica.
 - **Bundle inicial 157,8 KB gzip** (meta 130 KB): dívida técnica aceita; ver `HANDOFF_EN.md` §10.
