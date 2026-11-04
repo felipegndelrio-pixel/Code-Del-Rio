@@ -61,8 +61,8 @@ describe('activateGumroad', () => {
   it('mensagens por status, em EN por padrão e em PT quando pedido', async () => {
     const c = await load();
     const cases: [number, unknown, string, RegExp][] = [
-      [404, { error: 'sem_licenca' }, 'nao_encontrado', /could not find an active purchase/],
-      [401, { error: 'token_invalido' }, 'nao_encontrado', /could not find/],
+      [404, { error: 'sem_licenca' }, 'nao_encontrado', /find an active purchase/],
+      [401, { error: 'token_invalido' }, 'nao_encontrado', /find an active purchase/],
       [422, { error: 'ativacao_manual' }, 'ativacao_manual', /contact support/],
       [400, { error: 'chave_invalida' }, 'licenca_invalida', /license key/],
       [400, { error: 'email_invalido' }, 'email_invalido', /valid email/],
@@ -142,7 +142,7 @@ describe('entrada EN (/entrar com locale en)', () => {
   it('campos de e-mail e license key, textos em inglês, sem Hotmart', async () => {
     const html = await renderEn('/entrar');
     expect(html).toContain('Sign in to NexoProcess');
-    expect(html).toContain('Purchase email');
+    expect(html).toContain('Email used for purchase');
     expect(html).toContain('License key');
     expect(html).toContain('name="license_key"');
     expect(html).toContain('Try the demo');

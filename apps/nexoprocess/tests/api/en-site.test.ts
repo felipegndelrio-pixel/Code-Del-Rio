@@ -169,7 +169,7 @@ describe('Cloudflare Web Analytics: só na landing /en/ (K2)', () => {
 describe('texto de uso offline no app EN (C3)', () => {
   it('login.gumroad.intro e license.error.offline citam o mesmo prazo da constante LICENSE_OFFLINE_DAYS', () => {
     const en = readFileSync(new URL('../../src/i18n/messages/en.ts', import.meta.url), 'utf8');
-    const phrase = `connect at least once every ${LICENSE_OFFLINE_DAYS} days to keep your license active`;
+    const phrase = `at least once every ${LICENSE_OFFLINE_DAYS} days to renew`;
     for (const key of ['login.gumroad.intro', 'license.error.offline']) {
       const line = en.split('\n').find((l) => l.includes(`'${key}'`)) ?? '';
       expect(line, key).toContain(phrase);

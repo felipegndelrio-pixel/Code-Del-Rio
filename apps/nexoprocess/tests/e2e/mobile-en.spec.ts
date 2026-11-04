@@ -25,7 +25,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`EN: Home vazia e cabeçalho em inglês, sem português, acessíveis e sem rolagem lateral (${theme})`, async ({ page }) => {
     await enPage(page, theme);
     await page.goto('/app');
-    await expect(page.getByRole('heading', { level: 1, name: 'Understand your process, find the bottlenecks and leave with an improvement plan.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Understand your process, identify bottlenecks, and build an improvement plan.' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'My projects', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Help', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Map my first process' })).toBeVisible();

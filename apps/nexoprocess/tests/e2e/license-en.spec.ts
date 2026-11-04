@@ -37,7 +37,7 @@ const notFound = () => new Response(JSON.stringify({ success: false }), { status
 const local = (page: Page) => page.evaluate(() => ({ token: localStorage.getItem('nexo.license'), key: localStorage.getItem('nexo.license.key'), lang: localStorage.getItem('nexo-ui.lang') }));
 
 async function signIn(page: Page, email: string, key: string) {
-  await page.getByLabel('Purchase email').fill(email);
+  await page.getByLabel('Email used for purchase').fill(email);
   await page.getByLabel('License key').fill(key);
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
@@ -75,7 +75,7 @@ test('EN: chave inexistente mostra o motivo em inglês e não salva nada', async
   await page.goto('/entrar?lang=en');
   await signIn(page, BUYER, 'WRONG-KEY-0000');
   const alert = page.getByRole('alert');
-  await expect(alert).toContainText('We could not find an active purchase for this email and license key.');
+  await expect(alert).toContainText('We couldn’t find an active purchase matching this email address and license key.');
   await expect(alert.getByRole('link', { name: 'Buy on Gumroad' })).toBeVisible();
   expect(await local(page)).toMatchObject({ token: null, key: null });
 });
