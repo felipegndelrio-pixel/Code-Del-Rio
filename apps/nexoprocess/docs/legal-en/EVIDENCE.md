@@ -92,6 +92,34 @@ Legend: **PROVADO** = the code or schema shows it; **POLÍTICA** = a commitment,
 | Controller = the seller named in the Terms | Terms §1 | PROVADO (text) |
 | Not intended for children under 16 (D-L11) | No age gate in the app | **POLÍTICA (P4)** |
 
+## Terms of Use (`TERMS_EN.md`): factual sentences
+
+Added 04/11/2026 (the first version of this file covered only the Privacy Policy). Paths under `apps/nexoprocess/`.
+
+| Sentence | Evidence | State |
+|---|---|---|
+| §2 "US$ 39, one-time" | Landing price: `public/en/index.html:7,34,88`. The charged price is configured in the Gumroad product, not in code | PROVADO (landing); the charge itself: **V3, Gumroad panel** |
+| §2 "Taxes may be added at checkout by Gumroad" | Checkout is only a link (`VITE_GUMROAD_CHECKOUT_URL`); tax is Gumroad's behaviour | **V3: depends on a third-party doc** |
+| §2 "sign in with the e-mail used in the purchase and the license key" | `decide(..., expectedEmail)` rejects `email_diferente` (`api/_lib/gumroad.ts:129`); key sent to Gumroad `verify` (`gumroad.ts:94`) | PROVADO |
+| §2 "No fixed device limit" | `increment_uses_count: 'false'` always (`gumroad.ts:3,94`); no device count anywhere | PROVADO |
+| §2 "Excessive or shared use may lead to the key being disabled" | Manual revoke by the founder (`docs/GUMROAD_ENTITLEMENT.md` §13.3). No automatic detection | **POLÍTICA (P5)** |
+| §3 "signed token stored on your device" | Token verified with the public key (`src/license/token.ts:44-46`), stored under `nexo.license` (`src/license/config.ts:37`) | PROVADO |
+| §3 "renews it in the background when you are online" | `LicenseGate.tsx:34-36` (`navigator.onLine`, token older than `refreshAfterSec` = 3600 s, `config.ts:34`). Server re-checks Gumroad only if the token is at least 86 400 s old, otherwise returns it unchanged (`gumroad.ts:260`) | PROVADO (see note N1) |
+| §3 / landing "30 days" offline | Token `exp = now + (ttlDays ?? 30) days` (`gumroad.ts:304`; `api/_lib/handlers.ts:63,130`). Constant `LICENSE_OFFLINE_DAYS = 30` (`scripts/lib/en-site.mjs:7`), tested in `tests/api/en-site.test.ts` | PROVADO (depends on `LICENSE_TTL_DAYS` staying unset: `docs/LANCAMENTO_EN.md:38`) |
+| §3 "Access ends at the next online license check after a refund, chargeback or unresolved dispute" | `refunded` → revoke; `chargebacked` or `disputed` without `dispute_won` → revoke (`gumroad.ts:139-143,165-166`). On `nao_encontrado` the app clears the token and goes to `/entrar?motivo=revogado` (`LicenseGate.tsx:36-38`) | PROVADO (see note N1) |
+| §3 "A partial refund keeps your access" | `gumroad.ts:148`: "reembolso parcial não aparece no verify: acesso mantido (D6)"; schema keeps `access_active` for `partially_refunded` (`schema-purchases.sql:21,435-449`) | PROVADO |
+| §3 "If we cannot verify automatically, the app asks you to contact support, and access can be granted manually" | Server answers **422 `ativacao_manual`** with a contact-support message (`gumroad.ts:207-212,297`); app maps 422 to `license.error.manual` (`config.ts:145`). Manual grant via `gumroad_manual` (`docs/GUMROAD_ENTITLEMENT.md` §13.2; `gumroad.ts:295`) | PROVADO |
+| §4 "processes, spreadsheets... stay on your device; we do not receive them" | Same as Privacy §1: IndexedDB (`src/storage/db.ts:51-52`), CSP `connect-src 'self'` (`public/_headers:10`) | PROVADO |
+| §4 "the app has a backup/restore function" | `exportBackup` (`db.ts:265`), `restoreBackup` (`db.ts:286`) | PROVADO |
+| §4 "Clearing browser data or private browsing can erase your work" | Data lives only in IndexedDB/localStorage (`db.ts:51-52`). `clearAll` also removes every `nexo.*` key, including `nexo.license.key` (`db.ts:246-253`; key name `config.ts:59`) | PROVADO |
+| §5 "Do not try to bypass the license check" | A rule, not a code fact. The check is client-side for the PWA (token verification, `token.ts:44`) | **POLÍTICA (P6)** |
+| §1 "Sold by Felipe Del Rio, an individual based in Brazil" | Founder's identity | **POLÍTICA** (founder confirms) |
+| §7 "total liability limited to the amount you paid"; §9 Brazilian law | Legal positions of the founder; no lawyer review | **POLÍTICA (P3)** |
+
+**N1 (nuance, not a contradiction):** the client tries to renew when the token is older than 1 hour, but the server only re-checks Gumroad when the token is at least 24 hours old. So "next online license check" means, in practice, up to about 24 h after the refund while online, and up to 30 days offline. The Terms and the landing do not promise a shorter time.
+
+**Not proven by code in the Terms:** only the third-party items (V3) and the founder's commitments (P5, P6, P3). Nothing in the Terms contradicts the code.
+
 ## Decisions taken (04/11/2026, authority delegated by the founder)
 
 1. U1: removed "backups" from §2.
