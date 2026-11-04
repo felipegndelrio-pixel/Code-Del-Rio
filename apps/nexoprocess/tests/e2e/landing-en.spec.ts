@@ -61,6 +61,7 @@ test('landing EN: conteúdo, links de compra e entrada, imagens carregadas', asy
   expect(await buy.count()).toBeGreaterThanOrEqual(3);
   for (const l of await buy.all()) expect(await l.getAttribute('href')).toBe('#checkout');
   await expect(page.getByRole('link', { name: 'Already bought? Sign in' })).toHaveAttribute('href', '/entrar?lang=en');
+  await expect(page.getByRole('link', { name: 'Try the free demo' })).toHaveAttribute('href', '/entrar?lang=en');
   await expect(page.getByText('US$ 39').first()).toBeVisible();
   const imgs = page.locator('main img');
   expect(await imgs.count()).toBe(3);
