@@ -104,7 +104,7 @@ describe('copy da landing EN (revisão J)', () => {
   });
   it('sem alegações não provadas de navegador e com reembolso/impostos qualificados', () => {
     expect(src).not.toMatch(/Safari \(16|107\+|104\+|iPhone and iPad/);
-    expect(src).toContain('Tested on current Chrome and Edge.');
+    expect(src).toContain('Tested on current Chrome and Edge. Safari and Firefox should work but are not yet verified on every device; tell us if anything looks wrong.');
     expect(src).toContain('access ends at the next online license check after a refund');
     expect(src).not.toContain('access ends on the device');
     expect(src).toContain('Taxes may apply at checkout.');
@@ -163,6 +163,25 @@ describe('Cloudflare Web Analytics: só na landing /en/ (K2)', () => {
     expect(md).toMatch(/does not use cookies/);
     expect(md).toMatch(/app itself[^.]*does \*\*not\*\* load this script/);
     expect(md).not.toMatch(/No analytics/);
+  });
+});
+
+describe('texto de uso offline no app EN (C3)', () => {
+  it('login.gumroad.intro e license.error.offline citam o mesmo prazo da constante LICENSE_OFFLINE_DAYS', () => {
+    const en = readFileSync(new URL('../../src/i18n/messages/en.ts', import.meta.url), 'utf8');
+    const phrase = `connect at least once every ${LICENSE_OFFLINE_DAYS} days to keep your license active`;
+    for (const key of ['login.gumroad.intro', 'license.error.offline']) {
+      const line = en.split('\n').find((l) => l.includes(`'${key}'`)) ?? '';
+      expect(line, key).toContain(phrase);
+    }
+  });
+  it('hp.access lista valor e moeda entre os dados guardados no servidor (C2)', () => {
+    const en = readFileSync(new URL('../../src/i18n/messages/en.ts', import.meta.url), 'utf8');
+    expect(en.split('\n').find((l) => l.includes("'hp.access'"))).toContain('the amount and currency');
+  });
+  it('a Privacidade diz que a coleta inclui a contagem de visitas às páginas públicas (C1)', () => {
+    const md = readFileSync(new URL('../../docs/legal-en/PRIVACY_EN.md', import.meta.url), 'utf8');
+    expect(md).toContain('We only handle the data needed to check your purchase and to count visits to our public pages.');
   });
 });
 

@@ -6,7 +6,7 @@ status: approved
 Last updated: 04/11/2026
 
 ## 1. Summary
-Your process data stays on your device. We only handle the data needed to check your purchase.
+Your process data stays on your device. We only handle the data needed to check your purchase and to count visits to our public pages.
 
 ## 2. What stays on your device
 Stored in your browser (IndexedDB / localStorage): your processes, drafts, backups, preferences (theme, language), tips already seen, and the access token and license key used to keep you signed in. The app's service worker caches only app files, never your process data.
