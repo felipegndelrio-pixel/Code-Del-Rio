@@ -1,0 +1,39 @@
+1
+00:00:00,100 --> 00:00:02,100
+Seu processo vive numa planilha?
+
+2
+00:00:02,100 --> 00:00:04,400
+Quando o fluxo não está claro, os gargalos também não.
+
+3
+00:00:04,500 --> 00:00:06,240
+E ele vira um mapa visual,
+
+4
+00:00:06,240 --> 00:00:09,000
+com gargalos e retrabalho destacados.
+
+5
+00:00:09,150 --> 00:00:12,680
+O diagnóstico mostra tempo, esforço e custo,
+
+6
+00:00:12,680 --> 00:00:14,100
+com a fórmula à vista.
+
+7
+00:00:14,250 --> 00:00:16,290
+E tudo vira um plano de ação,
+
+8
+00:00:16,290 --> 00:00:18,100
+com responsável e prazo.
+
+9
+00:00:18,250 --> 00:00:22,360
+NexoProcess. Do processo na planilha ao plano de melhoria.
+
+10
+00:00:19,350 --> 00:00:23,360
+Conheça o NexoProcess.

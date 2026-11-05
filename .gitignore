@@ -17,3 +17,9 @@ dist-pages
 
 # Relatórios locais de build do NexoProcess
 .reports
+
+# vídeo: intermediários e prévias de depuração
+marketing/video/generated/_tmp_v2/
+marketing/video/assets/capturas-v2/peek*.png
+marketing/video/assets/**/chk*.png
+marketing/video/reports/build_v2.log
