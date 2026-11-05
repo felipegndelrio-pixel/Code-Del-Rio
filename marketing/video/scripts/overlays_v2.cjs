@@ -78,14 +78,15 @@ const SUBS = {
   }
   // Capas (opacas)
   const shot = `file://${M}/assets/telas-4k/03b-mapa-macro-recorte.png`;
-  const cover = (W, H, hookTop, hookSize, imgTop, imgW, logoTop) => `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 30% 30%,#183a6e 0%,#0d1c38 55%,#070f20 100%)"></div>
+  const cover = (W, H, hookTop, hookSize, imgTop, imgW, logoTop, boxH) => `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 30% 30%,#183a6e 0%,#0d1c38 55%,#070f20 100%)"></div>
     <div class="lock" style="position:absolute;left:80px;top:${logoTop}px;gap:20px;font-size:52px">${sym(84)}<span>NexoProcess</span></div>
     <div class="hl" style="left:80px;right:70px;top:${hookTop}px;font-size:${hookSize}px">Seu processo vive<br>numa <em>planilha?</em></div>
-    <div style="position:absolute;left:80px;top:${imgTop}px;width:${imgW}px;border-radius:22px;overflow:hidden;border:1.5px solid rgba(64,200,214,.55);box-shadow:0 30px 80px rgba(0,0,0,.55)"><img src="${shot}" style="display:block;width:${imgW * 1.55}px;margin-left:-${imgW * 0.06}px;margin-top:-${imgW * 0.18}px;height:auto"></div>
-    <div class="pil" style="position:absolute;left:80px;top:${imgTop + imgW * 0.56 + 40}px;font-size:34px">Mapa visual · Diagnóstico · Plano de ação</div>`;
+    <div style="position:absolute;left:80px;top:${imgTop}px;width:${imgW}px;height:${boxH}px;border-radius:22px;overflow:hidden;border:1.5px solid rgba(64,200,214,.55);box-shadow:0 30px 80px rgba(0,0,0,.55);background:#11151c"><img src="${shot}" style="display:block;width:100%;height:100%;object-fit:cover;object-position:0% 38%"></div>
+    <div class="pil" style="position:absolute;left:80px;top:${imgTop + boxH + 44}px;font-size:34px">Mapa visual · Diagnóstico · Plano de ação</div>
+    <div class="selo" style="left:80px;top:${imgTop + boxH + 110}px;font-size:22px;padding:9px 18px">Demonstração com dados fictícios</div>`;
   fs.mkdirSync(path.join(OUT, 'capas'), { recursive: true });
-  await render(1080, 1920, cover(1080, 1920, 520, 104, 860, 920, 330), 'capas/CAPA_INSTAGRAM.png', true);
-  await render(1080, 1350, cover(1080, 1350, 220, 92, 520, 920, 70), 'capas/CAPA_LINKEDIN.png', true);
+  await render(1080, 1920, cover(1080, 1920, 470, 104, 800, 920, 330, 470), 'capas/CAPA_INSTAGRAM.png', true);
+  await render(1080, 1350, cover(1080, 1350, 210, 92, 470, 920, 70, 470), 'capas/CAPA_LINKEDIN.png', true);
   fs.unlinkSync(path.join(OUT, '_tmp.html'));
   await b.close(); console.log('ok');
 })().catch((e) => { console.error(e); process.exit(1); });
