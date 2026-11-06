@@ -1,119 +1,157 @@
-# Paddle (Billing): segundo canal de venda EN (desenho P1, só documento)
+# Paddle (Billing): segundo canal de venda EN (desenho)
 
-Versão 1, de 04/11/2026, branch `wip/en-foundation`, base `d007d09`. Padrão: `GUMROAD_ENTITLEMENT.md`.
-Status: **RASCUNHO DE DESENHO. Sem código, sem migração, sem conta Paddle, nada publicado.** O comportamento PT/Hotmart e o canal Gumroad não mudam.
-Pedido: fundador, 04/11/2026 (via revisor). Gumroad continua sendo o canal de lançamento; a Paddle é opção futura.
+Versão 2, de 06/11/2026, branch `wip/paddle`, base `v2.6.0-rc2` (`5461f40`). Padrão: `GUMROAD_ENTITLEMENT.md`. A v1 (04/11/2026) era rascunho sem fonte oficial; a v2 troca as hipóteses por fatos da documentação oficial da Paddle Billing.
+Status: **desenho com fatos oficiais; implementação em `api/_lib/paddle.ts` (P2), sem chamada real, nada publicado, nenhuma migração aplicada fora do G3.** O comportamento PT/Hotmart e o canal Gumroad não mudam.
+Pedido: fundador, 06/11/2026 ("avançar em todas as frentes para vender fora do Brasil o quanto antes"). Gumroad continua sendo o canal de lançamento atual.
 
-## 0. Fontes e limite da pesquisa
+## 0. Fontes e como foram verificadas
 
-| # | Fonte | Estado | Data |
-|---|---|---|---|
-| P1 | Documentação oficial da Paddle (`developer.paddle.com`: webhooks, assinatura, adjustments, sandbox, API) | **NÃO LIDA.** O proxy desta sessão responde 403 em `developer.paddle.com` (`curl`: "CONNECT tunnel failed, response 403"); o agente de leitura também falhou (`ENOTFOUND`) em 12 páginas | 04/11/2026 |
-| C1 | Código deste repositório (`api/_lib/schema-purchases.sql`, `gumroad.ts`, `GUMROAD_ENTITLEMENT.md`) | Lido | 04/11/2026 |
+Todas lidas em 06/11/2026, direto em `developer.paddle.com` (cada URL tem uma versão Markdown oficial: o mesmo caminho + `.md`). Não usei a busca de documentação da Paddle (`paddle-docs-retrieval…workers.dev`): o proxy desta sessão a bloqueia.
 
-**FATO:** nenhuma afirmação sobre a Paddle neste documento foi confirmada em fonte oficial. Tudo que é da Paddle está marcado **A VALIDAR** e, quando aparece uma expectativa, ela é **HIPÓTESE (conhecimento geral, não verificado)**. As partes do nosso lado (banco, tipos canônicos, ids) são FATO do código [C1].
-**Como destravar:** liberar `developer.paddle.com` na rede da sessão (decisão do fundador, como a D8 da Gumroad) **ou** o fundador abrir as páginas da lista da §12 no iPhone e confirmar. Os URLs abaixo são os que devem ser lidos; **não foram abertos**.
+| # | Página oficial | Para quê |
+|---|---|---|
+| P1 | https://developer.paddle.com/webhooks/about/signature-verification | cabeçalho, algoritmo, tolerância, rotação |
+| P2 | https://developer.paddle.com/webhooks/about/how-webhooks-work | formato do evento, entrega, `event_id`, `occurred_at` |
+| P3 | https://developer.paddle.com/webhooks/about/respond-to-webhooks | resposta, retentativas, IPs |
+| P4 | https://developer.paddle.com/webhooks/transactions/transaction-completed | evento de transação concluída (schema + exemplo) |
+| P5 | https://developer.paddle.com/webhooks/adjustments/adjustment-created e `…/adjustment-updated` | reembolso, chargeback (schema + exemplo) |
+| P6 | https://developer.paddle.com/build/transactions/create-transaction-adjustments | regras de reembolso, crédito e chargeback |
+| P7 | https://developer.paddle.com/sdks/sandbox | sandbox |
+| P8 | https://developer.paddle.com/api-reference/about/paddle-ids | formato dos IDs |
+| P9 | https://developer.paddle.com/api-reference/customers/get-customer e `…/about/authentication` | e-mail do cliente; chave de API |
+| P10 | https://developer.paddle.com/webhooks/about/notification-destinations e `…/webhooks/simulator/test-webhooks` | destino de notificação, simulador |
+| P11 | https://developer.paddle.com/llms.txt (tabela Classic × Billing) | a Billing não entrega chave de licença |
+| C1 | Código deste repositório (`api/_lib/schema-purchases.sql`, `gumroad.ts`, `store.ts`) | nosso lado |
+
+**DADO DO USUÁRIO (fundador, 06/11/2026):** a Paddle respondeu que aceita pessoa física no Brasil e que faz a revisão do site no ar. Não verifiquei isso em fonte pública. Impostos e *seller of record* continuam fora dos textos legais EN (D-L2).
 
 ## 1. Resumo e recomendação
 
-- **Conclusão (INFERÊNCIA):** a Paddle encaixa no mesmo banco (`nexo_purchases`, `platform 'paddle'`) sem mudar o modelo. O que muda é a **ativação**: na Gumroad a licença nasce do `verify` sem segredo; na Paddle a compra só chega por **webhook assinado** (ou por API com chave secreta).
-- **Recomendação:** concessão **dirigida por webhook** (a compra concluída grava a concessão) e ativação do comprador por **e-mail + id da transação**, conferidos contra o banco (§5). Sem chave de licença própria na v1 do canal.
-- **Não recomendo lançar a Paddle antes de a Gumroad vender:** dois canais dobram suporte e conciliação. Decisão D-P1.
-- Pontos legais (quem é o *seller of record*, impostos, país do vendedor pessoa física no Brasil, aprovação da conta): **A VALIDAR na documentação e nos termos da Paddle; não afirmar nos textos legais EN** (D-L2 já evita afirmar o *seller of record*).
+- **FATO [P4, P5]:** o evento de compra (`transaction.completed`) e os de reembolso/chargeback (`adjustment.created` e `adjustment.updated`) **não trazem o e-mail do comprador**: só `customer_id` (`ctm_…`). O e-mail vem de `GET /customers/{id}` (permissão `customer.read`) [P9] ou do evento `customer.created`.
+- **FATO [P11]:** na Paddle Billing a Paddle **não gera chave de licença**: "Build your own workflows using transaction webhooks". A opção C da v1 está descartada.
+- **Recomendação (mantida):** concessão **dirigida por webhook assinado** e ativação do comprador por **e-mail + id da transação** (`txn_…`), conferidos contra o banco (§5). Sem chave de licença própria.
+- **Escolha de desenho (INFERÊNCIA):** o e-mail é obtido por **chamada autenticada** `GET /customers/{id}` dentro do webhook, não por tabela de clientes alimentada por `customer.created`, porque a ordem de entrega não é garantida [P3] e a tabela exigiria migração maior. Custo: um segredo de servidor a mais (`PADDLE_API_KEY`, só `customer.read`) e uma chamada por evento.
+- **Risco aberto de ativação (A VALIDAR):** a doc diz que o recibo por e-mail traz um PDF com a fatura (`invoice_number`), mas **não diz que o `txn_…` aparece** nele [P8, P11]. Antes de vender, abrir um recibo do sandbox e conferir. Plano B no §5.
+- **Não recomendo lançar a Paddle antes de a Gumroad vender:** dois canais dobram suporte e conciliação (D-P1).
 
-## 2. Webhook assinado: verificação (A VALIDAR)
+## 2. Webhook assinado: verificação (FATOS [P1], 06/11/2026)
 
-O que o desenho exige, independente dos detalhes da Paddle:
+| Item | Fato oficial |
+|---|---|
+| Cabeçalho | `Paddle-Signature` |
+| Formato | `ts=1671552777;h1=eb4d0dc8…` — duas partes separadas por `;`: `ts` (Unix, segundos) e `h1` |
+| Algoritmo | HMAC com SHA-256 sobre `ts` + `:` + **corpo cru** (bytes recebidos, sem reformatar), chave = a *endpoint secret key* do destino, saída em hexadecimal |
+| Comparação | o exemplo oficial compara `h1` com o resultado calculado em tempo constante (`timingSafeEqual`) |
+| Tolerância | a doc recomenda checar `ts` contra o relógio; o padrão dos SDKs oficiais é **5 segundos**. O exemplo manual rejeita evento mais velho que 5 s |
+| Rotação | "Signatures contain at least one `h1`… During secret rotation, more than one `h1` is returned." Logo, aceitar se **qualquer** `h1` bater |
+| Segredo | um por destino de notificação; formato de exemplo `pdl_ntfset_…`; fica em Paddle > Events > Notifications (ou `endpoint_secret_key` na API). "Treat it like a password" |
+| Corpo | "Don't transform or process the raw body… including adding whitespace": ler os bytes antes de qualquer `JSON.parse` |
 
-1. Ler o **corpo cru** (bytes), antes de qualquer `JSON.parse`; limite de 64 KB (`readBodyLimited`, como o ping da Gumroad).
-2. Verificar a assinatura **antes de qualquer leitura de dados**. Sem assinatura válida → 401, nada gravado, log sem corpo.
-3. Comparação em tempo constante; tolerância de relógio (anti-replay) configurável.
-4. Segredo do destino de notificação só em variável de ambiente (§9), nunca no repositório.
-5. Falha de configuração (segredo ausente) → 503 e nada gravado (falha fechada, como o 503 de chave inválida da licença).
+Do nosso lado (decisões, INFERÊNCIA):
+1. Corpo ≤ 64 KB (`readBodyLimited`), lido como texto uma única vez e usado tanto na assinatura quanto no `JSON.parse`.
+2. Assinatura verificada **antes de qualquer leitura de dados**. Inválida, ausente, malformada ou fora da tolerância → **401**, nada gravado, log sem corpo.
+3. Segredo ausente → 503 `nao_configurado` e nada gravado (falha fechada).
+4. Tolerância padrão **5 s** (o valor do SDK), ajustável por `PADDLE_SIGNATURE_TOLERANCE_SEC`. Vale para atraso e para relógio adiantado (valor absoluto).
+5. **A VALIDAR (sandbox):** se cada retentativa é reassinada com `ts` novo. A doc não diz. Se não for, retentativas depois de 5 s seriam recusadas e só o primeiro envio valeria; nesse caso, subir a tolerância. Também **A VALIDAR** se o corpo chega intacto pelas Pages Functions (o desenho lê os bytes crus; teste com payload real do simulador).
 
-A VALIDAR na doc oficial (lista de perguntas, sem resposta ainda):
-- Nome do cabeçalho de assinatura e seu formato. **HIPÓTESE (não verificada):** cabeçalho `Paddle-Signature` com `ts` e `h1`; HMAC-SHA256 sobre `ts` + `:` + corpo cru.
-- Tolerância de tempo recomendada.
-- Se há mais de um segredo ativo durante rotação.
-- Se o corpo cru pode ser reserializado por proxy (Cloudflare Pages Functions) sem quebrar a assinatura.
-- Fonte: https://developer.paddle.com/webhooks/signature-verification (**não aberta**).
+## 3. Entrega (FATOS [P2, P3])
 
-## 3. Eventos para tipos canônicos
+- Resposta esperada: HTTP `200` em até **5 segundos** (P3 diz `200`; a página do sandbox diz `2xx`: divergência A ≠ B, usamos exatamente `200`). Outro código ou demora → retentativa.
+- Retentativas: **live** até 60 tentativas em cerca de 2 dias (≈10 na 1ª hora, ≈45 no 1º dia; espera `60 × n^1.1` s); **sandbox** 3 tentativas em cerca de 2 minutos. Esgotadas, o status vira `failed` e dá para reenviar pela API (*replay*).
+- **Ordem não garantida.** A doc manda comparar `occurred_at` antes de mudar o estado. Entrega **pelo menos uma vez**: deduplicar por `event_id` (`evt_…`).
+- Corpo: `event_id`, `event_type`, `occurred_at` (RFC 3339), `notification_id` (`ntf_…`, muda a cada notificação), `data`.
+- IPs de origem publicados (live: 34.232.58.13, 34.195.105.136, 34.237.3.244, 35.155.119.135, 52.11.166.252, 34.212.5.7; sandbox: 34.194.127.46, 54.234.237.108, 3.208.120.145, 44.226.236.210, 44.241.183.62, 100.20.172.113). A Paddle recomenda lista de permissão; **não** implementamos filtro por IP no código (Pages Functions atrás da Cloudflare; a assinatura é o controle). Se houver WAF/bot-fight na Cloudflare, liberar o caminho do webhook (P3) — ação do fundador.
+- A doc recomenda responder antes de processar. Aqui o processamento é curto (uma consulta de cliente e uma gravação) e fica dentro do prazo, com timeout de 3 s na API da Paddle; falha → 5xx e a Paddle reenvia (idempotente por `provider_event_id`).
 
-O SQL classifica pelo **nome** do evento que gravamos (`schema-purchases.sql:315-358`), não pelo nome da Paddle. Nomes nossos propostos:
+## 4. Eventos para tipos canônicos
 
-| Situação | Nome gravado por nós | Tipo canônico | Como o SQL decide |
-|---|---|---|---|
-| Transação concluída (pagamento confirmado) | `PADDLE_TRANSACTION_COMPLETED` (grant) | `active` | `grant` exige `APPROVED` ou `COMPLETE` |
-| Reembolso total | `PADDLE_REFUNDED` (revoke) | `refunded` | contém `REFUND` |
-| Reembolso parcial | `PADDLE_PARTIAL_REFUND` + valor + `provider_event_id` | `partially_refunded` (mantém acesso) | `PARTIAL`+`REFUND`; **exige `provider_event_id`**, senão bloqueia (`partial_refund_event_id_missing`) |
-| Reembolso pendente de aprovação | `PADDLE_REFUND_PENDING_APPROVAL` | `refund_pending_approval` | `REFUND` + `PENDING`/`APPROVAL` |
-| Chargeback / disputa aberta | `PADDLE_CHARGEBACK` | `charged_back` | contém `CHARGEBACK` |
-| Aviso de chargeback | `PADDLE_CHARGEBACK_WARNING` | `chargeback_warning` | `CHARGEBACK`+`WARNING` |
-| Disputa **ganha** | `PADDLE_CHARGEBACK_REVERSED` (revoke) | `chargeback_reverse` → `active` | `CHARGEBACK`+`REVERSE` |
-| Pagamento falhou | `PADDLE_PAYMENT_FAILED` | `payment_failed` | `PAYMENT`+`FAILED` |
-| Cancelada | `PADDLE_CANCELLED` | `cancelled` | `CANCEL` |
+O SQL classifica pelo **nome** que gravamos (`schema-purchases.sql`, `nexo_apply_purchase_event`), não pelo nome da Paddle. Os campos e valores de `action`, `type` e `status` são FATOS da Paddle [P4–P6]; o mapeamento para os nomes é decisão nossa.
 
-**Armadilhas (FATO do SQL [C1]):**
-- **Nunca** gravar `PADDLE_DISPUTE_WON` nem `…CHARGEBACK_WON`: o nome contém `DISPUTE`/`CHARGEBACK` sem `REVERSE` e vira `charged_back`, **revogando quem ganhou** (mesma armadilha do `GUMROAD_DISPUTE_WON`). Disputa ganha = `…CHARGEBACK_REVERSED`.
-- Só enviar `CHARGEBACK_REVERSED` se a compra estiver `charged_back` (RPC `nexo_purchase_state`); senão cria bloqueio de conciliação. Mesma regra C1 da Gumroad.
-- **Crédito** (ajuste que não devolve dinheiro) **não** tem nome reconhecido: gravar `PADDLE_CREDIT` cairia em `revoke_event_unrecognized` e **bloquearia o e-mail inteiro**. Ajuste de crédito = ignorar (200, sem gravar) e logar. A VALIDAR se a Paddle tem esse tipo.
-- Nome que contenha `REFUND` e também `PENDING` muda de tipo: nomes fixos, sem montar string com dados do payload.
-- Ordem de entrega não garantida (HIPÓTESE): o SQL já ignora evento mais velho (`older_event`) e não ressuscita compra terminal. Usar o horário do **evento** da Paddle como `occurred_at` na concessão e `now()` na revogação, como na Gumroad (§2 do doc Gumroad).
+### 4.1 Eventos assinados no destino de notificação (somente estes)
+`transaction.completed`, `adjustment.created`, `adjustment.updated`. Todo o resto é ignorado com 200 e log (não grava).
 
-**A VALIDAR (sem resposta ainda), em https://developer.paddle.com/webhooks/overview (não aberta):**
-- Lista exata de eventos e se transação e ajuste (*adjustment*) são eventos separados. **HIPÓTESE:** reembolso e chargeback chegam como *adjustment* com um campo `action`; a transação concluída é outro evento.
-- Valores literais de `action` e `status` do ajuste (reembolso, crédito, chargeback, chargeback revertido, aviso), e quais são totais ou parciais.
-- Como distinguir reembolso **total** de **parcial** (comparar valor do ajuste com o total da transação?). Sem essa regra, risco R3.
-- Se o reembolso passa por aprovação (estado pendente) antes de valer.
+### 4.2 Transação concluída [P4]
+- `transaction.completed`: "Transactions move to completed after they're `paid`"; é onde a Paddle termina de calcular taxas, totais e fatura.
+- Campos usados de `data`: `id` (`txn_…`), `status` (`completed`), `customer_id`, `currency_code` (`USD`, maiúsculo), `details.totals.grand_total` (texto, **menor unidade**, ex.: `"65215"` = 652,15), `items[].price.product_id` (`pro_…`), `items[].price.id` (`pri_…`), `subscription_id` (só em recorrente), `origin`.
+- Grant gravado como `PADDLE_TRANSACTION_COMPLETED` (contém `COMPLETE`, aceito pelo grant).
+- Regras: `status` precisa ser `completed`; algum item com `product_id` = `PADDLE_PRODUCT_ID`, senão **ignora** (outro produto); `subscription_id` presente → ignora e loga (produto é pagamento único).
 
-## 4. Identificadores e formato
+### 4.3 Reembolso, crédito e chargeback [P5, P6]
+`adjustment.*` traz `action`, `type` (`full`|`partial`), `status`, `transaction_id`, `customer_id`, `totals.total` (menor unidade) e `currency_code`.
+
+| `action` (FATO) | Significado oficial | O que fazemos | Nome gravado | Tipo canônico |
+|---|---|---|---|---|
+| `refund`, `status=pending_approval` | "Most refunds for live accounts require Paddle approval" | revoke | `PADDLE_REFUND_PENDING_APPROVAL` | `refund_pending_approval` (acesso mantido pelo SQL) |
+| `refund`, `approved`, `type=full` | reembolso do total | revoke | `PADDLE_REFUNDED` | `refunded` |
+| `refund`, `approved`, `type=partial` | reembolso de itens/valor | revoke + `refund_amount` | `PADDLE_PARTIAL_REFUND` | `partially_refunded` (mantém acesso); o SQL converte em `refunded` quando a soma dos parciais alcança o valor da compra |
+| `refund`, `rejected` | Paddle recusou | ignora (o acesso não foi tirado no pendente) | — | — |
+| `chargeback` | "Created automatically… when a customer successfully disputes a charge"; o valor é devolvido | revoke | `PADDLE_CHARGEBACK` | `charged_back` |
+| `chargeback_warning` | aviso antecipado; "The amount is refunded" | revoke (**decisão D-P8**) | `PADDLE_CHARGEBACK` | `charged_back` |
+| `chargeback_reverse` | "when Paddle contests a chargeback successfully" | revoke, **só se a compra estiver `charged_back`** | `PADDLE_CHARGEBACK_REVERSED` | `chargeback_reverse` → `active` |
+| `chargeback_warning_reverse` | reversão do aviso | igual a `chargeback_reverse` | `PADDLE_CHARGEBACK_REVERSED` | idem |
+| `credit`, `credit_reverse` | crédito na fatura; não devolve dinheiro | ignora e loga | — | — |
+
+Regras:
+- `chargeback`, `chargeback_warning` e as reversões só valem com `status=approved`. O `adjustment.updated` do chargeback original com `status=reversed` (a Paddle marca o original quando cria a reversão) **é ignorado**.
+- **Armadilhas (FATO do SQL [C1]):**
+  - **Nunca** gravar `PADDLE_DISPUTE_WON`/`…CHARGEBACK_WON`: o nome tem `DISPUTE`/`CHARGEBACK` sem `REVERSE` e vira `charged_back`, **revogando quem ganhou** (mesma armadilha da Gumroad). Disputa ganha = `…CHARGEBACK_REVERSED`.
+  - **Nunca** gravar um nome com `CHARGEBACK` + `WARNING`: o SQL o classifica como `chargeback_warning` (mantém acesso). Por isso o aviso é gravado como `PADDLE_CHARGEBACK`.
+  - `PADDLE_CREDIT` cairia em `revoke_event_unrecognized` e **bloquearia o e-mail inteiro**: créditos nunca são gravados.
+  - Nome com `REFUND` e `PENDING` muda de tipo: nomes fixos, nunca montados com dados do payload.
+  - `CHARGEBACK_REVERSED` sem a compra em `charged_back` cria bloqueio de conciliação: a rota lê `nexo_purchase_state` antes (regra C1 da Gumroad); se não estiver `charged_back`, ignora.
+- **Compra desconhecida:** o `adjustment.*` não traz o produto. Se `nexo_purchase_state('paddle', txn)` devolver `null`, a transação não é nossa (ou o `transaction.completed` ainda não foi processado): **ignora com 200 e loga**; reembolso sem compra conhecida cai no runbook manual. Risco residual no §10 (P12).
+- **Idempotência por estado:** `provider_event_id` = `<adj_id>:<status>` nos ajustes e `event_id` na compra. Assim `adjustment.created` e `adjustment.updated` do **mesmo** estado não contam duas vezes o reembolso parcial.
+- **Horário:** `occurred_at` do evento da Paddle nas concessões e nas revogações (a Paddle manda o horário real; ver P2). O SQL ignora evento mais velho (`older_event`) e não ressuscita compra encerrada.
+- **A VALIDAR (sandbox):** os valores exatos de `type` em chargebacks e se o `adjustment.updated` de um reembolso aprovado traz `status=approved`.
+
+## 5. Identificadores e formato
 
 - `platform = 'paddle'` (cabe em `^[a-z][a-z0-9_-]{0,31}$`) [C1].
-- Transação: `^[A-Za-z0-9_-]{1,64}$`; produto: `^[A-Za-z0-9._:-]{1,128}$` [C1]. **HIPÓTESE:** ids da Paddle têm prefixo e `_` (ex.: `txn_…`), compatíveis. A VALIDAR o formato real; se vier fora do formato, mesma saída segura da Gumroad: **422 `ativacao_manual`, nada gravado**.
-- Guardar o **id da transação** como `transaction_id` e o **id do preço ou produto** como `product_id`.
-- `provider_event_id` = id da notificação (deduplicação; A VALIDAR o nome do campo).
-- Moeda: `upper()` de 3 letras; valor em unidade maior (`amount numeric(14,2)`). A VALIDAR se a Paddle manda o total em unidade menor como texto.
-- E-mail do comprador: A VALIDAR se vem no evento ou só por consulta de cliente na API. **Se só pela API**, o webhook precisa de chamada autenticada (§9, chave de API) ou o desenho muda para ativação sem e-mail do evento.
+- **FATO [P8]:** todo ID é prefixo + 26 caracteres `[a-z0-9]`: `txn_` (transação, 30 caracteres), `pro_` (produto), `pri_` (preço), `ctm_` (cliente), `adj_` (ajuste), `evt_` (evento), `ntf_` (notificação). Todos cabem em `^[A-Za-z0-9_-]{1,64}$` (transação) e `^[A-Za-z0-9._:-]{1,128}$` (produto). **Sem normalização** (ao contrário da Gumroad). Fora do padrão `^txn_[a-z\d]{26}$` / `^pro_[a-z\d]{26}$` → 422 `ativacao_manual`, nada gravado.
+- Guardar `transaction_id` = `txn_…`, `product_id` = `pro_…`.
+- `provider_event_id`: ver §4.3 (`evt_…` ou `adj_…:<status>`, ≤ 160 caracteres).
+- Valores: `grand_total` e `totals.total` vêm como texto na **menor unidade da moeda** [P4, "lowest denomination"]. Convertemos por `÷ 100`. **A VALIDAR:** moedas sem centavos (ex.: JPY): a doc consultada não trata; só afeta o valor exibido, não a soma dos reembolsos (mesma unidade nos dois lados).
+- Moeda: `currency_code` já em maiúsculas (3 letras).
 
-## 5. Como o comprador ativa
+### Como o comprador ativa (opção A, recomendada)
+`POST /api/paddle-license` com `{ email, transaction_id }` ou `{ token, transaction_id }` (renovação):
+1. `transaction_id` no formato `txn_…`; e-mail normalizado; corpo ≤ 4 KB.
+2. O servidor consulta o banco (RPC nova `nexo_lookup_purchase`) por `platform='paddle'` + transação **e** e-mail igual ao digitado. Sem chamada à Paddle na ativação.
+3. Resposta de erro genérica (mesma para "não existe", "e-mail diferente" e "revogada"). Atraso do webhook: mensagem "tente de novo em alguns minutos".
+4. Renovação confere o banco de novo: revogado por webhook corta na próxima renovação.
+- **Compra Paddle não vale só por e-mail (D3).** FATO do código [C1]: `nexo_lookup_license` excluía só `platform <> 'gumroad'`. Troca para `platform not in ('gumroad','paddle')`, dentro de `schema-purchases.sql` (idempotente; o G3 aplica duas vezes), com teste "D3 paddle". As compras Hotmart ficam inalteradas.
+- **Plano B se o `txn_…` não aparecer no recibo (A VALIDAR):** aceitar também o `invoice_number` da fatura (existe em `transaction.completed` quando a transação é concluída [P4]); exigiria guardá-lo (migração) e foi deixado fora desta fase. Alternativa sem migração: página de sucesso do checkout com o id (`successUrl`/`checkout.completed` dão o id ao navegador). Decisão do fundador (D-P9).
+- O id da transação é um segredo fraco (vai no recibo). Mitigação: exigir **também** o e-mail e a RPC não distinguir os casos de erro. Limitar tentativas em Pages Functions: A VALIDAR (D-P3).
 
-| Opção | Como | Prós | Contras |
-|---|---|---|---|
-| **A (recomendada)** | E-mail + **id da transação** (do recibo) em `/api/paddle-license`; o servidor confere contra `nexo_purchases` (`platform 'paddle'`) preenchida pelo webhook | Sem chave própria; sem chamada à API da Paddle na ativação; revogação por webhook | Depende de o webhook ter chegado antes (atraso → "tente em alguns minutos"); id da transação vira credencial |
-| B | Chave de licença própria gerada por nós no webhook e enviada por e-mail | Mesma experiência da Gumroad | Precisa enviar e-mail (serviço novo, custo, segredo) e armazenar/gerar chave |
-| C | A Paddle entrega a chave | Nenhum código de chave | **HIPÓTESE:** a Paddle Billing não gera chave de licença; A VALIDAR. Se não gera, C está descartada |
+## 6. Sandbox (FATOS [P7, P10])
 
-Detalhes da opção A (INFERÊNCIA):
-- Rota nova e separada, como a da Gumroad; **não toca `/api/license` (PT)**.
-- Entrada `{ email, transaction_id }`, corpo ≤ 4 KB; validar formato antes de qualquer consulta; resposta de erro genérica (não revelar se o e-mail existe).
-- Exige `purchase.email === e-mail digitado` (D2) e `status/access_active` do banco; a renovação reconfere o banco (revogado por webhook corta na próxima renovação, ≤ 1 h online, ≤ `LICENSE_TTL_DAYS` offline).
-- **Mudança de SQL necessária (FATO do código [C1]):** hoje `nexo_lookup_license` exclui só `platform <> 'gumroad'` (`schema-purchases.sql:198-199`). Sem generalizar, uma compra `paddle` valeria **só por e-mail** (D3 violada). Antes de qualquer código, trocar para lista de plataformas que exigem segredo (`gumroad`, `paddle`) e cobrir no G3. Essa mudança toca o caminho PT: provar com os testes PT inalterados.
-- Id da transação é segredo fraco (aparece no recibo). Mitigação: exigir **também** o e-mail e limitar tentativas (A VALIDAR limite viável em Pages Functions, que não têm contador próprio). Decisão D-P3.
-
-## 6. Sandbox
-
-- **A VALIDAR:** existência de ambiente sandbox separado, URL da API sandbox, conta e chaves separadas, cartões de teste, e se o webhook de sandbox usa segredo próprio. Fonte: https://developer.paddle.com/build/tools/sandbox (**não aberta**).
-- Regras do nosso lado (independem da Paddle): variável `PADDLE_ENV=sandbox|production` (padrão **production** só no build de venda; erro se faltar); compra de sandbox **não** pode conceder em produção (equivalente ao `GUMROAD_ALLOW_TEST`, D5): rejeitar evento cujo ambiente não bate com `PADDLE_ENV`. A VALIDAR como o evento identifica o ambiente.
-- Teste sem dinheiro: simulador de eventos da Paddle, se existir (A VALIDAR).
+- Sandbox é um **ambiente separado**: conta própria (cadastro em `sandbox-vendors.paddle.com/signup`), dados, chaves, destinos de notificação, produtos e clientes **não são compartilhados** com a conta live.
+- Base da API: live `https://api.paddle.com`, sandbox `https://sandbox-api.paddle.com`.
+- Chaves de API: formato `^pdl_(live|sdbx)_apikey_[a-z\d]{26}_[a-zA-Z\d]{22}_[a-zA-Z\d]{3}$`; "contém `_sdbx`" = sandbox. Credencial de um ambiente na API do outro devolve erro `forbidden`.
+- Cartões de teste: `4242 4242 4242 4242` (sem 3DS), `4000 0038 0000 0446` (3DS), `4000 0000 0000 0002` (recusado), entre outros; qualquer nome e validade futura. Só funcionam no sandbox.
+- No sandbox: sem aprovação do site; reembolsos aprovados automaticamente **a cada 10 minutos**; e-mails só chegam ao domínio da conta (os demais são encaminhados ao e-mail principal); 3 tentativas de webhook.
+- **Simulador de webhooks** [P10]: eventos únicos e cenários, sem transação real. Só destinos com `traffic_source` `all` ou `simulation` recebem simulações; destino `platform` só recebe eventos reais. **Em produção usar `platform`.**
+- **Como o evento identifica o ambiente: não identifica.** O payload não traz campo de ambiente. O que separa os ambientes é o **segredo do destino** (cada conta tem o seu): produção só conhece o segredo live; evento do sandbox falha na assinatura (401). Por isso a v1 do desenho ("rejeitar evento cujo ambiente não bate") é substituída por: `PADDLE_ENV` define a base da API e **precisa bater com o prefixo da `PADDLE_API_KEY`** (`pdl_live_`/`pdl_sdbx_`); divergência → 503 `nao_configurado`.
+- Go-live: checklist oficial (https://developer.paddle.com/build/go-live-checklist); recriar catálogo e destino na conta live. Aprovação do site/domínio é da Paddle (DADO DO USUÁRIO: revisão do site no ar).
 
 ## 7. Reembolso, disputa e ajuste: política do app
 
-Igual à Gumroad (D6): reembolso **total** revoga; **parcial** mantém acesso; chargeback revoga; disputa ganha reativa. Prazo de reembolso e quem decide: **A VALIDAR** nos termos do vendedor na Paddle. O texto `REFUND_EN.md` (7 dias, via Gumroad) **precisaria ser reaberto** se a Paddle virar canal: não editar nesta fase.
+Igual à Gumroad (D6): reembolso **total** revoga; **parcial** mantém acesso (e revoga se a soma alcançar o valor da compra); chargeback revoga; disputa ganha reativa. Reembolso automático da Paddle [P6]: aprovado sozinho se a conta passou pela verificação, valor ≤ 400 USD (ou equivalente), menor que o saldo e não for transferência bancária; fora disso fica `pending_approval`. Prazo de reembolso e quem decide: termos do vendedor na Paddle (A VALIDAR). O `REFUND_EN.md` (7 dias, via Gumroad) **precisa ser reaberto** se a Paddle virar canal (D-P5); não editado nesta fase.
 
 ## 8. Volume e limites
 
-- A VALIDAR: limite de taxa da API; política de retentativas do webhook; prazo de resposta exigido; códigos tratados como sucesso. **HIPÓTESE:** entrega pelo menos uma vez e sem ordem garantida → deduplicar por id de notificação (`nexo_purchase_events`, `provider_event_id`).
-- Se o webhook exigir resposta rápida, gravar e responder; sem trabalho pesado.
+- Por compra: 1 chamada `GET /customers/{id}` no `transaction.completed` e 1 por ajuste. Limite de taxa da API da Paddle: **A VALIDAR** (não consultei a página de limites).
+- Falha na API da Paddle ou no Supabase → 503 para o webhook (a Paddle reenvia). Falha de assinatura nunca vira retentativa útil.
 
 ## 9. Variáveis (nomes; valores só no painel da Cloudflare, nunca no repositório)
 
-- `PADDLE_WEBHOOK_SECRET` (obrigatória; segredo do destino de notificação).
-- `PADDLE_ENV` (`sandbox` ou `production`, obrigatória).
-- `PADDLE_PRODUCT_ID` (ou id do preço; obrigatória; confere `product_id` do evento).
-- `PADDLE_API_KEY` **somente se** o e-mail não vier no evento (§4); a VALIDAR; é segredo de servidor, nunca `VITE_*`.
-- `PADDLE_SIGNATURE_TOLERANCE_SEC` (opcional).
-- Reusa `LICENSE_PRIVATE_JWK`, `LICENSE_TTL_DAYS` e `SUPABASE_*`. Nenhuma variável `VITE_PADDLE_*` secreta. Link de compra no cliente: variável pública própria (nome a definir; A VALIDAR se o checkout é por link ou por script da Paddle, o que mexeria na CSP).
+- `PADDLE_WEBHOOK_SECRET` (obrigatória; *endpoint secret key* do destino).
+- `PADDLE_ENV` (`sandbox` ou `production`, obrigatória; define a base da API e confere o prefixo da chave).
+- `PADDLE_PRODUCT_ID` (obrigatória; `pro_…`, confere o produto dos itens).
+- `PADDLE_API_KEY` (obrigatória; permissão mínima `customer.read`; segredo de servidor, nunca `VITE_*`).
+- `PADDLE_SIGNATURE_TOLERANCE_SEC` (opcional, padrão 5).
+- Reusa `LICENSE_PRIVATE_JWK`, `LICENSE_TTL_DAYS` e `SUPABASE_*`.
+- Checkout no cliente: **A VALIDAR** (Paddle.js com *client-side token* ou link de pagamento; Paddle.js mexe na CSP). Nenhuma variável `VITE_PADDLE_*` secreta. Fora do escopo desta fase.
 
 ## 10. DFMEA curto
 
@@ -121,38 +159,46 @@ Escala 1 a 5; RPN = S×O×D.
 
 | # | Modo de falha | Efeito | S | O | D | RPN | Mitigação |
 |---|---|---|---|---|---|---|---|
-| P1 | Webhook sem verificação ou com verificação frouxa | Qualquer um concede ou revoga | 5 | 2 | 2 | 20 | Assinatura antes de ler; tempo constante; teste com assinatura inválida/ausente/velha |
+| P1 | Webhook sem verificação ou frouxa | Qualquer um concede/revoga | 5 | 2 | 2 | 20 | Assinatura antes de ler; tempo constante; testes: inválida, ausente, velha, corpo alterado, vários `h1` |
 | P2 | Gravar `…DISPUTE_WON` | Revoga quem ganhou | 4 | 2 | 2 | 16 | Nome fixo `…CHARGEBACK_REVERSED`; teste G3 |
-| P3 | Reembolso parcial tratado como total (ou vice-versa) | Revoga indevidamente ou mantém acesso reembolsado | 4 | 3 | 3 | 36 | Regra explícita total×parcial validada na doc; teste com os dois |
-| P4 | Ajuste de crédito gravado como revogação | Bloqueio de conciliação no e-mail inteiro | 4 | 2 | 3 | 24 | Ignorar tipos não mapeados (200 + log); nunca gravar nome fora da tabela §3 |
-| P5 | `paddle` valendo só por e-mail (D3) | Acesso indevido por quem sabe o e-mail | 4 | 3 | 2 | 24 | Generalizar a exclusão no SQL antes do código; G3 "D3 paddle" |
-| P6 | Evento de sandbox concedendo em produção | Acesso grátis | 3 | 2 | 3 | 18 | `PADDLE_ENV` + rejeitar ambiente divergente |
-| P7 | Webhook atrasado ou perdido | Comprador não consegue ativar; reembolso não revoga | 3 | 3 | 3 | 27 | Mensagem "tente em alguns minutos"; suporte com runbook manual (`paddle_manual`, como `gumroad_manual`); conciliação por consulta à API (A VALIDAR) |
-| P8 | Corpo reserializado quebra a assinatura | Todas as vendas rejeitadas | 5 | 2 | 2 | 20 | Ler bytes crus; teste com corpo real do sandbox |
-| P9 | Id de transação adivinhado/vazado | Ativação por terceiro | 3 | 2 | 4 | 24 | Exigir também o e-mail; limitar tentativas; D-P3 |
-| P10 | Textos legais/reembolso divergem do canal Paddle | Promessa errada ao comprador | 4 | 3 | 2 | 24 | Reabrir `REFUND_EN` e Termos antes de ligar o canal; D-P5 |
-| P11 | Dois canais ativos para o mesmo e-mail | Estados contraditórios | 2 | 2 | 3 | 12 | `platform` separa; acesso = qualquer compra ativa (regra atual de `nexo_refresh_license_access`) |
+| P3 | Parcial tratado como total (ou o inverso) | Revoga indevido / mantém reembolsado | 4 | 3 | 3 | 36 | `type` oficial `full`/`partial`; soma dos parciais no SQL; testes com os dois |
+| P4 | Crédito gravado como revogação | Bloqueio do e-mail inteiro | 4 | 2 | 3 | 24 | `credit*` ignorado; só nomes da tabela §4.3 |
+| P5 | `paddle` valendo só por e-mail (D3) | Acesso por quem sabe o e-mail | 4 | 3 | 2 | 24 | SQL com lista de plataformas; G3 "D3 paddle" |
+| P6 | Evento do sandbox concedendo em produção | Acesso grátis | 3 | 2 | 3 | 18 | Segredo por ambiente; `PADDLE_ENV` × prefixo da chave; destino `platform` |
+| P7 | Webhook atrasado ou perdido | Comprador sem ativar; reembolso sem revogar | 3 | 3 | 3 | 27 | Mensagem "tente em alguns minutos"; retentativas da Paddle; runbook `paddle_manual` |
+| P8 | Corpo reserializado quebra a assinatura | Todas as vendas rejeitadas | 5 | 2 | 2 | 20 | Bytes crus; teste com payload do simulador (A VALIDAR) |
+| P9 | `txn_…` adivinhado ou vazado | Ativação por terceiro | 3 | 2 | 4 | 24 | Exigir e-mail; erro genérico; D-P3 |
+| P10 | Textos legais/reembolso divergem do canal | Promessa errada | 4 | 3 | 2 | 24 | Reabrir `REFUND_EN` e Termos antes de ligar (D-P5) |
+| P11 | Dois canais para o mesmo e-mail | Estados contraditórios | 2 | 2 | 3 | 12 | `platform` separa; acesso = qualquer compra ativa |
+| P12 | Ajuste chega antes da compra ser conhecida (ordem não garantida), ou reversão antes do chargeback | Reembolso ignorado; revogação final indevida | 4 | 1 | 3 | 12 | Ignora com log; retentativas; runbook manual; ocorrência improvável (ajustes ocorrem horas/dias depois) |
+| P13 | Recibo não mostra o `txn_…` | Comprador não consegue ativar | 4 | 3 | 2 | 24 | Conferir no sandbox antes de vender; plano B §5 (D-P9) |
+| P14 | Chave de API com permissão demais | Dano se vazar | 4 | 1 | 3 | 12 | Só `customer.read`; segredo só no painel |
 
-## 11. Plano de testes (quando houver código; nada executado agora)
+## 11. Plano de testes (sem chamada real)
 
-- Unitários com assinatura calculada no teste (segredo falso): válida, inválida, ausente, velha, corpo alterado; cada evento da §3 vira o tipo esperado; evento não mapeado → 200 sem gravar; ambiente divergente → rejeitado; id fora do formato → 422 sem gravar; corpo > 64 KB → 413.
-- G3 (Postgres real): grant `paddle` ativa; `REFUNDED` revoga e grant posterior não reativa; `CHARGEBACK` → `CHARGEBACK_REVERSED` → ativa; `…DISPUTE_WON` daria `charged_back` (documenta a armadilha); `paddle` não vale por e-mail (P5); reembolso parcial sem `provider_event_id` bloqueia; mínimo do G3 ajustado ao total exato.
+- Unitários com assinatura calculada no teste (segredo falso): válida, vários `h1`, inválida, ausente, malformada, velha, futura, corpo alterado; cada evento da §4 vira o nome esperado; `credit` e eventos não assinados → 200 sem gravar; produto diferente e `subscription_id` → ignorado; id fora do formato → 422 sem gravar; corpo > 64 KB → 413; API de cliente indisponível → 503 sem gravar; `provider_event_id` por estado.
+- G3 (Postgres real): grant `paddle` ativa; `REFUNDED` revoga e grant posterior não reativa; `PADDLE_CHARGEBACK` → `…CHARGEBACK_REVERSED` → ativa; `…DISPUTE_WON` daria `charged_back` (documenta a armadilha); `paddle` não vale por e-mail (D3); parcial sem `provider_event_id` bloqueia; parciais somados viram reembolso; `nexo_lookup_purchase` (e-mail errado, revogada, bloqueio aberto); mínimo do G3 ajustado ao total exato.
 - Rotas PT e Gumroad com os testes existentes, inalterados.
 
 ## 12. O que NÃO foi verificado
 
-- **Toda a documentação da Paddle** (§0). Páginas a ler antes de qualquer código: `developer.paddle.com/webhooks/signature-verification`, `…/webhooks/overview`, `…/webhooks/respond-to-webhooks`, eventos de transação e de ajuste, `…/build/tools/sandbox`, referência da API (limites, consulta de transação e cliente), e os termos do vendedor (país, pessoa física, impostos, reembolso).
-- Se a Paddle aceita vendedor pessoa física no Brasil e quais as condições: **não encontrado, não pesquisado.**
-- Qualquer valor de campo, nome de cabeçalho ou de evento da Paddle citado como HIPÓTESE.
+- Nenhuma chamada real à Paddle (assinatura, API de cliente, sandbox). Os payloads dos testes seguem os exemplos oficiais, mas são simulados.
+- Se o recibo do sandbox mostra o `txn_…` (P13).
+- Se retentativas são reassinadas com `ts` novo (§2.5).
+- Limites de taxa da API, moedas sem centavos (§5), valores de `type` em chargebacks.
+- Termos do vendedor (reembolso, impostos, país): só o DADO DO USUÁRIO sobre pessoa física no Brasil.
+- Pages Functions reais, Safari do iPhone e Android.
 
-## 13. Decisões do fundador (abertas)
+## 13. Decisões do fundador
 
-| # | Decisão | Recomendação |
-|---|---|---|
-| D-P1 | Abrir o canal Paddle agora ou depois da primeira venda Gumroad? | Depois |
-| D-P2 | Liberar `developer.paddle.com` na rede da sessão, ou o fundador valida as páginas da §12? | Liberar só leitura, ou o fundador valida |
-| D-P3 | Ativação: A (e-mail + id da transação), B (chave nossa por e-mail) ou C (se a Paddle emitir chave)? | A |
-| D-P4 | Aceitar mudar o SQL de exclusão por e-mail (D3) para uma lista de plataformas, com G3 | Sim, só com prova de que o PT não mudou |
-| D-P5 | Reabrir `REFUND_EN` e Termos (prazo, quem é o *seller of record*, impostos) se a Paddle virar canal | Sim, antes de ligar |
-| D-P6 | Falha da Paddle/webhook na renovação: falha fechada mantendo o token até `exp` (como D1) | Sim |
-| D-P7 | Conta Paddle (cadastro, aprovação, dados pessoais) | Ação do fundador, fora desta sessão |
+| # | Decisão | Recomendação | Estado |
+|---|---|---|---|
+| D-P1 | Abrir a Paddle agora ou depois da 1ª venda Gumroad? | Depois | Aberta (o pedido de 06/11 pede avançar o código; ligar o canal é outra decisão) |
+| D-P2 | Liberar `developer.paddle.com` na rede da sessão | — | **Resolvida** em 06/11/2026 (leitura feita) |
+| D-P3 | Ativação: A (e-mail + id da transação) | A | Recomendação mantida; implementada |
+| D-P4 | Mudar o SQL de exclusão por e-mail (D3) para lista de plataformas | Sim, com prova de que o PT não mudou | Implementada no G3 (PT inalterado) |
+| D-P5 | Reabrir `REFUND_EN` e Termos se a Paddle virar canal | Sim, antes de ligar | Aberta |
+| D-P6 | Falha da Paddle na renovação: mantém o token até `exp` | Sim | Implementada (renovação só confere o banco; sem chamada à Paddle) |
+| D-P7 | Conta Paddle (cadastro, aprovação, dados pessoais) | Ação do fundador | Aberta |
+| D-P8 | `chargeback_warning` revoga (o valor já foi devolvido) ou só avisa (como o SQL faz com a Hotmart)? | Revogar | **Implementado revogando; confirmar.** Alternativa: gravar `PADDLE_CHARGEBACK_WARNING` (mantém acesso) |
+| D-P9 | Se o recibo não mostrar o `txn_…`: aceitar `invoice_number` (migração) ou página de sucesso com o id | Decidir após ver o recibo do sandbox | Aberta |
