@@ -7,7 +7,7 @@ Legend: **PROVADO** = the code or schema shows it; **POLÍTICA** = a commitment,
 ## Result
 
 - **U1 (§2 "backups" stored in the browser): contradicted by the code. FIXED 04/11/2026**: the word was removed from the text.
-- **U2 (§3.1 "Visits from the EU are not measured"): true only after a founder action.** Decision 04/11/2026: sentence kept (founder decision D-L10). **Pre-sale requirement: turn the Cloudflare EU option on and check it before the first sale** (`docs/LANCAMENTO_EN.md` §6.2, item 4).
+- **U2 (§3.1 "Visits from the EU are not measured"): RESOLVED 06/11/2026.** Founder fact: the "exclude EU visitors" option does not exist in the current Cloudflare Web Analytics dashboard, so the sentence was false. It was removed and replaced with: "Visits from all countries are measured the same way. You can block the script with your browser or a content blocker; the public pages work without it." Code check: `public/en/*.html` have no script of their own; the only script is the injected beacon (`scripts/lib/en-site.mjs`), and nothing depends on it.
 - **U3 (§4 "status (active or revoked)"): imprecise. FIXED 04/11/2026**: text now says "status".
 - **4 items are commitments, not code facts:** retention 5 years, 30-day reply, legal bases, children (P1–P4). **2 items depend on third-party docs, not re-read today** (V1–V2).
 - Everything else is PROVADO.
@@ -50,7 +50,7 @@ Legend: **PROVADO** = the code or schema shows it; **POLÍTICA** = a commitment,
 | Public pages under `/en/` use Cloudflare Web Analytics, as a script | `CF_BEACON` and snippet (`scripts/lib/en-site.mjs:14,28`); pages carry `{{CF_WA_SNIPPET}}` (`scripts/build-en-site.mjs`, page template) | PROVADO |
 | The app does not load the script / sends nothing to it | App CSP `script-src 'self'`, `connect-src 'self'` (`public/_headers:10`, `vercel.json:39`); `/en/*` is the only route with the beacon host (`_headers:13-17`, `vercel.json:64`); tests `tests/api/vercel-headers.test.ts`, `tests/e2e/landing-en.spec.ts` | PROVADO |
 | What Cloudflare reports; no cookies/localStorage; no fingerprinting | Cloudflare's own documentation (read 01/11/2026 per `docs/LANCAMENTO_EN.md` §6.2). Not re-read today (network) | **V1: depends on a third-party doc** |
-| **"Visits from the EU are not measured."** (D-L10) | A Cloudflare dashboard setting. No code or file here controls it | **NÃO COMPROVADO (U2): false until the founder turns the option on and checks it** |
+| ~~"Visits from the EU are not measured."~~ (removed 06/11/2026) | Replaced by "Visits from all countries are measured the same way... the public pages work without it." Pages `/en/` have no script of their own besides the injected beacon (`public/en/*.html`; `scripts/lib/en-site.mjs:21-27`) | **RESOLVIDO (U2)** |
 
 ## §4 What we keep on the server
 
@@ -123,7 +123,7 @@ Added 04/11/2026 (the first version of this file covered only the Privacy Policy
 ## Decisions taken (04/11/2026, authority delegated by the founder)
 
 1. U1: removed "backups" from §2.
-2. U2: sentence kept; turning on the Cloudflare EU option is a pre-sale requirement, checked by the founder.
+2. U2: sentence removed 06/11/2026 (the Cloudflare EU option does not exist); no pre-sale action pending.
 3. U3: "status" only.
 4. V1, V2: the founder should open the Cloudflare Web Analytics docs and the Gumroad payments page and confirm (not re-read today).
 5. P1-P4 are commitments; keep only what the founder can honour.

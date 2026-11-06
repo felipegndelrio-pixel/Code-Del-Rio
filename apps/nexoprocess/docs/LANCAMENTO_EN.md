@@ -221,7 +221,7 @@ Prova o ciclo comprar → ativar → perder o acesso, com evidência real. Anote
 1. Painel da Cloudflare → Analytics & Logs → Web Analytics → adicionar o site (hostname do domínio da landing). Copie só o **token** do snippet mostrado (`data-cf-beacon='{"token": "…"}'`).
 2. **NÃO ligue a "injeção automática" (one-click)** para esse hostname: ela colocaria o script também no app. A CSP do app bloqueia o script (verificado), mas o objetivo é não haver tentativa.
 3. Informe o token como `VITE_CF_WA_TOKEN` no build de venda (§4.1). Sem ele, o build **falha** (verificado).
-4. **Ação sua (D-L10):** na Cloudflare, ligue a opção de excluir visitantes da UE da medição. A Privacidade já afirma "Visits from the EU are not measured"; **só fica verdadeiro depois que você ligar**. A VALIDAR no painel.
+4. **Resolvido em 06/11/2026 (decisão do fundador):** a opção "excluir visitantes da UE" NÃO existe no painel atual do Cloudflare Web Analytics (FATO informado pelo fundador). A frase "Visits from the EU are not measured" foi removida da Privacidade; não há ação pendente aqui.
 
 **CSP/_headers (FATO verificado no `wrangler pages dev`):** `/en/*` destaca (`! Content-Security-Policy`) o CSP do app e define o seu, que só acrescenta `script-src https://static.cloudflareinsights.com/beacon.min.js` e `connect-src https://cloudflareinsights.com` (o snippet manual envia para `cloudflareinsights.com`; na injeção automática seria a própria origem). O espelho `vercel.json` usa duas regras disjuntas. Nada muda para o app.
 

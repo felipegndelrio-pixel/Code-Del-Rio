@@ -3,7 +3,7 @@ status: approved
 ---
 # NexoProcess — Privacy Policy
 
-Last updated: 04/11/2026
+Last updated: 06/11/2026
 
 ## 1. Summary
 Your process data stays on your device. We only handle the data needed to check your purchase and to count visits to our public pages.
@@ -24,7 +24,7 @@ The public pages under `/en/` (the sales page and the legal pages) use **Cloudfl
 
 The app itself (what you use after signing in) does **not** load this script and sends nothing to Cloudflare Web Analytics.
 
-Visits from the EU are not measured.
+Visits from all countries are measured the same way. You can block the script with your browser or a content blocker; the public pages work without it.
 
 ## 4. What we keep on the server
 A purchase record: e-mail, product, sale identifier, status, amount and currency paid, event and date. Server logs show the e-mail masked. Your processes and spreadsheets are **not** sent or stored. Purchase records are kept while the license is valid and for up to 5 years for tax and accounting.

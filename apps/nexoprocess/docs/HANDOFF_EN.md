@@ -1,6 +1,6 @@
 # HANDOFF EN — próxima sessão
 
-> **STATUS LEGAL (04/11/2026):** os três textos EN (Termos, Privacidade, Reembolso) estão `status: approved`, com as decisões D-L1…D-L13 do fundador (02/11/2026). **Não houve revisão por advogado**; a aprovação é do fundador (`LANCAMENTO_EN.md` §6.3). Pendente do fundador: ligar na Cloudflare a exclusão de visitantes da UE (a Privacidade já diz "Visits from the EU are not measured").
+> **STATUS LEGAL (04/11/2026):** os três textos EN (Termos, Privacidade, Reembolso) estão `status: approved`, com as decisões D-L1…D-L13 do fundador (02/11/2026). **Não houve revisão por advogado**; a aprovação é do fundador (`LANCAMENTO_EN.md` §6.3). Atualização 06/11/2026: a opção "excluir visitantes da UE" não existe no painel atual do Cloudflare Web Analytics (FATO do fundador); a frase foi removida da Privacidade e não há pendência aqui.
 
 Versão 2, 01/11/2026 (v1 no mesmo dia; v2 acrescenta Formulário, Assistente e Relatório/PDF). Branch `wip/en-foundation`. Autor: sessão de engenharia EN (Sonnet).
 
