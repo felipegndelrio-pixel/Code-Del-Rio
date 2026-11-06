@@ -14,6 +14,7 @@ import { spawn } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { handleGumroadLicense } from '../../api/_lib/gumroad';
+import { handlePaddleLicense, handlePaddleWebhook } from '../../api/_lib/paddle';
 import { handleLicense, handleWebhook } from '../../api/_lib/handlers';
 import { supabaseStore } from '../../api/_lib/store';
 import { assertIntegrationConfig, assertPostgrestUsesTestDatabase, assertSafeTestTargets } from './db-target';
@@ -401,4 +402,166 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     }
     await reset();
   });
+
+  // ---------------------------------------------------------------- Paddle (P2)
+  const PD_SECRET = 'pdl_ntfset_TESTONLY_g3_not_a_real_secret';
+  const PD_API_KEY = `pdl_sdbx_apikey_${'0'.repeat(26)}_${'x'.repeat(22)}_abc`;
+  const PD_PRODUCT = 'pro_01gsz4t5hdjse780zja8vvr7jg';
+  const PD_CTM = 'ctm_01hv6y1jedq4p1n0yqn5ba3ky4';
+  const PD_NOW = Date.parse('2026-11-06T12:00:00Z');
+  const pdId = (prefix: string, tag: string) => `${prefix}_${tag.toLowerCase().replace(/[^a-z0-9]/g, '').padEnd(26, '0').slice(0, 26)}`;
+  const minute = (m: number) => new Date(Date.parse('2026-11-01T10:00:00Z') + m * 60_000).toISOString();
+  let pdJwk: JsonWebKey | null = null;
+  const pdPrivate = async () => {
+    if (!pdJwk) {
+      const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+      pdJwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    }
+    return pdJwk;
+  };
+  /** Paddle simulada (API de clientes): nenhuma chamada real. */
+  const pdDeps = async (email: string) => ({
+    store: supabaseStore(REST!, JWT!, viaGateway),
+    privateJwk: await pdPrivate(),
+    webhookSecret: PD_SECRET,
+    env: 'sandbox' as const,
+    productId: PD_PRODUCT,
+    apiKey: PD_API_KEY,
+    now: () => PD_NOW,
+    fetchImpl: (async () => new Response(JSON.stringify({ data: { id: PD_CTM, email } }), { status: 200 })) as unknown as typeof fetch,
+  });
+  const pdSend = async (email: string, payload: unknown) => {
+    const body = JSON.stringify(payload);
+    const ts = Math.floor(PD_NOW / 1000);
+    const h1 = createHmac('sha256', PD_SECRET).update(`${ts}:${body}`).digest('hex');
+    return handlePaddleWebhook(new Request('https://x.test/api/paddle-webhook', { method: 'POST', body, headers: { 'paddle-signature': `ts=${ts};h1=${h1}` } }), await pdDeps(email));
+  };
+  const pdCompleted = (email: string, txn: string, at: number, evt: string) =>
+    pdSend(email, {
+      event_id: evt, event_type: 'transaction.completed', occurred_at: minute(at), notification_id: pdId('ntf', 'n'),
+      data: { id: txn, status: 'completed', customer_id: PD_CTM, currency_code: 'USD', subscription_id: null, items: [{ price: { product_id: PD_PRODUCT } }], details: { totals: { grand_total: '10000' } } },
+    });
+  const pdAdjust = (email: string, adj: string, txn: string, at: number, over: Record<string, unknown>, type = 'adjustment.created', evt = pdId('evt', adj)) =>
+    pdSend(email, {
+      event_id: evt, event_type: type, occurred_at: minute(at), notification_id: pdId('ntf', 'n'),
+      data: { id: adj, action: 'refund', type: 'full', status: 'approved', transaction_id: txn, customer_id: PD_CTM, totals: { total: '10000' }, ...over },
+    });
+  const pdActivate = async (email: string, txn: string) =>
+    handlePaddleLicense(new Request('https://x.test/api/paddle-license', { method: 'POST', body: JSON.stringify({ email, transaction_id: txn }) }), await pdDeps(email));
+
+  it('paddle: webhook concede com ids txn_/pro_ intactos; reentrega não regrava; ativação por e-mail + transação', async () => {
+    await reset();
+    const e = 'p-grant@it.test';
+    const txn = pdId('txn', 'grant1');
+    expect((await pdCompleted(e, txn, 0, pdId('evt', 'g1'))).status).toBe(200);
+    expect((await pdCompleted(e, txn, 0, pdId('evt', 'g1'))).status).toBe(200); // reentrega do mesmo evento
+    expect(await purchases(e)).toEqual([{ platform: 'paddle', transaction_id: txn, status: 'active', access_active: true, refunded_amount: 0 }]);
+    expect(await raw().purchaseOwner!('paddle', txn)).toEqual({ email: e, status: 'active', access_active: true, blocked: false });
+    expect((await pdActivate(e, txn)).status).toBe(200);
+    expect((await pdActivate('outro@it.test', txn)).status).toBe(404); // e-mail diferente
+    expect((await pdActivate(e, pdId('txn', 'inexistente'))).status).toBe(404);
+    expect(await openBlocks(e)).toEqual([]);
+  });
+
+  it('paddle: reembolso total revoga, a ativação nega e a concessão antiga não reativa', async () => {
+    await reset();
+    const e = 'p-refund@it.test';
+    const txn = pdId('txn', 'refund1');
+    await pdCompleted(e, txn, 0, pdId('evt', 'r1'));
+    expect((await pdAdjust(e, pdId('adj', 'r1'), txn, 10, { status: 'pending_approval' })).status).toBe(200);
+    expect((await pdActivate(e, txn)).status).toBe(200); // pendente: acesso mantido
+    expect((await pdAdjust(e, pdId('adj', 'r1'), txn, 20, {}, 'adjustment.updated')).status).toBe(200);
+    expect(await purchases(e)).toEqual([expect.objectContaining({ status: 'refunded', access_active: false })]);
+    expect((await pdActivate(e, txn)).status).toBe(404);
+    await pdCompleted(e, txn, 0, pdId('evt', 'r1b')); // entrega atrasada da compra
+    expect(await purchases(e)).toEqual([expect.objectContaining({ status: 'refunded', access_active: false })]);
+    expect(await openBlocks(e)).toEqual([]);
+  });
+
+  it('paddle: chargeback → reversão restaura; reversão sem chargeback não cria bloqueio; nomes errados cairiam em armadilhas', async () => {
+    await reset();
+    const e = 'p-dispute@it.test';
+    const txn = pdId('txn', 'dispute1');
+    await pdCompleted(e, txn, 0, pdId('evt', 'd1'));
+    expect(await (await pdAdjust(e, pdId('adj', 'd0'), txn, 5, { action: 'chargeback_reverse' })).json()).toEqual({ ignored: 'sem_chargeback' }); // ativa: ignora
+    expect((await pdAdjust(e, pdId('adj', 'd1'), txn, 10, { action: 'chargeback_warning' })).status).toBe(200);
+    expect(await raw().purchaseState!('paddle', txn)).toEqual({ status: 'charged_back', access_active: false });
+    expect((await pdActivate(e, txn)).status).toBe(404);
+    expect((await pdAdjust(e, pdId('adj', 'd2'), txn, 20, { action: 'chargeback_warning_reverse' })).status).toBe(200);
+    expect(await raw().purchaseState!('paddle', txn)).toEqual({ status: 'active', access_active: true });
+    expect((await pdActivate(e, txn)).status).toBe(200);
+    expect(await openBlocks(e)).toEqual([]);
+    // Armadilhas documentadas: DISPUTE_WON revoga quem ganhou; CHARGEBACK_WARNING mantém acesso (SQL).
+    const t = 'p-trap@it.test';
+    const trapTxn = pdId('txn', 'trap1');
+    await raw().grant({ platform: 'paddle', email: t, transaction: trapTxn, product_id: PD_PRODUCT, event: 'PADDLE_TRANSACTION_COMPLETED', occurred_at: minute(0) });
+    await raw().revoke({ platform: 'paddle', email: t, transaction: trapTxn, product_id: PD_PRODUCT, event: 'PADDLE_DISPUTE_WON', occurred_at: minute(1) });
+    expect(await raw().purchaseState!('paddle', trapTxn)).toEqual({ status: 'charged_back', access_active: false });
+    const w = 'p-warn@it.test';
+    const warnTxn = pdId('txn', 'warn1');
+    await raw().grant({ platform: 'paddle', email: w, transaction: warnTxn, product_id: PD_PRODUCT, event: 'PADDLE_TRANSACTION_COMPLETED', occurred_at: minute(0) });
+    await raw().revoke({ platform: 'paddle', email: w, transaction: warnTxn, product_id: PD_PRODUCT, event: 'PADDLE_CHARGEBACK_WARNING', occurred_at: minute(1) });
+    expect(await raw().purchaseState!('paddle', warnTxn)).toEqual({ status: 'chargeback_warning', access_active: true });
+  });
+
+  it('paddle: parciais somados viram reembolso; created+updated do mesmo estado não somam duas vezes', async () => {
+    await reset();
+    const e = 'p-partial@it.test';
+    const txn = pdId('txn', 'partial1');
+    await pdCompleted(e, txn, 0, pdId('evt', 'p1')); // 100,00
+    const part = (adj: string, at: number, total: string, type = 'adjustment.created') => pdAdjust(e, pdId('adj', adj), txn, at, { type: 'partial', totals: { total } }, type, pdId('evt', `${adj}${type}`));
+    await part('pa', 10, '3000');
+    await part('pa', 11, '3000', 'adjustment.updated'); // mesmo estado (approved), outro evento
+    expect(await purchases(e)).toEqual([expect.objectContaining({ status: 'partially_refunded', access_active: true, refunded_amount: 30 })]);
+    expect((await pdActivate(e, txn)).status).toBe(200);
+    await part('pb', 20, '7000');
+    expect(await purchases(e)).toEqual([expect.objectContaining({ status: 'refunded', access_active: false })]);
+    expect((await pdActivate(e, txn)).status).toBe(404);
+    expect(await openBlocks(e)).toEqual([]);
+  });
+
+  it('D3 paddle: /api/license {email} não concede por compra paddle; Hotmart igual a antes; misto segue só o Hotmart', async () => {
+    await reset();
+    const jwk = await pdPrivate();
+    const byEmail = async (email: string) => (await handleLicense(new Request('https://x.test/api/license', { method: 'POST', body: JSON.stringify({ email }) }), { store: store(), privateJwk: jwk })).status;
+    const s = store();
+    await s.grant({ platform: 'paddle', email: 'only-pd@it.test', transaction: pdId('txn', 'd3a'), product_id: PD_PRODUCT, event: 'PADDLE_TRANSACTION_COMPLETED' });
+    expect(await s.lookup('only-pd@it.test')).toBeNull();
+    expect(await byEmail('only-pd@it.test')).toBe(404);
+    expect((await pdActivate('only-pd@it.test', pdId('txn', 'd3a'))).status).toBe(200); // pela transação vale
+    await s.grant({ email: 'mixed-pd@it.test', transaction: 'H3', event: 'PURCHASE_APPROVED' });
+    await s.grant({ platform: 'paddle', email: 'mixed-pd@it.test', transaction: pdId('txn', 'd3b'), product_id: PD_PRODUCT, event: 'PADDLE_TRANSACTION_COMPLETED' });
+    expect(await byEmail('mixed-pd@it.test')).toBe(200);
+    await s.revoke({ email: 'mixed-pd@it.test', transaction: 'H3', event: 'PURCHASE_REFUNDED' });
+    expect(await s.lookup('mixed-pd@it.test')).toBe('revoked'); // a compra paddle ativa não vale só por e-mail
+    expect(await byEmail('mixed-pd@it.test')).toBe(404);
+  });
+
+  it('nexo_purchase_owner: service_role lê; anon e authenticated são negados; bloqueio aberto nega a ativação', async () => {
+    await reset();
+    const e = 'p-perm@it.test';
+    const txn = pdId('txn', 'perm1');
+    await raw().grant({ platform: 'paddle', email: e, transaction: txn, product_id: PD_PRODUCT, event: 'PADDLE_TRANSACTION_COMPLETED' });
+    const call = (headers: Record<string, string>) =>
+      fetch(`${REST}/rpc/nexo_purchase_owner`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_platform: 'paddle', p_transaction: txn }) });
+    const ok = await call(auth());
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ email: e, status: 'active', access_active: true, blocked: false });
+    const secret = process.env.PGRST_JWT_SECRET;
+    expect(secret, 'PGRST_JWT_SECRET é necessário para o teste de permissão').toBeTruthy();
+    const b64 = (x: unknown) => Buffer.from(JSON.stringify(x)).toString('base64url');
+    const body = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 600 })}`;
+    const authed = `${body}.${createHmac('sha256', secret!).update(body).digest('base64url')}`;
+    for (const headers of [{}, { Authorization: `Bearer ${authed}` }] as Record<string, string>[]) {
+      const r = await call(headers);
+      expect([401, 403]).toContain(r.status);
+      expect(((await r.json()) as { code?: string }).code).toBe('42501');
+    }
+    // Um bloqueio de conciliação aberto no e-mail corta a ativação.
+    await raw().grant({ platform: 'paddle', email: e, transaction: 'txn_a=b', product_id: PD_PRODUCT, event: 'PADDLE_TRANSACTION_COMPLETED' }); // id inválido → bloqueio
+    expect(await openBlocks(e)).toEqual([{ reason: 'transaction_invalid' }]);
+    expect((await pdActivate(e, txn)).status).toBe(404);
+    await reset();
+  });
+
 });
