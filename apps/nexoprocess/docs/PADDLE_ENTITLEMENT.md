@@ -107,7 +107,7 @@ Regras:
 ## 5. Identificadores e formato
 
 - `platform = 'paddle'` (cabe em `^[a-z][a-z0-9_-]{0,31}$`) [C1].
-- **FATO [P8]:** todo ID é prefixo + 26 caracteres `[a-z0-9]`: `txn_` (transação, 30 caracteres), `pro_` (produto), `pri_` (preço), `ctm_` (cliente), `adj_` (ajuste), `evt_` (evento), `ntf_` (notificação). Todos cabem em `^[A-Za-z0-9_-]{1,64}$` (transação) e `^[A-Za-z0-9._:-]{1,128}$` (produto). **Sem normalização** (ao contrário da Gumroad). Fora do padrão `^txn_[a-z\d]{26}$` / `^pro_[a-z\d]{26}$` → 422 `ativacao_manual`, nada gravado.
+- **FATO [P8]:** todo ID é prefixo + 26 caracteres `[a-z0-9]`: `txn_` (transação, 30 caracteres), `pro_` (produto), `pri_` (preço), `ctm_` (cliente), `adj_` (ajuste), `evt_` (evento), `ntf_` (notificação). Todos cabem em `^[A-Za-z0-9_-]{1,64}$` (transação) e `^[A-Za-z0-9._:-]{1,128}$` (produto). **Sem normalização** (ao contrário da Gumroad). Fora do padrão `^txn_[a-z\d]{26}$` / `^ctm_…` / `^adj_…`: no **webhook** → 200 `ignored` (reenviar não conserta), nada gravado e erro no log (vale o runbook manual); na **ativação**, `transaction_id` fora do padrão → 400 `id_invalido`.
 - Guardar `transaction_id` = `txn_…`, `product_id` = `pro_…`.
 - `provider_event_id`: ver §4.3 (`evt_…` ou `adj_…:<status>`, ≤ 160 caracteres).
 - Valores: `grand_total` e `totals.total` vêm como texto na **menor unidade da moeda** [P4, "lowest denomination"]. Convertemos por `÷ 100`. **A VALIDAR:** moedas sem centavos (ex.: JPY): a doc consultada não trata; só afeta o valor exibido, não a soma dos reembolsos (mesma unidade nos dois lados).
@@ -116,7 +116,7 @@ Regras:
 ### Como o comprador ativa (opção A, recomendada)
 `POST /api/paddle-license` com `{ email, transaction_id }` ou `{ token, transaction_id }` (renovação):
 1. `transaction_id` no formato `txn_…`; e-mail normalizado; corpo ≤ 4 KB.
-2. O servidor consulta o banco (RPC nova `nexo_lookup_purchase`) por `platform='paddle'` + transação **e** e-mail igual ao digitado. Sem chamada à Paddle na ativação.
+2. O servidor consulta o banco (RPC nova `nexo_purchase_owner`, só `service_role`, devolve e-mail, estado e se há bloqueio aberto) por `platform='paddle'` + transação e compara o e-mail com o digitado. Sem chamada à Paddle na ativação.
 3. Resposta de erro genérica (mesma para "não existe", "e-mail diferente" e "revogada"). Atraso do webhook: mensagem "tente de novo em alguns minutos".
 4. Renovação confere o banco de novo: revogado por webhook corta na próxima renovação.
 - **Compra Paddle não vale só por e-mail (D3).** FATO do código [C1]: `nexo_lookup_license` excluía só `platform <> 'gumroad'`. Troca para `platform not in ('gumroad','paddle')`, dentro de `schema-purchases.sql` (idempotente; o G3 aplica duas vezes), com teste "D3 paddle". As compras Hotmart ficam inalteradas.
@@ -177,7 +177,7 @@ Escala 1 a 5; RPN = S×O×D.
 ## 11. Plano de testes (sem chamada real)
 
 - Unitários com assinatura calculada no teste (segredo falso): válida, vários `h1`, inválida, ausente, malformada, velha, futura, corpo alterado; cada evento da §4 vira o nome esperado; `credit` e eventos não assinados → 200 sem gravar; produto diferente e `subscription_id` → ignorado; id fora do formato → 422 sem gravar; corpo > 64 KB → 413; API de cliente indisponível → 503 sem gravar; `provider_event_id` por estado.
-- G3 (Postgres real): grant `paddle` ativa; `REFUNDED` revoga e grant posterior não reativa; `PADDLE_CHARGEBACK` → `…CHARGEBACK_REVERSED` → ativa; `…DISPUTE_WON` daria `charged_back` (documenta a armadilha); `paddle` não vale por e-mail (D3); parcial sem `provider_event_id` bloqueia; parciais somados viram reembolso; `nexo_lookup_purchase` (e-mail errado, revogada, bloqueio aberto); mínimo do G3 ajustado ao total exato.
+- G3 (Postgres real): grant `paddle` ativa; `REFUNDED` revoga e grant posterior não reativa; `PADDLE_CHARGEBACK` → `…CHARGEBACK_REVERSED` → ativa; `…DISPUTE_WON` daria `charged_back` (documenta a armadilha); `paddle` não vale por e-mail (D3); parcial sem `provider_event_id` bloqueia; parciais somados viram reembolso; `nexo_purchase_owner` (service_role lê; anon e authenticated negados; e-mail errado, revogada, bloqueio aberto); mínimo do G3 ajustado ao total exato (35 = 29 + 6 testes `paddle`).
 - Rotas PT e Gumroad com os testes existentes, inalterados.
 
 ## 12. O que NÃO foi verificado
