@@ -195,19 +195,19 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     await reset();
     const s = store(); const e = 'multi@it.test';
     await s.grant({ email: e, platform: 'hotmart', transaction: 'H1', product_id: '123', event: 'PURCHASE_APPROVED' });
-    await s.grant({ email: e, platform: 'paddle', transaction: 'P1', product_id: '123', event: 'PURCHASE_APPROVED' });
-    await s.revoke({ email: e, platform: 'paddle', transaction: 'P1', product_id: '123', event: 'REFUND' });
+    await s.grant({ email: e, platform: 'otherpay', transaction: 'P1', product_id: '123', event: 'PURCHASE_APPROVED' });
+    await s.revoke({ email: e, platform: 'otherpay', transaction: 'P1', product_id: '123', event: 'REFUND' });
     expect(await s.lookup(e)).toBe('active');
     expect(await purchases(e)).toEqual(expect.arrayContaining([
       expect.objectContaining({ platform: 'hotmart', transaction_id: 'H1', access_active: true }),
-      expect.objectContaining({ platform: 'paddle', transaction_id: 'P1', status: 'refunded', access_active: false }),
+      expect.objectContaining({ platform: 'otherpay', transaction_id: 'P1', status: 'refunded', access_active: false }),
     ]));
   });
 
   it('reembolso parcial mantém a compra; reembolso total desativa apenas essa compra', async () => {
     await reset(); const s = store(); const e = 'partial@it.test';
     await s.grant({ email: e, transaction: 'H1', product_id: '123', amount: 100, currency: 'USD', event: 'PURCHASE_APPROVED' });
-    await s.grant({ email: e, platform: 'paddle', transaction: 'P1', product_id: '123', event: 'PURCHASE_APPROVED' });
+    await s.grant({ email: e, platform: 'otherpay', transaction: 'P1', product_id: '123', event: 'PURCHASE_APPROVED' });
     await s.revoke({ email: e, transaction: 'H1', product_id: '123', amount: 100, refund_amount: 20, provider_event_id: 'r1', event: 'PARTIAL_REFUND' });
     expect(await s.lookup(e)).toBe('active');
     expect(await purchases(e)).toEqual(expect.arrayContaining([expect.objectContaining({ transaction_id: 'H1', access_active: true, refunded_amount: 20 })]));
