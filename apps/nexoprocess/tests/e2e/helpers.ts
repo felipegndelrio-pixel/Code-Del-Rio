@@ -20,7 +20,7 @@ export const CSP_EN = cspLines[1];
 /** Único domínio externo permitido, e só nas páginas estáticas /en/: o beacon do Cloudflare Web Analytics (K2). */
 export const BEACON_HOSTS = /^(static\.)?cloudflareinsights\.com$/;
 
-export async function prepare(page: Page, opts: { theme?: 'dark' | 'light'; tour?: boolean; allowBeacon?: boolean } = {}) {
+export async function prepare(page: Page, opts: { theme?: 'dark' | 'light'; tour?: boolean; allowBeacon?: boolean; enCsp?: string } = {}) {
   const errors: string[] = [];
   const external: string[] = [];
   const beacon: string[] = [];
@@ -39,7 +39,7 @@ export async function prepare(page: Page, opts: { theme?: 'dark' | 'light'; tour
   await page.route('**/*', async (route) => {
     const resp = await route.fetch();
     const headers = { ...resp.headers() };
-    if ((headers['content-type'] ?? '').includes('text/html')) headers['content-security-policy'] = /^\/en(\/|$)/.test(new URL(route.request().url()).pathname) ? CSP_EN : CSP;
+    if ((headers['content-type'] ?? '').includes('text/html')) headers['content-security-policy'] = /^\/en(\/|$)/.test(new URL(route.request().url()).pathname) ? (opts.enCsp ?? CSP_EN) : CSP;
     await route.fulfill({ response: resp, headers });
   });
   if (opts.allowBeacon) {

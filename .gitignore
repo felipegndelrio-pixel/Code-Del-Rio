@@ -14,6 +14,7 @@ dist-e2e
 dist-demo
 dist-single
 dist-licenca
+dist-licenca-paddle
 dist-pages
 
 # Relatórios locais de build do NexoProcess

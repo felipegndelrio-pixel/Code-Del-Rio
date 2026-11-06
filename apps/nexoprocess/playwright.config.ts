@@ -29,7 +29,9 @@ export default defineConfig({
     // Suíte funcional completa no desktop.
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 }, launchOptions: { executablePath } }, testIgnore: /license/ },
     // Build de venda (VITE_LICENSE_REQUIRED=true) na porta 4181.
-    { name: 'licenca', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 }, baseURL: 'http://127.0.0.1:4181', launchOptions: { executablePath } }, testMatch: /license/ },
+    { name: 'licenca', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 }, baseURL: 'http://127.0.0.1:4181', launchOptions: { executablePath } }, testMatch: /license(?!-paddle)/ },
+    // Build de venda COM as variáveis VITE_PADDLE_* (porta 4182): entrada Paddle e compra na landing.
+    { name: 'licenca-paddle', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 }, baseURL: 'http://127.0.0.1:4182', launchOptions: { executablePath } }, testMatch: /license-paddle/ },
     // Larguras de referência da V4: 1440 · 768 · 390 (iPhone) · 320, além de Android (Pixel 7).
     { name: 'w1440', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, launchOptions: { executablePath } }, testMatch: /responsive/ },
     { name: 'w1024', use: { ...devices['Desktop Chrome'], viewport: { width: 1024, height: 768 }, launchOptions: { executablePath } }, testMatch: /responsive/ },
@@ -63,6 +65,32 @@ export default defineConfig({
         VITE_EN_TERMS_URL: '/en/terms/',
         VITE_EN_PRIVACY_URL: '/en/privacy/',
         VITE_EN_REFUND_URL: '/en/refund/',
+        BUNDLE_REPORT: 'false',
+      },
+    },
+    {
+      command: 'npx vite build --config apps/nexoprocess/vite.config.ts --outDir dist-licenca-paddle && npx vite preview --config apps/nexoprocess/vite.config.ts --outDir dist-licenca-paddle --port 4182 --host 127.0.0.1 --strictPort',
+      cwd: '../..',
+      url: 'http://127.0.0.1:4182',
+      timeout: 180_000,
+      reuseExistingServer: !process.env.CI,
+      env: {
+        ...(process.env as Record<string, string>),
+        VITE_LICENSE_REQUIRED: 'true',
+        VITE_LICENSE_PUBLIC_JWK: JSON.stringify(licenseKeys.publicJwk),
+        VITE_HOTMART_CHECKOUT_URL: LICENSE_TEST_CHECKOUT,
+        VITE_SUPPORT_EMAIL: LICENSE_TEST_SUPPORT,
+        VITE_GUMROAD_CHECKOUT_URL: 'https://example.gumroad.com/l/teste',
+        VITE_EN_TERMS_URL: '/en/terms/',
+        VITE_EN_PRIVACY_URL: '/en/privacy/',
+        VITE_EN_REFUND_URL: '/en/refund/',
+        VITE_CF_WA_TOKEN: 'abcdef0123456789abcdef0123456789',
+        // Paddle: valores SÓ DE TESTE (sandbox). Origens do checkout fictícias.
+        VITE_PADDLE_CLIENT_TOKEN: 'test_0123456789abcdef0123456789',
+        VITE_PADDLE_ENV: 'sandbox',
+        VITE_PADDLE_PRICE_ID: `pri_${'a1'.repeat(13)}`,
+        VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test',
+        NEXO_EN_DIST: new URL('./dist-licenca-paddle', import.meta.url).pathname,
         BUNDLE_REPORT: 'false',
       },
     },
