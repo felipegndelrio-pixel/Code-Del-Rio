@@ -1,0 +1,58 @@
+---
+status: draft
+---
+# NexoProcess — Privacy Policy (Paddle channel)
+
+Last updated: 06/11/2026
+
+> DRAFT for the Paddle sales channel. TO VALIDATE (lawyer and founder) before use. Not the approved text for the Gumroad channel.
+
+## 1. Summary
+Your process data stays on your device. We only handle the data needed to check your purchase and to count visits to our public pages.
+
+## 2. What stays on your device
+Stored in your browser (IndexedDB / localStorage): your processes, drafts, preferences (theme, language), tips already seen, and the access token and transaction ID used to keep you signed in. The app's service worker caches only app files, never your process data.
+
+Spreadsheets you import are read in memory. The file itself is not stored; only the extracted data, the file name and a hash are kept on your device.
+
+## 3. What is sent to our server
+| When | What is sent | Why |
+|---|---|---|
+| Sign in | The purchase e-mail and the transaction ID | Check the purchase and issue an access token |
+| Background renewal (at most once an hour, online only) | The access token and the transaction ID | Check the purchase is still valid (refund, chargeback, dispute) |
+| After checkout (from Paddle to us) | Paddle notifies our server of completed payments, refunds and chargebacks. Our server then reads your e-mail from Paddle | Record the purchase and keep your access in step with refunds |
+
+### 3.1 Website analytics (public pages only)
+The public pages under `/en/` (the sales page and the legal pages) use **Cloudflare Web Analytics**, loaded as a script from Cloudflare. It measures visits and page performance. Per Cloudflare's documentation, it reports the page path, the referring site, the visitor's country, device type, browser and operating system, and page-load timings. Per the same documentation, it does not use cookies or `localStorage` and does not fingerprint visitors.
+
+The app itself (what you use after signing in) does **not** load this script and sends nothing to Cloudflare Web Analytics.
+
+### 3.2 Checkout script (sales page only)
+The sales page loads Paddle's checkout script (`cdn.paddle.com`) so you can pay without leaving the page. The app itself does not load it. TO VALIDATE: what Paddle collects through this script and its legal basis, according to Paddle's own privacy policy.
+
+You can block the analytics script with your browser or a content blocker; the public pages work without it.
+
+## 4. What we keep on the server
+A purchase record: e-mail, product, transaction identifier, status, amount and currency paid, event and date. Server logs show the e-mail masked. Your processes and spreadsheets are **not** sent or stored. Purchase records are kept while the license is valid and for up to 5 years for tax and accounting.
+
+## 5. Third parties
+- **Paddle** sells the product as merchant of record, processes the payment, calculates and collects taxes, and handles refunds and chargebacks. We do not receive card data. TO VALIDATE: whether Paddle acts as an independent controller of your payment data, and where its privacy policy governs.
+- **Cloudflare** hosts the app and the API (it receives technical request metadata: IP, user agent, time, URL) and provides the analytics on the public pages only (section 3.1).
+- **Supabase** stores the purchase record (database).
+- No advertising cookies or external fonts are used, and the app has no analytics.
+
+## 6. Your choices
+- Backup and restore your data in the app.
+- "Erase local data" removes your projects and drafts from the device, and also the access token and the transaction ID.
+- To ask about or request deletion of your purchase record, see section 7.
+
+## 7. Controller, legal bases and your rights
+Controller of the purchase record: Felipe Del Rio, an individual based in Brazil. Contact: {{SUPPORT_EMAIL}}
+
+You may ask for access, correction, deletion and objection by e-mail to {{SUPPORT_EMAIL}}. We reply within 30 days. Legal bases: contract (the license) and legitimate interest (cookieless analytics on the public pages). For data held by Paddle, see Paddle's privacy policy (TO VALIDATE).
+
+## 8. Children
+Not intended for children under 16.
+
+## 9. Contact
+{{SUPPORT_EMAIL}}

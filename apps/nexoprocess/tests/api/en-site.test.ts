@@ -235,3 +235,18 @@ describe('copy da landing: atualizações (K1)', () => {
 
 });
 
+
+describe('variante Paddle dos textos legais (docs/legal-en/paddle): rascunho que o build de venda recusa', () => {
+  const dir = new URL('../../docs/legal-en/paddle', import.meta.url).pathname;
+  it('os 3 textos existem, estão em rascunho e têm pontos TO VALIDATE (nada foi aprovado por engano)', () => {
+    expect(LEGAL_FILES).toHaveLength(3);
+    const problems: string[] = legalGate(dir);
+    for (const f of LEGAL_FILES as string[]) {
+      expect(problems.some((p) => p.startsWith(f) && /status "draft"/.test(p)), f).toBe(true);
+      expect(problems.some((p) => p.startsWith(f) && /TO VALIDATE/.test(p)), f).toBe(true);
+    }
+  });
+  it('os textos aprovados da Gumroad continuam sem menção à Paddle', () => {
+    for (const f of ['TERMS_EN.md', 'PRIVACY_EN.md', 'REFUND_EN.md']) expect(readFileSync(new URL(`../../docs/legal-en/${f}`, import.meta.url), 'utf8')).not.toMatch(/paddle/i);
+  });
+});
