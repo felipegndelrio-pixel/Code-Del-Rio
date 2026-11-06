@@ -294,6 +294,16 @@ export function memoryStore(
       return { result: 'active', status: 'active' };
     },
 
+    /** Dono da compra (platform + transação), para testes das rotas Paddle. */
+    async purchaseOwner(platform, transaction) {
+      for (const rec of data.values()) {
+        if ((rec.platform ?? 'hotmart') === platform && rec.transaction === transaction) {
+          return { email: rec.email, status: rec.status === 'active' ? 'active' : 'refunded', access_active: rec.status === 'active', blocked: false };
+        }
+      }
+      return null;
+    },
+
     async revoke(rec) {
       const email = normalizeEmail(rec.email);
       const tx = normalizeTransaction(rec.transaction);

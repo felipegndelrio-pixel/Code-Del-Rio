@@ -12,6 +12,17 @@ function parseJwk(raw: string | undefined): JsonWebKey | null {
   }
 }
 
+/**
+ * Paddle (canal opcional): a entrada só aparece com as três variáveis públicas válidas (token de cliente,
+ * ambiente e price id). Token test_ = sandbox, live_ = produção; precisam conferir com o ambiente.
+ */
+function paddleFlag(): boolean {
+  const token = (import.meta.env.VITE_PADDLE_CLIENT_TOKEN ?? '').trim();
+  const mode = (import.meta.env.VITE_PADDLE_ENV ?? '').trim();
+  const price = (import.meta.env.VITE_PADDLE_PRICE_ID ?? '').trim();
+  return /^(test|live)_[A-Za-z0-9]{10,64}$/.test(token) && (mode === 'sandbox' || mode === 'production') && (mode === 'sandbox') === token.startsWith('test_') && /^pri_[a-z\d]{26}$/.test(price);
+}
+
 export const LICENSE = {
   required: import.meta.env.VITE_LICENSE_REQUIRED === 'true',
   publicJwk: parseJwk(import.meta.env.VITE_LICENSE_PUBLIC_JWK),
@@ -20,6 +31,9 @@ export const LICENSE = {
   /** Gumroad (EN): e-mail + license key verificados na Gumroad pelo servidor. */
   gumroadEndpoint: '/api/gumroad-license',
   gumroadCheckoutUrl: import.meta.env.VITE_GUMROAD_CHECKOUT_URL ?? '',
+  /** Paddle (EN): e-mail + id da transação (txn_…), conferidos no banco preenchido pelo webhook assinado. */
+  paddleEndpoint: '/api/paddle-license',
+  paddleEnabled: paddleFlag(),
   /** Páginas legais EN (rascunho, publicadas com a landing EN). Vazio = link não aparece. */
   legalEn: {
     terms: import.meta.env.VITE_EN_TERMS_URL ?? '',
@@ -74,10 +88,30 @@ function saveLicenseKey(key: string) {
   }
 }
 
+/** Id da transação Paddle guardado para renovar o acesso (vem do recibo do comprador; não é segredo do servidor). */
+export const TXN_KEY = 'nexo.license.txn';
+
+export function loadTxnId(): string | null {
+  try {
+    return localStorage.getItem(TXN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveTxnId(id: string) {
+  try {
+    localStorage.setItem(TXN_KEY, id);
+  } catch {
+    /* armazenamento bloqueado */
+  }
+}
+
 export function clearToken() {
   try {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(LICENSE_KEY_KEY);
+    localStorage.removeItem(TXN_KEY);
   } catch {
     /* nada a limpar */
   }
@@ -139,6 +173,11 @@ export async function activateGumroad(
     if (!payload) return { ok: false, reason: 'chave_invalida', message: t('license.error.device') };
     saveToken(data.token);
     saveLicenseKey(body.licenseKey.trim());
+    try {
+      localStorage.removeItem(TXN_KEY); // uma compra por aparelho: a última ativação manda
+    } catch {
+      /* nada a limpar */
+    }
     return { ok: true, payload };
   }
   if (r.status === 404 || r.status === 401) return { ok: false, reason: 'nao_encontrado', message: t('license.error.notFound') };
@@ -152,10 +191,76 @@ export async function activateGumroad(
   return { ok: false, reason: 'erro', message: t('license.error.unavailable') };
 }
 
-/** Renovação em segundo plano: com license key guardada vai à Gumroad; sem ela, igual a antes. */
+
+/**
+ * Paddle: { email, transactionId } ativa; { token, transactionId } renova. 404/401 encerram o acesso
+ * (nao_encontrado); 502/503/rede mantêm o token atual até vencer (D-P6). Mensagens no idioma pedido.
+ */
+export async function activatePaddle(
+  body: { email: string; transactionId: string } | { token: string; transactionId: string },
+  locale: Locale = 'en',
+): Promise<ActivateResult> {
+  const t = (k: Parameters<typeof translate>[1]) => translate(locale, k);
+  const payloadBody = 'email' in body ? { email: body.email, transaction_id: body.transactionId } : { token: body.token, transaction_id: body.transactionId };
+  let r: Response;
+  try {
+    r = await fetch(LICENSE.paddleEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadBody) });
+  } catch {
+    return { ok: false, reason: 'offline', message: t('license.error.offline') };
+  }
+  const data = (await r.json().catch(() => ({}))) as { token?: string; error?: string };
+  if (r.ok && data.token) {
+    const payload = LICENSE.publicJwk ? await verifyToken(data.token, LICENSE.publicJwk) : null;
+    if (!payload) return { ok: false, reason: 'chave_invalida', message: t('license.error.device') };
+    saveToken(data.token);
+    saveTxnId(body.transactionId.trim().toLowerCase());
+    try {
+      localStorage.removeItem(LICENSE_KEY_KEY); // uma compra por aparelho: a última ativação manda
+    } catch {
+      /* nada a limpar */
+    }
+    return { ok: true, payload };
+  }
+  if (r.status === 404 || r.status === 401) return { ok: false, reason: 'nao_encontrado', message: t('paddle.error.notFound') };
+  if (r.status === 400) {
+    return data.error === 'id_invalido'
+      ? { ok: false, reason: 'licenca_invalida', message: t('paddle.error.txn') }
+      : { ok: false, reason: 'email_invalido', message: t('license.error.invalidEmail') };
+  }
+  if (r.status === 503) return { ok: false, reason: 'nao_configurado', message: t('license.error.notConfigured') };
+  return { ok: false, reason: 'erro', message: t('license.error.unavailable') };
+}
+
+/** Esperas (ms) entre tentativas quando a compra ainda não chegou pelo webhook: soma ≈ 30 s. */
+export const PADDLE_RETRY_WAITS_MS = [2000, 3000, 5000, 8000, 12000];
+
+/**
+ * Ativa pela Paddle repetindo só enquanto a resposta for "não encontrado" (o checkout pode terminar antes do
+ * webhook gravar a compra). Para na 1ª resposta diferente. onWait é chamado antes de cada espera.
+ */
+export async function activatePaddleWithRetry(
+  body: { email: string; transactionId: string },
+  locale: Locale = 'en',
+  opts: { waits?: number[]; sleep?: (ms: number) => Promise<void>; onWait?: () => void } = {},
+): Promise<ActivateResult> {
+  const waits = opts.waits ?? PADDLE_RETRY_WAITS_MS;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
+  let r = await activatePaddle(body, locale);
+  for (const w of waits) {
+    if (r.ok || r.reason !== 'nao_encontrado') return r;
+    opts.onWait?.();
+    await sleep(w);
+    r = await activatePaddle(body, locale);
+  }
+  return r;
+}
+
+/** Renovação em segundo plano: com license key guardada vai à Gumroad; com id de transação, à Paddle; sem nenhum, igual a antes. */
 export function renew(token: string, locale?: Locale): Promise<ActivateResult> {
   const key = loadLicenseKey();
-  return key ? activateGumroad({ token, licenseKey: key }, locale) : activate({ token });
+  if (key) return activateGumroad({ token, licenseKey: key }, locale);
+  const txn = loadTxnId();
+  return txn ? activatePaddle({ token, transactionId: txn }, locale) : activate({ token });
 }
 
 /** E-mail do token salvo, sem verificar (só para exibir). */

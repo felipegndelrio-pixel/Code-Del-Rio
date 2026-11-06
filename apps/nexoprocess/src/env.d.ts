@@ -14,6 +14,10 @@ interface ImportMetaEnv {
   readonly VITE_SUPPORT_EMAIL?: string;
   /** Link de compra na Gumroad (entrada EN). */
   readonly VITE_GUMROAD_CHECKOUT_URL?: string;
+  /** Paddle (EN, opcional): as três juntas ligam a entrada Paddle e a compra na landing. */
+  readonly VITE_PADDLE_CLIENT_TOKEN?: string;
+  readonly VITE_PADDLE_ENV?: string;
+  readonly VITE_PADDLE_PRICE_ID?: string;
   /** Páginas legais EN (landing EN). Vazio = link não aparece. */
   readonly VITE_EN_TERMS_URL?: string;
   readonly VITE_EN_PRIVACY_URL?: string;

@@ -11,6 +11,7 @@ import { SupportLink } from '../components/SupportLink';
 import { useI18n } from '../i18n/I18nProvider';
 import { activateGumroad, LICENSE } from '../license/config';
 import { endDemo } from '../license/demo';
+import PaddleEntryEn from './PaddleEntryEn';
 
 const linkCls = 'font-semibold text-brand underline';
 
@@ -125,6 +126,8 @@ export default function LoginEn({ volta, motivo, onDemo }: { volta: string; moti
             {t('login.submit')}
           </Button>
         </form>
+
+        {LICENSE.paddleEnabled && <PaddleEntryEn volta={volta} />}
 
         <div className="mt-4 rounded-2xl border border-dashed border-line/30 p-4">
           <p className="text-sm font-semibold text-ink">{t('login.demo.title')}</p>
