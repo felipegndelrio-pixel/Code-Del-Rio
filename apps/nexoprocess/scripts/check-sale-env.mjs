@@ -6,7 +6,7 @@
 // entrada EN sairia sem botão de compra e sem links legais, em silêncio. A troca PT de sábado usa a TAG v2.5.0-rc1, que não tem esta exigência.
 import { fileURLToPath } from 'node:url';
 import { jwkFingerprint, jwkImportProblem, jwkProblems, parseJwkText } from '../src/license/jwk.mjs';
-import { draftPages, legalGate } from './lib/en-site.mjs';
+import { draftPages, legalGate, paddleConfig } from './lib/en-site.mjs';
 
 const errors = [];
 // Chave pública do build: JSON (sem aspas "inteligentes": o app a lê com JSON.parse), kty EC, crv P-256, x e y de 43 caracteres
@@ -46,6 +46,17 @@ if (drafts.length) errors.push(`Páginas EN ainda em rascunho (faixa DRAFT): ${d
 // Aprovação jurídica explícita: cada docs/legal-en/*.md precisa de "status: approved" e não pode ter "TO VALIDATE"/"DRAFT".
 const legalDir = process.env.NEXO_LEGAL_DIR || fileURLToPath(new URL('../docs/legal-en', import.meta.url));
 errors.push(...legalGate(legalDir).map((p) => `Texto legal EN não aprovado: ${p}`));
+// Paddle (opcional): as VITE_PADDLE_* só valem juntas e válidas; ligadas, exigem as origens do checkout no CSP de /en/ (sem elas o
+// checkout seria bloqueado em silêncio) e os textos legais da variante Paddle aprovados pelo fundador (docs/legal-en/paddle/).
+{
+  const pc = paddleConfig(process.env);
+  errors.push(...pc.problems);
+  if (pc.enabled) {
+    if (!pc.frame.length) errors.push('VITE_PADDLE_CSP_FRAME ausente (origem do checkout da Paddle; descubra no sandbox, PADDLE_ENTITLEMENT.md, checklist).');
+    const paddleLegal = process.env.NEXO_LEGAL_PADDLE_DIR || fileURLToPath(new URL('../docs/legal-en/paddle', import.meta.url));
+    errors.push(...legalGate(paddleLegal).map((p) => `Texto legal Paddle não aprovado: ${p}`));
+  }
+}
 if (errors.length) {
   console.error(`Build de venda NÃO gerado:\n- ${errors.join('\n- ')}`);
   process.exit(1);

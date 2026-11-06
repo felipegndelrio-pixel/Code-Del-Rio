@@ -79,9 +79,9 @@ describe('páginas estáticas EN: sem dependência externa, sem script', () => {
       for (const m of h.matchAll(/href="((?:terms|privacy|refund)\.html)"/g)) expect(existsSync(SITE + m[1])).toBe(true);
     });
   }
-  it('index: só estes marcadores (analytics, compra, dias offline e suporte) e título/descrição presentes', () => {
+  it('index: só estes marcadores (analytics, compra, compra Paddle opcional, dias offline e suporte) e título/descrição presentes', () => {
     const h = readFileSync(SITE + 'index.html', 'utf8');
-    expect([...new Set(h.match(/\{\{[A-Z_]+\}\}/g))].sort()).toEqual(['{{CF_WA_SNIPPET}}', '{{GUMROAD_CHECKOUT_URL}}', '{{LICENSE_OFFLINE_DAYS}}', '{{SUPPORT_EMAIL}}']);
+    expect([...new Set(h.match(/\{\{[A-Z_]+\}\}/g))].sort()).toEqual(['{{CF_WA_SNIPPET}}', '{{GUMROAD_CHECKOUT_URL}}', '{{LICENSE_OFFLINE_DAYS}}', '{{PADDLE_BUY_BUTTON}}', '{{PADDLE_SCRIPTS}}', '{{SUPPORT_EMAIL}}']);
     expect(h).toContain('From process spreadsheet to improvement plan.');
     expect(h).toContain('href="/entrar?lang=en"');
     expect(h).toMatch(/<meta name="description" content="[^"]{60,}/);

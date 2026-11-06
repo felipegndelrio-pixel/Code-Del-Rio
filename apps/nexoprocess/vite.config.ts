@@ -79,7 +79,7 @@ export default defineConfig(({ mode }) => {
         enforce: 'post',
         closeBundle() {
           if (single) return;
-          injectDist(import.meta.dirname + '/dist', env, { sale: env.VITE_LICENSE_REQUIRED === 'true' });
+          injectDist(env.NEXO_EN_DIST || import.meta.dirname + '/dist', env, { sale: env.VITE_LICENSE_REQUIRED === 'true' }); // NEXO_EN_DIST: só para builds de teste com outro --outDir
         },
       },
       {
