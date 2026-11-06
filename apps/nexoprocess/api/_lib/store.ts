@@ -28,6 +28,14 @@ export interface PurchaseState {
   access_active: boolean;
 }
 
+export interface PurchaseOwner {
+  email: string;
+  status: string;
+  access_active: boolean;
+  /** Há bloqueio de conciliação aberto no e-mail (corta todo o acesso). */
+  blocked: boolean;
+}
+
 export interface LicenseStore {
   kind: 'supabase' | 'allowlist' | 'memory';
   lookup(email: string): Promise<LicenseStatus | null>;
@@ -35,6 +43,8 @@ export interface LicenseStore {
   revoke(rec: Omit<LicenseRecord, 'status'>): Promise<LicenseStatus>;
   /** Estado de uma compra (platform, transação), ou null. Usado pela Gumroad (disputa ganha). */
   purchaseState?(platform: string, transaction: string): Promise<PurchaseState | null>;
+  /** Dono (e-mail) e estado de uma compra, ou null. Usado pela Paddle (ativação e revogação). */
+  purchaseOwner?(platform: string, transaction: string): Promise<PurchaseOwner | null>;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -147,6 +157,27 @@ export function supabaseStore(
         throw new Error('Supabase purchaseState: resposta inesperada');
       }
       return { status, access_active };
+    },
+
+    async purchaseOwner(platform, transaction) {
+      const r = await fetchImpl(`${root}/rpc/nexo_purchase_owner`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ p_platform: platform, p_transaction: transaction }),
+      });
+      if (!r.ok) {
+        throw new Error(`Supabase purchaseOwner: HTTP ${r.status}`);
+      }
+      const body: unknown = await r.json().catch(() => undefined);
+      if (body === null) return null;
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        throw new Error('Supabase purchaseOwner: resposta inesperada');
+      }
+      const { email, status, access_active, blocked } = body as Record<string, unknown>;
+      if (typeof email !== 'string' || typeof status !== 'string' || typeof access_active !== 'boolean' || typeof blocked !== 'boolean') {
+        throw new Error('Supabase purchaseOwner: resposta inesperada');
+      }
+      return { email, status, access_active, blocked };
     },
 
     async revoke(rec) {
