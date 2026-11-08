@@ -157,7 +157,8 @@ Normal depois de 30 dias offline. O cliente digita e-mail e chave de novo (preci
 ### 2.8 Bloqueio aberto (consulta B)
 Um bloqueio aberto corta o acesso de **todas** as compras daquele e-mail. Leia `reason`, corrija a causa (ex.: id inválido → conceder manual 13.2) e só então resolva com 13.4. Se não entender o `reason`, **não resolva**: chame a engenharia.
 
-### 2.9 Respostas-modelo (rascunho em inglês; `SUPPORT_EN` não existe no repositório)
+### 2.9 Respostas-modelo (rascunho em inglês)
+O `SUPPORT_EN.md` existe, mas na branch `wip/paddle` (sessão 5): **a juntar** (ainda não está nesta branch). Até lá, use estas 4 respostas curtas.
 - Pedido de dados: "Hi! Please reply with the email you used at checkout and a screenshot of your Gumroad receipt (the license key is on it). Thanks!"
 - Chave errada: "That key does not match a purchase. Please copy it again from the receipt, with no spaces, and sign in with the purchase email."
 - Concessão manual feita: "Done — your access is active. Please sign in again with your purchase email and license key."
@@ -265,6 +266,6 @@ order by quando desc;
 ---
 
 ## 5. O que esta sessão NÃO verificou
-- Nenhuma consulta SQL deste guia foi executada contra um banco real (não há acesso); os nomes de tabelas e colunas vêm de `api/_lib/schema-purchases.sql`.
+- Nenhuma consulta SQL deste guia foi executada contra o seu banco de produção (não há acesso); os nomes de tabelas e colunas vêm de `api/_lib/schema-purchases.sql`. As funções `nexo_*` citadas têm testes de integração (`tests/integration/store.postgres.test.ts`).
 - O comando PowerShell e os nomes de menu da Cloudflare, Gumroad e Supabase estão marcados **A VALIDAR**.
 - O estado de produção (deploy, V5=200, KYC da Stripe) é informação do revisor.
