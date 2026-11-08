@@ -142,3 +142,69 @@ describe('check-sale-env com Paddle', () => {
     expect(r.out).toContain('VITE_PADDLE_ENV ausente');
   });
 });
+
+describe('modo staging-paddle (check-sale-env --staging-paddle e nexo:build:staging-paddle)', () => {
+  const pub = JSON.stringify(generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ format: 'jwk' }));
+  const legal = (status: string) => {
+    const d = mkdtempSync(join(tmpdir(), 'legal-'));
+    for (const f of ['TERMS_EN.md', 'PRIVACY_EN.md', 'REFUND_EN.md']) writeFileSync(join(d, f), `---\nstatus: ${status}\n---\n# ${f}\n`);
+    return d;
+  };
+  const CLEAN = mkdtempSync(join(tmpdir(), 'site-'));
+  writeFileSync(join(CLEAN, 'index.html'), '<body>ok</body>');
+  const GOOD = { VITE_LICENSE_PUBLIC_JWK: pub, VITE_HOTMART_CHECKOUT_URL: 'https://pay.hotmart.com/x', VITE_SUPPORT_EMAIL: 's@example.com', VITE_GUMROAD_CHECKOUT_URL: 'https://x.gumroad.com/l/n', VITE_EN_TERMS_URL: 'https://e.com/t', VITE_EN_PRIVACY_URL: 'https://e.com/p', VITE_EN_REFUND_URL: 'https://e.com/r', VITE_CF_WA_TOKEN: 'abcdef0123456789abcdef0123456789' };
+  const SANDBOX = { VITE_PADDLE_CLIENT_TOKEN: 'test_0123456789abcdef0123456789', VITE_PADDLE_ENV: 'sandbox', VITE_PADDLE_PRICE_ID: `pri_${'a1'.repeat(13)}` };
+  // NEXO_LEGAL_PADDLE_DIR NÃO é definido: vale o diretório REAL docs/legal-en/paddle, que está em rascunho.
+  const run = (script: string, args: string[], over: Record<string, string>, legalDir = legal('approved')) => {
+    const env: Record<string, string> = { PATH: process.env.PATH ?? '', NEXO_EN_SITE_DIR: CLEAN, NEXO_LEGAL_DIR: legalDir, ...GOOD, ...over };
+    const r = spawnSync(process.execPath, [`${ROOT}scripts/${script}`, ...args], { env, encoding: 'utf8' });
+    return { code: r.status, out: `${r.stdout}${r.stderr}` };
+  };
+  const staging = (over: Record<string, string>, legalDir?: string) => run('check-sale-env.mjs', ['--staging-paddle'], over, legalDir);
+
+  it('4 combinações ambiente × token: só sandbox + test_ passa (com os textos Paddle reais em rascunho)', () => {
+    const ok = staging(SANDBOX);
+    expect(ok.code).toBe(0);
+    for (const [name, over] of [
+      ['sandbox + live_', { ...SANDBOX, VITE_PADDLE_CLIENT_TOKEN: 'live_0123456789abcdef0123456789' }],
+      ['production + test_', { ...SANDBOX, VITE_PADDLE_ENV: 'production' }],
+      ['production + live_', { ...SANDBOX, VITE_PADDLE_ENV: 'production', VITE_PADDLE_CLIENT_TOKEN: 'live_0123456789abcdef0123456789' }],
+    ] as [string, Record<string, string>][]) {
+      const r = staging(over);
+      expect(r.code, name).toBe(1);
+      expect(r.out, name).toMatch(/staging-paddle RECUSADO/);
+      expect(r.out, name).not.toMatch(/NÃO PUBLICAR/); // nada de "ok" com aviso: recusa
+    }
+  });
+  it('aviso grande no console quando aceita; avisa da falta de VITE_PADDLE_CSP_FRAME sem recusar', () => {
+    const r = staging(SANDBOX);
+    expect(r.out).toContain('BUILD DE STAGING COM PADDLE EM SANDBOX. NÃO PUBLICAR EM PRODUÇÃO, NÃO VENDER.');
+    expect(r.out).toContain('RASCUNHO');
+    expect(r.out).toContain('VITE_PADDLE_CSP_FRAME ausente');
+    expect(staging({ ...SANDBOX, VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test' }).out).not.toContain('CSP_FRAME ausente');
+  });
+  it('modo staging sem Paddle configurada, ou incompleta, é recusado (não vira build de venda por engano)', () => {
+    expect(staging({}).code).toBe(1);
+    expect(staging({ VITE_PADDLE_CLIENT_TOKEN: SANDBOX.VITE_PADDLE_CLIENT_TOKEN, VITE_PADDLE_ENV: 'sandbox' }).code).toBe(1);
+  });
+  it('build de venda NORMAL continua recusando rascunho Paddle, mesmo em sandbox/test_ e mesmo com a variável de ambiente', () => {
+    const r = run('check-sale-env.mjs', [], { ...SANDBOX, VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test', NEXO_STAGING_PADDLE: '1' });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/Texto legal Paddle não aprovado/);
+  });
+  it('o modo staging NÃO afrouxa os textos legais da Gumroad nem o resto do build de venda', () => {
+    const pending = legal('draft');
+    const r = staging(SANDBOX, pending);
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/Texto legal EN não aprovado/);
+    expect(staging({ ...SANDBOX, VITE_GUMROAD_CHECKOUT_URL: '' }).code).toBe(1);
+  });
+  it('nexo:build:staging-paddle recusa produção/live_ antes de qualquer build; build-sale.mjs não passa o argumento de staging', () => {
+    const r = run('build-staging-paddle.mjs', [], { ...SANDBOX, VITE_PADDLE_ENV: 'production', VITE_PADDLE_CLIENT_TOKEN: 'live_0123456789abcdef0123456789' });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/staging-paddle RECUSADO/);
+    expect(r.out).not.toMatch(/Commit do build/);
+    expect(readFileSync(`${ROOT}scripts/build-sale.mjs`, 'utf8')).not.toMatch(/staging-paddle|NEXO_STAGING/);
+    expect(readFileSync(`${ROOT}../../package.json`, 'utf8')).toContain('"nexo:build:staging-paddle": "node apps/nexoprocess/scripts/build-staging-paddle.mjs"');
+  });
+});

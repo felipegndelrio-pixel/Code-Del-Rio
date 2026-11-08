@@ -27,6 +27,7 @@
     "nexo:test": "vitest run -c apps/nexoprocess/vitest.config.ts",
     "nexo:e2e": "playwright test -c apps/nexoprocess/playwright.config.ts",
     "nexo:build:venda": "node apps/nexoprocess/scripts/build-sale.mjs",
+    "nexo:build:staging-paddle": "node apps/nexoprocess/scripts/build-staging-paddle.mjs",
     "nexo:build:single": "SINGLEFILE=true VITE_ROUTER=hash vite build --config apps/nexoprocess/vite.config.ts",
     "nexo:build:preview-file": "npm run nexo:build:single",
     "nexo:lint": "eslint apps/nexoprocess",

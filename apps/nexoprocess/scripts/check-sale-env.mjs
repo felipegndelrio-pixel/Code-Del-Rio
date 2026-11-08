@@ -48,10 +48,23 @@ const legalDir = process.env.NEXO_LEGAL_DIR || fileURLToPath(new URL('../docs/le
 errors.push(...legalGate(legalDir).map((p) => `Texto legal EN não aprovado: ${p}`));
 // Paddle (opcional): as VITE_PADDLE_* só valem juntas e válidas; ligadas, exigem as origens do checkout no CSP de /en/ (sem elas o
 // checkout seria bloqueado em silêncio) e os textos legais da variante Paddle aprovados pelo fundador (docs/legal-en/paddle/).
+// MODO STAGING (só com o argumento --staging-paddle, que apenas scripts/build-staging-paddle.mjs passa): aceita os textos Paddle em
+// rascunho e a ausência das origens do checkout (o fundador as descobre no console, PADDLE_ENTITLEMENT.md §14), MAS só com
+// VITE_PADDLE_ENV=sandbox E token test_. Qualquer outra combinação é recusada. O build de venda normal não muda.
 {
+  const staging = process.argv.includes('--staging-paddle');
   const pc = paddleConfig(process.env);
   errors.push(...pc.problems);
-  if (pc.enabled) {
+  if (staging) {
+    const sandbox = (process.env.VITE_PADDLE_ENV ?? '').trim() === 'sandbox' && (process.env.VITE_PADDLE_CLIENT_TOKEN ?? '').trim().startsWith('test_');
+    if (!sandbox) errors.push('Modo staging-paddle RECUSADO: exige VITE_PADDLE_ENV=sandbox E VITE_PADDLE_CLIENT_TOKEN começando com test_. Com produção/live_ use o build de venda normal (textos Paddle aprovados).');
+    else if (!pc.enabled) errors.push('Modo staging-paddle exige as três VITE_PADDLE_* (token test_, ambiente sandbox, price id) válidas.');
+    else {
+      const bar = '#'.repeat(78);
+      console.warn(`\n${bar}\n##  BUILD DE STAGING COM PADDLE EM SANDBOX. NÃO PUBLICAR EM PRODUÇÃO, NÃO VENDER.\n##  Os textos legais da variante Paddle estão em RASCUNHO e foram aceitos só por este modo.\n##  Vale somente para teste com cartão de teste no domínio de staging (docs/PADDLE_ENTITLEMENT.md §14).\n${bar}\n`);
+      if (!pc.frame.length) console.warn('AVISO: VITE_PADDLE_CSP_FRAME ausente: o checkout será bloqueado pelo CSP de /en/ até você informar a origem (leia as violações no console do navegador, §14 item 14).');
+    }
+  } else if (pc.enabled) {
     if (!pc.frame.length) errors.push('VITE_PADDLE_CSP_FRAME ausente (origem do checkout da Paddle; descubra no sandbox, PADDLE_ENTITLEMENT.md, checklist).');
     const paddleLegal = process.env.NEXO_LEGAL_PADDLE_DIR || fileURLToPath(new URL('../docs/legal-en/paddle', import.meta.url));
     errors.push(...legalGate(paddleLegal).map((p) => `Texto legal Paddle não aprovado: ${p}`));
