@@ -134,7 +134,7 @@ Regras:
 - **Hosts do checkout (iframe e rede): NÃO constam nas páginas consultadas.** Por isso vêm das variáveis acima e são **A VALIDAR no sandbox** (abrir o checkout, ler as violações de CSP no console e copiar as origens). Sem `VITE_PADDLE_CSP_FRAME` o build de venda é recusado.
 - **Retorno do checkout:** `checkout.completed` (Paddle.js) leva a `/entrar?lang=en#txn=…&email=…`. **Desvio deliberado da sugestão do revisor:** os dados vão no **fragmento** (`#`), não na query, para não aparecerem no log do servidor nem no Referer; a tela os lê e apaga o fragmento. Com os dois preenchidos a ativação começa sozinha e, em 404, repete (esperas de 2, 3, 5, 8 e 12 s, ≈ 30 s) mostrando "Finishing your purchase…"; depois, a mensagem normal.
 - **Entrada:** seção "Bought with Paddle?" (e-mail + id da transação) só com as variáveis; o formulário Gumroad não muda. A renovação usa `/api/paddle-license` quando há id de transação guardado (`nexo.license.txn`); a última ativação (Gumroad ou Paddle) apaga a outra credencial no aparelho.
-- **Build de venda com Paddle** exige também os textos legais da variante Paddle aprovados (`docs/legal-en/paddle/`, P5): enquanto estiverem em rascunho, o build é recusado.
+- **Build de venda com Paddle** exige também os textos legais da variante Paddle aprovados (`docs/legal-en/paddle/`, P5): enquanto estiverem em rascunho, o build é recusado. **Única exceção:** `npm run nexo:build:staging-paddle` (S1), só com `VITE_PADDLE_ENV=sandbox` e token `test_`, com aviso grande no console; nunca publicar esse build em produção.
 - **Verificado:** vitest (cliente, build, script) e e2e em Chromium com Paddle.js **simulado** e a rota real `/api/paddle-license`. **NÃO verificado:** Paddle.js real, checkout real, CSP real em Pages (`nexo:test:csp` precisa do wrangler), Safari/Android.
 
 ## 6. Sandbox (FATOS [P7, P10])
@@ -216,31 +216,93 @@ Escala 1 a 5; RPN = S×O×D.
 | D-P7 | Conta Paddle (cadastro, aprovação, dados pessoais) | Ação do fundador | Aberta |
 | D-P8 | `chargeback_warning` revoga (o valor já foi devolvido) ou só avisa (como o SQL faz com a Hotmart)? | Revogar | **Implementado revogando; confirmar.** Alternativa: gravar `PADDLE_CHARGEBACK_WARNING` (mantém acesso) |
 | D-P9 | Se o recibo não mostrar o `txn_…`: aceitar `invoice_number` (migração) ou página de sucesso com o id | Decidir após ver o recibo do sandbox | Via (a') `checkout.completed` aprovada pelo revisor e implementada (P4); recibo e `successUrl` no checklist §14 |
-| D-P10 | Testar no sandbox com a variante Paddle ainda em rascunho: usar build de staging fora do `check-sale-env` (A VALIDAR), ou aprovar os rascunhos antes | Staging para o sandbox; aprovar só para vender | Aberta |
+| D-P10 | Testar no sandbox com a variante Paddle ainda em rascunho | Modo de build só para staging | **Resolvida (S1, 08/11/2026):** `npm run nexo:build:staging-paddle` aceita os rascunhos Paddle **apenas** com `VITE_PADDLE_ENV=sandbox` e token `test_`; recusa qualquer outra combinação; o build de venda normal segue recusando rascunho. Roteiro na §14 |
 
-## 14. Checklist do sandbox (P6): passos do fundador quando a conta Paddle sair
+## 14. Roteiro do sandbox no staging (P6/S3): passos do fundador
 
-Versão 1, 06/11/2026. Executar **no sandbox** (conta separada; nada de dinheiro real), em um domínio de teste/staging, **antes** de qualquer venda. Marque cada linha com o resultado e a data. **Nunca anote nem cole valores de segredos** (chave de API, token, segredo do destino): só o nome, o tamanho e "ok/falhou". O que for "A VALIDAR" no resto do documento se resolve aqui.
+Versão 2, 08/11/2026. Executar **no sandbox da Paddle** (conta separada; sem dinheiro real) e no **staging** (`https://staging-en.nexoprocess.pages.dev`, ramo `staging-en`, ambiente **Preview** da Cloudflare). **Nunca cole nem anote o valor de segredos** (chave de API, segredo do destino) em chat, e-mail ou repositório: só nome, tamanho e "ok/falhou". Tudo que está "A VALIDAR" se resolve neste roteiro. Nenhum comando aqui foi executado por quem escreveu (sem acesso à Paddle, à Cloudflare nem ao seu PC).
 
-**Pré-requisito de venda (todos os itens "Bloqueia a venda" precisam passar).**
+**Fatos usados (doc oficial, lida em 08/11/2026):** o sandbox é uma conta separada (https://sandbox-vendors.paddle.com/signup); chave de API de sandbox contém `_sdbx` e token de cliente começa com `test_`; no sandbox não precisa de aprovação do site; reembolsos são aprovados sozinhos **a cada 10 minutos**; e-mails só chegam ao domínio da conta, os demais (inclusive gmail/hotmail) são **encaminhados ao e-mail principal da conta** (https://developer.paddle.com/sdks/sandbox); cartões de teste: `4242 4242 4242 4242` (sem 3DS), `4000 0038 0000 0446` (com 3DS), `4000 0000 0000 0002` (recusado), qualquer nome e validade futura (mesma página).
 
-### 14.1 Preparar a conta (uma vez)
-| # | Passo | Onde / fonte | Resultado |
-|---|---|---|---|
-| 1 | Criar a conta **sandbox** (separada da live) | https://sandbox-vendors.paddle.com/signup (P7) | |
-| 2 | Criar o **produto** e o **preço** do NexoProcess (pagamento único, US$ 39). Anotar os ids `pro_…` e `pri_…` (26 caracteres após o prefixo) | Paddle > Catalog | |
-| 3 | Criar a **chave de API** com **só a permissão `customer.read`**. Ela contém `_sdbx` (`pdl_sdbx_apikey_…`) | Paddle > My account > Settings > Authentication > API keys (P9) | |
-| 4 | Criar o **token de cliente** (começa com `test_`) | mesma tela, aba de tokens de cliente | |
-| 5 | Criar o **destino de notificação**: tipo URL, endereço `https://<domínio de teste>/api/paddle-webhook`, eventos `transaction.completed`, `adjustment.created`, `adjustment.updated` (só esses três), **uso (`traffic_source`) = "Platform and simulation"** no sandbox para poder usar o simulador; copiar o **segredo do destino** | Paddle > Events > Notifications (P10) | |
-| 6 | No painel da Cloudflare (ambiente de teste), criar as variáveis **só pelo nome**: `PADDLE_WEBHOOK_SECRET`, `PADDLE_ENV=sandbox`, `PADDLE_PRODUCT_ID`, `PADDLE_API_KEY`, e as já existentes (`LICENSE_PRIVATE_JWK`, `SUPABASE_*`). `PADDLE_SIGNATURE_TOLERANCE_SEC` só se o item 12 mandar | `DEPLOY_CLOUDFLARE.md` | |
-| 7 | **WAF / bot:** liberar o caminho `/api/paddle-webhook` das regras de bot (a Paddle pede isso) e, se quiser, restringir aos IPs de **sandbox** (§3 deste documento) e ao user agent `Paddle` | Cloudflare > Security (P3) | |
-| 8 | Build de teste com as variáveis públicas: `VITE_PADDLE_CLIENT_TOKEN` (`test_…`), `VITE_PADDLE_ENV=sandbox`, `VITE_PADDLE_PRICE_ID`. **`VITE_PADDLE_CSP_FRAME` só depois do item 14** (sem ela o build de venda é recusado; para o 1º teste use o build de staging, `npm run nexo:build` com `VITE_LICENSE_REQUIRED=true`, que não passa por `check-sale-env`; A VALIDAR) | §4 do P4 | |
+### 14.1 Passo (a): na Paddle sandbox
+1. Entre em https://sandbox-vendors.paddle.com (conta já criada).
+2. **Catalog > Products**: crie o produto "NexoProcess" e, nele, um **preço** de pagamento único (US$ 39). Anote **só os ids**: `pro_…` (produto) e `pri_…` (preço). O `pro_…` vai em `PADDLE_PRODUCT_ID`; o `pri_…` em `VITE_PADDLE_PRICE_ID`.
+3. **Paddle > My account > Settings > Authentication**: confira que existem a **chave de API** de sandbox com **só a permissão `customer.read`** (contém `_sdbx`) e o **token de cliente** (`test_…`). Se a chave tiver mais permissões, crie outra só com `customer.read` e apague a antiga.
+4. **Paddle > Events > Notifications > New destination**: tipo **URL**; endereço `https://staging-en.nexoprocess.pages.dev/api/paddle-webhook`; eventos: **só** `transaction.completed`, `adjustment.created` e `adjustment.updated`; uso (`traffic_source`) **Platform and simulation**. Salve e copie a **chave secreta do destino** (Edit destination > ícone de copiar): ela vira `PADDLE_WEBHOOK_SECRET` no passo (b).
 
-### 14.2 Verificações (cada uma com resultado e evidência)
+### 14.2 Passo (b): Cloudflare, ambiente **Preview** (projeto `nexoprocess`)
+Cloudflare > Workers & Pages > `nexoprocess` > Settings > Variables and Secrets > **Preview** (os nomes de menu são A VALIDAR). Crie, **só no Preview**:
+
+| Nome | Tipo | Valor |
+|---|---|---|
+| `PADDLE_ENV` | texto | `sandbox` |
+| `PADDLE_PRODUCT_ID` | texto | o `pro_…` do passo (a) |
+| `PADDLE_API_KEY` | **Secret** | a chave de API de sandbox (`pdl_sdbx_apikey_…`) |
+| `PADDLE_WEBHOOK_SECRET` | **Secret** | a chave secreta do destino |
+
+Já devem existir no Preview as do staging: `LICENSE_PRIVATE_JWK`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (do Supabase **de staging**). `PADDLE_SIGNATURE_TOLERANCE_SEC` só se o item 12 da §14.4 mandar. **As variáveis só valem no próximo deployment**: crie todas **antes** do passo (c).
+
+### 14.3 Passo (c): build e deploy de staging (Windows, PowerShell, **uma sessão só**)
+O build de staging usa `npm run nexo:build:staging-paddle`. Ele **aceita os textos legais Paddle em rascunho** só se `VITE_PADDLE_ENV=sandbox` **e** o token começa com `test_`; com produção ou `live_` ele **recusa**. O build de venda normal (`nexo:build:venda`) continua recusando rascunho. As 4 variáveis `VITE_*` da Paddle são **públicas** (vão no JavaScript); os segredos do passo (b) **não** entram no build.
+```powershell
+# 1) Clone limpo, em pasta nova, no commit fixo informado pelo revisor
+cd $env:USERPROFILE
+git clone https://github.com/felipegndelrio-pixel/Code-Del-Rio.git nexo-paddle-staging
+cd nexo-paddle-staging
+$SHA = Read-Host 'SHA do commit (informado pelo revisor)'
+git checkout $SHA
+git status --short          # tem de ficar vazio
+git rev-parse HEAD          # tem de ser igual ao SHA informado
+
+# 2) Variáveis do build, uma por linha, só nesta sessão (nada vai para arquivo)
+$env:VITE_LICENSE_PUBLIC_JWK       = (Get-Clipboard -Raw).Trim()   # ANTES: copie a linha PÚBLICA da chave de STAGING
+$env:VITE_HOTMART_CHECKOUT_URL     = Read-Host 'VITE_HOTMART_CHECKOUT_URL'
+$env:VITE_SUPPORT_EMAIL            = Read-Host 'VITE_SUPPORT_EMAIL'
+$env:VITE_GUMROAD_CHECKOUT_URL     = Read-Host 'VITE_GUMROAD_CHECKOUT_URL'
+$env:VITE_EN_TERMS_URL             = Read-Host 'VITE_EN_TERMS_URL'
+$env:VITE_EN_PRIVACY_URL           = Read-Host 'VITE_EN_PRIVACY_URL'
+$env:VITE_EN_REFUND_URL            = Read-Host 'VITE_EN_REFUND_URL'
+$env:VITE_CF_WA_TOKEN              = Read-Host 'VITE_CF_WA_TOKEN'
+$env:VITE_PADDLE_ENV               = 'sandbox'
+$env:VITE_PADDLE_CLIENT_TOKEN      = Read-Host 'VITE_PADDLE_CLIENT_TOKEN (comeca com test_)'
+$env:VITE_PADDLE_PRICE_ID          = Read-Host 'VITE_PADDLE_PRICE_ID (pri_...)'
+$env:VITE_PADDLE_CSP_FRAME         = Read-Host 'VITE_PADDLE_CSP_FRAME (deixe VAZIO no 1o build; ver 14.5)'
+$env:VITE_PADDLE_CSP_CONNECT       = Read-Host 'VITE_PADDLE_CSP_CONNECT (deixe VAZIO no 1o build; ver 14.5)'
+
+# 3) Build de staging (recusa produção/live_; mostra o aviso grande) e deploy SÓ no ramo de staging
+npm ci
+npm run nexo:build:staging-paddle
+$GIT_COMMIT = git rev-parse HEAD
+cd apps/nexoprocess
+npx wrangler pages deploy dist --project-name nexoprocess --branch staging-en --commit-hash $GIT_COMMIT --commit-dirty=false
+```
+- Os textos entre aspas em `Read-Host` são só rótulos; **você digita o valor**. Para o 1º build, aperte Enter nas duas linhas de CSP (variável vazia = ausente; o build aceita isso **apenas** no modo staging).
+- O terminal deve mostrar o quadro `BUILD DE STAGING COM PADDLE EM SANDBOX. NÃO PUBLICAR EM PRODUÇÃO, NÃO VENDER.` e `Commit do build de staging: <SHA>`. Se aparecer `Modo staging-paddle RECUSADO`, confira `VITE_PADDLE_ENV` e o prefixo `test_` (nada foi gerado).
+- **Não use `--branch main`** com este build.
+- A VALIDAR: o endereço do repositório e o nome do ramo/projeto (aqui os do pedido do revisor).
+
+### 14.4 Passo (d): o teste (e a verificação por etapa)
+Cada linha com resultado e evidência. As com **"Bloqueia a venda"** precisam passar antes de qualquer venda real.
+
+**Sequência (faça nesta ordem; a tabela abaixo detalha o que conferir em cada etapa):**
+1. Abra `https://staging-en.nexoprocess.pages.dev/en/` no **Chrome do PC**, com o console aberto (F12 > Console) e clique em **Buy with Paddle**. Se o checkout **não abrir** ou o console mostrar `Refused to frame` / `Refused to connect`, vá para **14.5** e refaça o build (14.3) com as origens; depois volte aqui.
+2. No checkout (aparece a marca "Test Mode"): e-mail que você consulta (**gmail/hotmail são encaminhados ao e-mail principal da conta Paddle**, então o recibo chega lá), país qualquer, cartão `4242 4242 4242 4242`, nome qualquer, validade futura. Pague.
+3. Você deve voltar sozinho para `/entrar?lang=en` e **entrar no app** (pode aparecer "Finishing your purchase…" por alguns segundos). Se aparecer a mensagem 404 depois de ~30 s, o webhook não chegou: vá para o item 9.
+4. **Conferir o banco do staging** (Supabase de **staging** > SQL Editor), com o `txn_…` da compra (consulta P-D de `OPERACAO_EN.md` §6.1):
+```sql
+select platform, transaction_id, email, status, access_active, amount, currency, last_event
+  from public.nexo_purchases
+ where platform = 'paddle' and transaction_id = 'COLE_O_TXN_AQUI_EM_MINUSCULAS';
+```
+   Esperado: `status = 'active'`, `access_active = true`, `last_event = 'PADDLE_TRANSACTION_COMPLETED'`.
+5. **Reembolsar no sandbox:** Paddle sandbox > Transactions > a compra > Refund (total). O sandbox aprova sozinho **em até 10 minutos**. Rode a mesma consulta de novo: esperado `status = 'refunded'` e `access_active = false`.
+6. **Conferir a revogação no app:** no staging, saia e entre de novo com e-mail + `txn_…`: deve aparecer "We couldn’t find an active purchase matching this email address and transaction ID". Quem ficou logado perde o acesso na próxima verificação (até 1 h online).
+
+
 | # | O que conferir | Como | Passa se | Bloqueia a venda? | Resultado |
 |---|---|---|---|---|---|
 | 9 | **Webhook assinado chega e é aceito** | Fazer uma compra de teste (cartão `4242 4242 4242 4242`, validade futura, qualquer nome). Ver em Paddle > Events > Notifications o status de `transaction.completed` e, no log da função, `paddle transaction.completed → active` | Status "delivered" (200); compra gravada (consulta §13.1 do runbook Gumroad, com `platform='paddle'`) | **Sim** | |
-| 10 | **Assinatura inválida é recusada** | `curl -X POST` ao endereço do webhook sem o cabeçalho `Paddle-Signature` | 401; nada gravado | **Sim** | |
+| 10 | **Assinatura inválida é recusada** | no PowerShell: `try { Invoke-WebRequest -Method Post -Uri 'https://staging-en.nexoprocess.pages.dev/api/paddle-webhook' -Body '{}' -ContentType 'application/json' } catch { $_.Exception.Response.StatusCode.value__ }` (sem o cabeçalho `Paddle-Signature`) | 401; nada gravado | **Sim** | |
 | 11 | **O `txn_…` aparece no recibo/e-mail?** (risco P13) | Abrir o e-mail de recibo do sandbox (chega ao e-mail principal da conta; domínios gratuitos são encaminhados, P7) e o PDF da fatura. Procurar `txn_…` e o número da fatura | Registrar **sim/não** e onde. Se **não**: a ativação manual só funciona pela via do `checkout.completed`; decidir D-P9 (b)/(c) antes de vender | **Sim** (define o suporte) | |
 | 12 | **As retentativas são reassinadas com `ts` novo?** (tolerância de 5 s) | Fazer a função devolver 503 de propósito (ex.: `PADDLE_API_KEY` errada), comprar, e olhar as 3 tentativas do sandbox (~2 min) em Notifications e no log (`paddle → 401 assinatura inválida (expirada)` ou não) | Tentativas 2 e 3 **não** dão "expirada". Se derem: subir `PADDLE_SIGNATURE_TOLERANCE_SEC` (máx. 600) e repetir; registrar o valor | **Sim** | |
 | 13 | **`checkout.completed` traz `transaction_id` e e-mail** | Comprar pela landing de teste (`/en/`): o botão "Buy with Paddle" abre o checkout; ao concluir, a página deve ir a `/entrar?lang=en` e entrar sozinha | Entra no app; a barra de endereços fica sem `#txn`; "Finishing your purchase…" aparece só se o webhook demorar | **Sim** | |
@@ -254,12 +316,22 @@ Versão 1, 06/11/2026. Executar **no sandbox** (conta separada; nada de dinheiro
 | 21 | **Moeda sem centavos** (ex.: JPY) | Compra de teste em JPY se o preço permitir | O valor gravado é coerente, e reembolsos parciais somam certo | Não | |
 | 22 | **Textos legais da variante Paddle** | Ler `docs/legal-en/paddle/*.md` com o recibo e o checkout reais ao lado; resolver cada `TO VALIDATE` e só então trocar `status: approved` (decisão do fundador, D-P5) | Build de venda com Paddle deixa de ser recusado | **Sim, para vender** | |
 
-### 14.3 Ir para a produção (somente depois de tudo acima)
+### 14.5 Descobrir as origens de CSP do checkout (S2)
+**O que a doc oficial diz (lida em 08/11/2026, https://developer.paddle.com/llms-full.txt e as páginas de Paddle.js):** o script vem de `https://cdn.paddle.com/paddle/v2/paddle.js`; o ambiente sandbox usa `Paddle.Environment.set('sandbox')`; o token `test_…` é de sandbox. **A doc consultada NÃO menciona CSP, `frame-src` nem `connect-src`, e não lista os hosts do checkout.** Não foi encontrada fonte oficial; **não use valor de memória**. O que a Paddle carrega de fato se descobre no navegador:
+
+1. Faça o 1º build **sem** `VITE_PADDLE_CSP_FRAME` e `VITE_PADDLE_CSP_CONNECT` (14.3) e publique no staging.
+2. No **Chrome do PC**, abra `https://staging-en.nexoprocess.pages.dev/en/`, F12 > **Console**, clique em **Buy with Paddle**.
+3. O Chrome registra uma linha por origem bloqueada, por exemplo `Refused to frame 'https://…' because it violates the following Content Security Policy directive: …` (iframe do checkout) e `Refused to connect to 'https://…' …` (rede). Copie **só a origem** (`https://nome-do-host`, sem caminho nem `?`). Repita o clique até não aparecerem mais violações (o checkout pode pedir novas origens em etapas).
+4. **Onde pôr:** origens de `Refused to frame` em `VITE_PADDLE_CSP_FRAME`; de `Refused to connect` em `VITE_PADDLE_CSP_CONNECT`. Várias, separadas por vírgula, **até 6**, só `https://host` (sem `*`, sem caminho; o build recusa o que não for assim). Exemplo de formato (o host é fictício): `$env:VITE_PADDLE_CSP_FRAME = 'https://exemplo-1.test,https://exemplo-2.test'`.
+5. Refaça o passo (c) com as origens (a mesma pasta serve: rode só os `$env:` das duas CSP, `npm run nexo:build:staging-paddle` e o deploy) e repita o teste. Registre as origens encontradas (são públicas) no item 14 da tabela.
+6. Efeito no servidor: o build ajusta apenas o CSP de `/en/*` (`script-src` ganha `https://cdn.paddle.com`; `frame-src` e `connect-src` ganham as origens). O app (`/entrar`, `/app`) continua com `script-src 'self'`.
+
+### 14.6 Ir para a produção (somente depois de tudo acima)
 1. Conta **live** aprovada pela Paddle (DADO DO USUÁRIO: a Paddle já disse que aceita pessoa física no Brasil e revisa o site no ar). Seguir o checklist oficial: https://developer.paddle.com/build/go-live-checklist .
 2. Recriar produto, preço e **destino de notificação** na conta live (sandbox e live **não compartilham** nada, P7). Destino com `traffic_source` = **Platform only**. Novo segredo do destino.
 3. Trocar as variáveis para live: `PADDLE_ENV=production`, `PADDLE_API_KEY` (`pdl_live_…`), `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRODUCT_ID`; build com `VITE_PADDLE_CLIENT_TOKEN` (`live_…`), `VITE_PADDLE_ENV=production`, `VITE_PADDLE_PRICE_ID`. O servidor recusa chave cujo prefixo não bate com `PADDLE_ENV`.
 4. Repetir os itens 9, 13 e 16 com **uma compra real do próprio fundador** e reembolso, como no teste de fumaça da Gumroad (`HANDOFF_EN.md`).
 5. **Reverter** (se algo falhar): remover as `VITE_PADDLE_*` e refazer o build (landing e entrada voltam ao estado só-Gumroad); as rotas `/api/paddle-*` ficam inertes sem tráfego.
 
-### 14.4 O que registrar (sem segredos)
+### 14.7 O que registrar (sem segredos)
 Data, ambiente (sandbox/live), commit do build (`VITE_BUILD_ID`), resultado de cada linha, onde o `txn_…` aparece (item 11), a tolerância usada (item 12) e as origens de CSP encontradas (item 14, são públicas). Anexar prints sem dados pessoais.
