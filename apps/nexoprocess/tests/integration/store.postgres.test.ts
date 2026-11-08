@@ -10,7 +10,7 @@
 //   2) PostgREST (v12) com jwt-secret; um JWT HS256 com {"role":"service_role"}.
 //   3) NEXO_IT_POSTGREST_URL=http://127.0.0.1:3010 NEXO_IT_SERVICE_JWT=<jwt>
 //      NEXO_IT_PG_URL=postgresql://postgres@127.0.0.1:54329/postgres npm run nexo:test
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { handleGumroadLicense } from '../../api/_lib/gumroad';
@@ -399,6 +399,164 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
       expect([401, 403]).toContain(r.status);
       expect(((await r.json()) as { code?: string }).code).toBe('42501');
     }
+    await reset();
+  });
+
+  // ---------------------------------------------------------------- Regras SQL sem teste (revisão de cobertura O3)
+  // Chamam as funções direto por psql no banco de teste (já validado no topo do arquivo). Só testes: se algum
+  // comportamento diferir do esperado, o teste NÃO corrige o schema; ele registra o que o banco faz.
+  const sql = (text: string): string => execFileSync('psql', [PG!, '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-c', text], { encoding: 'utf8' }).trim();
+  const sqlJson = <T = unknown>(text: string): T => JSON.parse(sql(text)) as T;
+  const sqlError = (text: string): string => {
+    try {
+      execFileSync('psql', [PG!, '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose', '-c', text], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      return String((e as { stderr?: unknown }).stderr ?? e);
+    }
+    throw new Error(`esperava erro em: ${text}`);
+  };
+  const q = (v: string | number | null) => (v === null ? 'null' : typeof v === 'number' ? String(v) : `'${v.replace(/'/g, "''")}'`);
+  type Applied = { result: string; status: string; duplicate?: boolean; ignored?: string };
+  /** nexo_grant_purchase / nexo_revoke_purchase com os mesmos parâmetros que o store usa. */
+  const apply = (op: 'grant' | 'revoke', email: string, tx: string, event: string, o: { amount?: number; refund?: number; currency?: string; eventId?: string; at?: string; product?: string | null } = {}) =>
+    sqlJson<Applied>(
+      `select public.nexo_${op}_purchase('hotmart', ${q(tx)}, ${q(email)}, ${q(o.product === undefined ? '123' : o.product)}, ${q(event)}, ${q(o.amount ?? null)}, ${q(o.refund ?? null)}, ${q(o.currency ?? null)}, ${q(o.eventId ?? null)}, ${o.at ? `${q(o.at)}::timestamptz` : 'null'})::text`,
+    );
+  const purchaseRow = (email: string, tx: string) =>
+    sqlJson<{ status: string; access_active: boolean; refunded_amount: number; last_event: string | null } | null>(
+      `select coalesce((select to_jsonb(p) - 'email' from public.nexo_purchases p where p.email = ${q(email)} and p.transaction_id = ${q(tx)}), 'null'::jsonb)::text`,
+    );
+  const licenseStatus = (email: string) => sql(`select coalesce((select status from public.nexo_licenses where email = ${q(email)}), '(sem linha)')`);
+  const openBlockReasons = (email: string) => sql(`select coalesce(string_agg(reason, ',' order by reason), '') from public.nexo_reconciliation_blocks where email = ${q(email)} and resolved_at is null`);
+
+  it('SQL: expirada fecha a compra (expired, sem acesso) e uma aprovação tardia não a reabre (terminal_purchase)', async () => {
+    await reset();
+    const e = 'sqlr-expired@it.test';
+    expect(apply('grant', e, 'X1', 'PURCHASE_APPROVED', { amount: 100, currency: 'USD' })).toMatchObject({ result: 'active', status: 'active' });
+    expect(apply('revoke', e, 'X1', 'PURCHASE_EXPIRED')).toMatchObject({ result: 'blocked', status: 'revoked' });
+    expect(purchaseRow(e, 'X1')).toMatchObject({ status: 'expired', access_active: false, last_event: 'PURCHASE_EXPIRED' });
+    expect(licenseStatus(e)).toBe('revoked');
+    expect(apply('grant', e, 'X1', 'PURCHASE_APPROVED', { amount: 100, currency: 'USD' })).toMatchObject({ result: 'blocked', status: 'revoked', ignored: 'terminal_purchase' });
+    expect(purchaseRow(e, 'X1')).toMatchObject({ status: 'expired', access_active: false });
+    expect(openBlockReasons(e)).toBe('');
+    await reset();
+  });
+
+  it('SQL: pagamento falho/recusado e cancelamento fecham a compra, cada um com o seu status', async () => {
+    await reset();
+    const e = 'sqlr-closed@it.test';
+    for (const [tx, event, status] of [['F1', 'PAYMENT_FAILED', 'payment_failed'], ['F2', 'PURCHASE_PAYMENT_DECLINED', 'payment_failed'], ['F3', 'PURCHASE_CANCELED', 'cancelled']] as const) {
+      expect(apply('grant', e, tx, 'PURCHASE_APPROVED')).toMatchObject({ result: 'active' });
+      expect(apply('revoke', e, tx, event, {}), `${tx} ${event}`).toBeTruthy();
+      expect(purchaseRow(e, tx), `${tx} ${event}`).toMatchObject({ status, access_active: false });
+      // aprovação tardia da mesma transação não reabre
+      expect(apply('grant', e, tx, 'PURCHASE_APPROVED')).toMatchObject({ ignored: 'terminal_purchase' });
+    }
+    expect(licenseStatus(e)).toBe('revoked');
+    await reset();
+  });
+
+  it('SQL: aviso de chargeback e reembolso pendente mantêm acesso e guardam o status; reembolso total encerra', async () => {
+    await reset();
+    const e = 'sqlr-pending@it.test';
+    apply('grant', e, 'W1', 'PURCHASE_APPROVED', { amount: 100, currency: 'USD' });
+    expect(apply('revoke', e, 'W1', 'CHARGEBACK_WARNING')).toMatchObject({ result: 'active', status: 'active' });
+    expect(purchaseRow(e, 'W1')).toMatchObject({ status: 'chargeback_warning', access_active: true });
+    expect(apply('revoke', e, 'W1', 'PURCHASE_REFUND_PENDING_APPROVAL')).toMatchObject({ result: 'active' });
+    expect(purchaseRow(e, 'W1')).toMatchObject({ status: 'refund_pending_approval', access_active: true });
+    expect(licenseStatus(e)).toBe('active');
+    expect(apply('revoke', e, 'W1', 'PURCHASE_REFUNDED')).toMatchObject({ result: 'blocked', status: 'revoked' });
+    expect(purchaseRow(e, 'W1')).toMatchObject({ status: 'refunded', access_active: false });
+    await reset();
+  });
+
+  it('SQL: reembolso parcial com valor mas sem id de evento é bloqueado (partial_refund_event_id_missing) e o bloqueio corta o acesso até ser resolvido', async () => {
+    await reset();
+    const e = 'sqlr-partial@it.test';
+    apply('grant', e, 'P1', 'PURCHASE_APPROVED', { amount: 100, currency: 'USD' });
+    expect(apply('revoke', e, 'P1', 'PARTIAL_REFUND', { amount: 100, refund: 20 })).toMatchObject({ result: 'blocked', status: 'revoked' });
+    expect(openBlockReasons(e)).toBe('partial_refund_event_id_missing');
+    expect(purchaseRow(e, 'P1')).toMatchObject({ status: 'active', access_active: true, refunded_amount: 0 }); // nada foi gravado na compra
+    expect(licenseStatus(e)).toBe('revoked'); // o bloqueio aberto corta TODO o acesso do e-mail
+    const id = sql(`select id from public.nexo_reconciliation_blocks where email = ${q(e)} and resolved_at is null`);
+    expect(sqlJson(`select public.nexo_resolve_reconciliation_block(${id}, 'conferido na plataforma')::text`)).toEqual({ resolved: true, status: 'active' });
+    expect(openBlockReasons(e)).toBe('');
+    expect(licenseStatus(e)).toBe('active');
+    // com id de evento a mesma operação é aceita; sem valor de reembolso (0) não exige id
+    expect(apply('revoke', e, 'P1', 'PARTIAL_REFUND', { amount: 100, refund: 20, eventId: 'sqlr-ev-1' })).toMatchObject({ result: 'active' });
+    expect(purchaseRow(e, 'P1')).toMatchObject({ status: 'partially_refunded', access_active: true, refunded_amount: 20 });
+    expect(apply('revoke', e, 'P1', 'PARTIAL_REFUND', { amount: 100 })).toMatchObject({ result: 'active' });
+    expect(purchaseRow(e, 'P1')).toMatchObject({ status: 'partially_refunded', refunded_amount: 20 });
+    expect(openBlockReasons(e)).toBe('');
+    await reset();
+  });
+
+  it('SQL: nexo_resolve_reconciliation_block exige motivo (22023), ignora id inexistente e não resolve duas vezes', async () => {
+    await reset();
+    const e = 'sqlr-resolve@it.test';
+    apply('grant', e, 'R1', 'PURCHASE_APPROVED', { product: null }); // product_missing → bloqueio
+    const id = sql(`select id from public.nexo_reconciliation_blocks where email = ${q(e)} and resolved_at is null`);
+    for (const bad of ["''", "'   '", 'null']) {
+      const err = sqlError(`select public.nexo_resolve_reconciliation_block(${id}, ${bad})`);
+      expect(err, bad).toContain('resolution required');
+      expect(err, bad).toContain('22023');
+    }
+    expect(openBlockReasons(e)).toBe('product_missing'); // nada foi resolvido pelos pedidos inválidos
+    expect(sqlJson(`select public.nexo_resolve_reconciliation_block(9999999, 'x')::text`)).toEqual({ resolved: false, status: null });
+    expect(sqlJson(`select public.nexo_resolve_reconciliation_block(${id}, '  motivo com espaços  ')::text`)).toMatchObject({ resolved: true });
+    expect(sql(`select resolution from public.nexo_reconciliation_blocks where id = ${id}`)).toBe('motivo com espaços'); // aparado
+    expect(sqlJson(`select public.nexo_resolve_reconciliation_block(${id}, 'de novo')::text`)).toEqual({ resolved: false, status: null });
+    expect(sql(`select resolution from public.nexo_reconciliation_blocks where id = ${id}`)).toBe('motivo com espaços');
+    await reset();
+  });
+
+  it('SQL: nexo_refresh_license_access — sem dados não cria linha; compra ativa → active; bloqueio aberto → revoked; só bloqueio → revoked; e-mail normalizado', async () => {
+    await reset();
+    const none = 'sqlr-none@it.test';
+    sql(`select public.nexo_refresh_license_access(${q(none)})`);
+    expect(licenseStatus(none)).toBe('(sem linha)');
+    const e = 'sqlr-refresh@it.test';
+    apply('grant', e, 'A1', 'PURCHASE_APPROVED');
+    sql(`delete from public.nexo_licenses where email = ${q(e)}`);
+    sql(`select public.nexo_refresh_license_access('  SQLR-Refresh@IT.test ')`); // caixa e espaços
+    expect(licenseStatus(e)).toBe('active');
+    sql(`select public.nexo_add_reconciliation_block(${q(e)}, 'hotmart', 'A1', '123', 'manual_test', 'X', now())`);
+    sql(`select public.nexo_refresh_license_access(${q(e)})`);
+    expect(licenseStatus(e)).toBe('revoked');
+    const only = 'sqlr-onlyblock@it.test';
+    sql(`select public.nexo_add_reconciliation_block(${q(only)}, null, null, null, 'platform_missing_or_invalid', 'X', now())`);
+    sql(`select public.nexo_refresh_license_access(${q(only)})`);
+    expect(licenseStatus(only)).toBe('revoked');
+    expect(sql(`select coalesce(transaction, '(nulo)') from public.nexo_licenses where email = ${q(only)}`)).toBe('(nulo)');
+    // bloco duplicado idêntico não duplica (índice de bloqueio único aberto)
+    sql(`select public.nexo_add_reconciliation_block(${q(only)}, null, null, null, 'platform_missing_or_invalid', 'X', now())`);
+    expect(sql(`select count(*) from public.nexo_reconciliation_blocks where email = ${q(only)}`)).toBe('1');
+    await reset();
+  });
+
+  it('SQL: nexo_lookup_license — inválido/desconhecido → nulo; hotmart ativa → active; reembolsada → revoked; só gumroad → nulo (D3); bloqueio → revoked', async () => {
+    await reset();
+    const lookup = (email: string | null) => sql(`select coalesce(public.nexo_lookup_license(${q(email)})::text, '(nulo)')`);
+    expect(lookup(null)).toBe('(nulo)');
+    expect(lookup('sem-arroba')).toBe('(nulo)');
+    expect(lookup('desconhecido@it.test')).toBe('(nulo)');
+    const hm = 'sqlr-lookup-hm@it.test';
+    apply('grant', hm, 'L1', 'PURCHASE_APPROVED');
+    expect(JSON.parse(lookup(hm))).toEqual({ status: 'active' });
+    expect(JSON.parse(lookup('  SQLR-Lookup-HM@IT.test '))).toEqual({ status: 'active' }); // caixa e espaços
+    apply('revoke', hm, 'L1', 'PURCHASE_REFUNDED');
+    expect(JSON.parse(lookup(hm))).toEqual({ status: 'revoked' });
+    const gm = 'sqlr-lookup-gm@it.test';
+    sqlJson(`select public.nexo_grant_purchase('gumroad', 'LG1', ${q(gm)}, '32-nPAicqbLj8B_WswVlMw', 'GUMROAD_SALE_APPROVED')::text`);
+    expect(sql(`select access_active from public.nexo_purchases where email = ${q(gm)}`)).toBe('t');
+    expect(lookup(gm)).toBe('(nulo)'); // compra gumroad não vale só por e-mail
+    sqlJson(`select public.nexo_grant_purchase('hotmart', 'LH1', ${q(gm)}, '123', 'PURCHASE_APPROVED')::text`);
+    expect(JSON.parse(lookup(gm))).toEqual({ status: 'active' }); // misto: vale a hotmart
+    sql(`select public.nexo_add_reconciliation_block(${q(gm)}, 'hotmart', 'LH1', '123', 'manual_test', 'X', now())`);
+    expect(JSON.parse(lookup(gm))).toEqual({ status: 'revoked' }); // bloqueio aberto corta tudo
+    const blockedOnly = 'sqlr-lookup-block@it.test';
+    sql(`select public.nexo_add_reconciliation_block(${q(blockedOnly)}, null, null, null, 'platform_missing_or_invalid', 'X', now())`);
+    expect(JSON.parse(lookup(blockedOnly))).toEqual({ status: 'revoked' });
     await reset();
   });
 });
