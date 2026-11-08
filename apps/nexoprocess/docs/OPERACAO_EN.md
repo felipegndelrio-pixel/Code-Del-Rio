@@ -391,6 +391,7 @@ Nomes de menu da Paddle; qualquer SQL contra um banco real com compras Paddle (c
 - Produção: **enquanto o arquivo corrigido não estiver aplicado, não rode nenhum `schema-*.sql`.** Para a rc3, aplique **só** o arquivo do commit da rc3 (que já traz a correção), seguindo `PADDLE_ENTITLEMENT.md` §14.2b e §14.6 item 0, e rodando a consulta 7.1 antes e depois.
 
 ### 7.1 Detectar fantasmas (SÓ LEITURA; rode em PRODUÇÃO e no STAGING)
+**Antes de qualquer SQL desta seção (7.1 e 7.2):** confira o **Reference ID** do projeto em Supabase → Settings → General. Staging = `ywmaslgbuchuwondlkon` (dado do revisor, A VALIDAR por você no painel). Se o ID não for o do ambiente que você quer mexer, **pare**.
 Supabase → SQL Editor → nova consulta (confira o nome do projeto). Esperado em banco saudável: **zero linhas nas três**. Linha em (A) ou (B) = candidata a fantasma: **não apague nada em produção**; guarde o resultado e chame a engenharia.
 ```sql
 -- (A) Compras com a MESMA transação em mais de uma plataforma (candidatas a fantasma). Esperado em produção saudável: ZERO linhas.
@@ -418,8 +419,9 @@ select r.email, r.transaction, r.event, r.refunded_at
 Como ler: **(A)** lista compras `hotmart` cuja transação também existe em `gumroad`/`paddle` (a coluna `tambem_em` mostra qual); **(B)** lista bloqueios `legacy_*` sobrando; **(C)** lista o que entrou no histórico imutável por engano (esse histórico **não** pode ser corrigido por SQL: avise a engenharia, é caso a decidir).
 
 ### 7.2 Limpar fantasmas (escrita; STAGING e, com aprovação do fundador, PRODUÇÃO; só depois de ver o resultado de 7.1)
+**Confira o Reference ID do projeto (Settings → General; staging = `ywmaslgbuchuwondlkon`) antes de rodar o bloco.**
 **Critério oficial (decisão do revisor, 08/11/2026):** é fantasma a compra `hotmart` cujo `transaction_id` existe em `gumroad` ou `paddle` **com o MESMO e-mail**. Fantasma com e-mail diferente **não** é apagado por este bloco (o bloco aborta pela contagem): é caso para a engenharia decidir. Depois do DELETE, o bloco recalcula o acesso (`nexo_refresh_license_access`) dos e-mails apagados, que são exatamente os que têm compra `gumroad`/`paddle`; depois rode 7.1 (A): **zero linhas**.
-**Produção:** mesmo bloco, só com o fundador ciente, conferindo o nome do projeto, rodando 7.1 (A) antes e usando como `v_esperado` a contagem que ele mostrou (caso de 08/11/2026: a concessão manual de teste do fundador, `gumroad` ativa + `hotmart` ativa com a mesma transação). Nada foi executado em produção por este documento.
+**Produção:** mesmo bloco, só com o fundador ciente, conferindo o Reference ID do projeto, rodando 7.1 (A) antes e usando como `v_esperado` a contagem que ele mostrou. Produção: até hoje, nenhuma fantasma confirmada; rode 7.1 antes. Nada foi executado em produção por este documento.
 **Staging.** Antes: confira o projeto, rode 7.1 e anote **quantas** linhas vieram em (A). No staging de 08/11/2026 o esperado é **1** (a compra `hotmart` fantasma criada ao aplicar o schema; a contagem de compras foi de 1 para 2).
 
 1. Compras fantasmas. O bloco abaixo apaga **somente** compras `hotmart` cuja transação existe em outra plataforma e recalcula o acesso desses e-mails. Ele **aborta sem apagar nada** se a contagem real for diferente de `v_esperado` (ajuste o número para o que 7.1 (A) mostrou; para o caso de 08/11/2026, `1`):
@@ -442,6 +444,7 @@ begin
     returning h.email
   )
   select count(*), array_agg(email) into v_n, v_emails from d;
+  -- Obs.: se não houver nenhuma fantasma (v_n = 0), array_agg é nulo e o FOREACH falharia; é inofensivo (nada a recalcular) e o bloco aborta antes quando v_esperado > 0.
   if v_n <> v_esperado then
     raise exception 'esperado % fantasma(s), achei %: nada foi apagado', v_esperado, v_n;
   end if;
