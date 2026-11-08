@@ -95,7 +95,10 @@ try {
     beaconPages += 1;
     const ran = await page.evaluate(() => Boolean(window.__beacon));
     if (!ran) violations.push(`${r}: o beacon foi bloqueado (CSP de /en/ não o permite)`);
-    if ((await page.locator('script').count()) !== 1) violations.push(`${r}: esperado exatamente 1 <script> (o beacon)`);
+    // Só o beacon, mais (build com VITE_PADDLE_*) os dois scripts da Paddle documentados em PADDLE_ENTITLEMENT.md; qualquer outro é violação.
+    const scripts = await page.locator('script').evaluateAll((els) => els.map((e) => e.getAttribute('src') || 'inline'));
+    const extra = scripts.filter((src) => !/cloudflareinsights\.com\/beacon\.min\.js$/.test(src) && src !== 'https://cdn.paddle.com/paddle/v2/paddle.js' && src !== 'assets/paddle-buy.js');
+    if (extra.length || scripts.filter((src) => /cloudflareinsights/.test(src)).length !== 1) violations.push(`${r}: esperado o beacon (e, com Paddle, só os 2 scripts da Paddle); achei ${JSON.stringify(scripts)}`);
     visited.push(r);
   }
   console.log(`Páginas /en/ com o beacon permitido pela CSP: ${beaconPages}/${enPages.length}${beaconPages ? '' : ' (dist sem VITE_CF_WA_TOKEN: nada a provar)'}`);
