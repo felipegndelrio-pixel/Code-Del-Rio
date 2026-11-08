@@ -417,8 +417,10 @@ select r.email, r.transaction, r.event, r.refunded_at
 ```
 Como ler: **(A)** lista compras `hotmart` cuja transação também existe em `gumroad`/`paddle` (a coluna `tambem_em` mostra qual); **(B)** lista bloqueios `legacy_*` sobrando; **(C)** lista o que entrou no histórico imutável por engano (esse histórico **não** pode ser corrigido por SQL: avise a engenharia, é caso a decidir).
 
-### 7.2 Limpar o STAGING (escrita; só o staging; só depois de ver o resultado de 7.1)
-**Staging apenas.** Antes: confira o projeto, rode 7.1 e anote **quantas** linhas vieram em (A). No staging de 08/11/2026 o esperado é **1** (a compra `hotmart` fantasma criada ao aplicar o schema; a contagem de compras foi de 1 para 2).
+### 7.2 Limpar fantasmas (escrita; STAGING e, com aprovação do fundador, PRODUÇÃO; só depois de ver o resultado de 7.1)
+**Critério oficial (decisão do revisor, 08/11/2026):** é fantasma a compra `hotmart` cujo `transaction_id` existe em `gumroad` ou `paddle` **com o MESMO e-mail**. Fantasma com e-mail diferente **não** é apagado por este bloco (o bloco aborta pela contagem): é caso para a engenharia decidir. Depois do DELETE, o bloco recalcula o acesso (`nexo_refresh_license_access`) dos e-mails apagados, que são exatamente os que têm compra `gumroad`/`paddle`; depois rode 7.1 (A): **zero linhas**.
+**Produção:** mesmo bloco, só com o fundador ciente, conferindo o nome do projeto, rodando 7.1 (A) antes e usando como `v_esperado` a contagem que ele mostrou (caso de 08/11/2026: a concessão manual de teste do fundador, `gumroad` ativa + `hotmart` ativa com a mesma transação). Nada foi executado em produção por este documento.
+**Staging.** Antes: confira o projeto, rode 7.1 e anote **quantas** linhas vieram em (A). No staging de 08/11/2026 o esperado é **1** (a compra `hotmart` fantasma criada ao aplicar o schema; a contagem de compras foi de 1 para 2).
 
 1. Compras fantasmas. O bloco abaixo apaga **somente** compras `hotmart` cuja transação existe em outra plataforma e recalcula o acesso desses e-mails. Ele **aborta sem apagar nada** se a contagem real for diferente de `v_esperado` (ajuste o número para o que 7.1 (A) mostrou; para o caso de 08/11/2026, `1`):
 ```sql
@@ -434,7 +436,9 @@ begin
   with d as (
     delete from public.nexo_purchases h
      where h.platform = 'hotmart'
-       and exists (select 1 from public.nexo_purchases o where o.transaction_id = h.transaction_id and o.platform <> 'hotmart')
+       and exists (select 1 from public.nexo_purchases o
+                    where o.transaction_id = h.transaction_id and o.platform in ('gumroad','paddle')
+                      and o.email = h.email)
     returning h.email
   )
   select count(*), array_agg(email) into v_n, v_emails from d;
