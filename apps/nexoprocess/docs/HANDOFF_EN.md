@@ -36,7 +36,7 @@ Também em EN (v2): Formulário completo, Assistente de criação (inclui texto 
 2. Migre para o dicionário (PT idêntico).
 3. `npm run nexo:typecheck`, `npm run nexo:lint`, `npm run nexo:test -- src tests/api`.
 4. `npx playwright test -c apps/nexoprocess/playwright.config.ts --project=desktop tests/e2e/pt-golden.spec.ts` (golden PT tem que ficar idêntico) e `en-coverage.spec.ts`.
-5. Commit pequeno, push em `wip/en-foundation`, esperar o G3 (mínimo `passed >= 29`; se o total mudar, ajustar o mínimo para o total exato, `pending=0`) e anotar a linha do validador.
+5. Commit pequeno, push em `wip/en-foundation`, esperar o G3 (mínimo `passed >= 36`; se o total mudar, ajustar o mínimo para o total exato, `pending=0`) e anotar a linha do validador.
 6. Relatório curto ao revisor: hash, arquivos, testes, linha do G3, riscos, o que NÃO foi verificado.
 - Não rodar duas execuções do Playwright ao mesmo tempo (porta 4180; `licenca` usa 4181).
 - Duas falhas no mesmo ponto: pare e diagnostique.

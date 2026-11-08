@@ -37,10 +37,19 @@ export async function prepare(page: Page, opts: { theme?: 'dark' | 'light'; tour
     if (!['127.0.0.1', 'localhost'].includes(u.hostname) && !u.protocol.startsWith('data') && !u.protocol.startsWith('blob')) external.push(r.url());
   });
   await page.route('**/*', async (route) => {
-    const resp = await route.fetch();
-    const headers = { ...resp.headers() };
-    if ((headers['content-type'] ?? '').includes('text/html')) headers['content-security-policy'] = /^\/en(\/|$)/.test(new URL(route.request().url()).pathname) ? (opts.enCsp ?? CSP_EN) : CSP;
-    await route.fulfill({ response: resp, headers });
+    try {
+      const resp = await route.fetch();
+      // Lê o corpo ANTES de responder e não passa `response`: se a página navegar ou o teste terminar entre o fetch e o
+      // fulfill, a APIResponse é descartada ("Fetch response has been disposed") e o teste ficava intermitente.
+      const body = await resp.body();
+      const headers = { ...resp.headers() };
+      if ((headers['content-type'] ?? '').includes('text/html')) headers['content-security-policy'] = /^\/en(\/|$)/.test(new URL(route.request().url()).pathname) ? (opts.enCsp ?? CSP_EN) : CSP;
+      await route.fulfill({ status: resp.status(), headers, body });
+    } catch (e) {
+      // Requisição abandonada por navegação/fechamento da página: não é falha do app. Qualquer outro erro continua falhando.
+      if (/disposed|closed|already handled|Target page|Navigation/i.test(String(e))) return;
+      throw e;
+    }
   });
   if (opts.allowBeacon) {
     // Sem rede no teste: o beacon é respondido por um stub (o que importa é a página pedi-lo e a CSP permitir).
