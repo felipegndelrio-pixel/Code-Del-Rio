@@ -86,6 +86,13 @@ Conheça o NexoProcess: https://go.hotmart.com/A108124551M
 ```
 No Instagram, coloque o link da Hotmart na bio.
 
+## 6.1 Atualização: bloco "Em breve" no fechamento (08/11/2026)
+- **Texto:** "Em breve nas plataformas digitais internacionais" + **Paddle | Gumroad** + bandeiras 🇺🇸 🇬🇧 🇨🇦 🇦🇺. Entra aos 26,2 s, abaixo do CTA, nos dois vídeos.
+- **Paddle e Gumroad aparecem por nome**, na tipografia da marca, **sem os logos oficiais**: são marcas registradas e os arquivos oficiais não foram fornecidos. Se enviados, troco, conferindo as regras de uso de cada marca.
+- **Países:** escolhi mercados de língua inglesa, coerentes com o rascunho en-US. A VALIDAR com você.
+- **"Em breve"** é um plano informado por você. Evite prazo ou data até haver confirmação das plataformas.
+- **Revalidado:** 30,000 s / 900 quadros, -14,5 LUFS (`qa/final_29s.png`).
+
 ## 7. Pendências
 - Ouvir os vídeos no celular, antes de publicar.
 - Confirmar a página de destino da Hotmart.

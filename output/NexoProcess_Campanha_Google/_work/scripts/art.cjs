@@ -24,16 +24,21 @@ body{position:relative;overflow:hidden;color:#0d1c38}
 .lock{display:flex;align-items:center;font-weight:700;letter-spacing:-2px;color:#0d1c38}
 .cta{position:absolute;left:50%;transform:translateX(-50%);background:#0d1c38;color:#fff;font-weight:600;border-radius:999px;white-space:nowrap;box-shadow:0 12px 32px rgba(13,28,56,.28)}
 .cta2{background:#0d1c38;color:#fff;font-weight:700;letter-spacing:1.5px;border-radius:999px;display:inline-block;white-space:nowrap}
-.bg{position:absolute;inset:0;background-size:cover;background-position:center}`;
+.bg{position:absolute;inset:0;background-size:cover;background-position:center}
+.br{position:absolute;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.br .k{font-weight:600;letter-spacing:.14em;color:#5b6b86;text-transform:uppercase}
+.br .p{display:flex;align-items:center;gap:18px;font-weight:600;color:#0d1c38}
+.br .p s{width:1px;align-self:stretch;background:#b8c4d6;text-decoration:none}
+.br .f{display:flex;gap:12px;font-family:'Noto Color Emoji',sans-serif;line-height:1}`;
 
 // posição dos itens na gravação original (px nativos, quadro 1320x2868)
 const BUL = { f1: 1554, f2: 1806, f3: 2058, f4: 1140, f5: 1464 };
 const NAMES = { f1: 'Assistente guiado', f2: 'Mapeamento visual (BPMN)', f3: 'Diagnóstico de gargalos', f4: 'Comparação Antes × Depois', f5: 'Plano de ação' };
 const FMT = {
   916: { W: 1080, H: 1920, tgt_h: 1300, tgt_x: 440, tgt_y: 310, title: 'left:80px;right:80px;top:330px;font-size:92px', sel: 'left:40px;top:262px;font-size:24px;padding:12px 20px',
-    labL: 36, labFont: 29, val: 'top:300px', valT: 96, valS: 40, end: { lock: 120, name: 96, tag: 50, cta: 'top:1240px;font-size:40px;padding:22px 44px' }, cta: 'Conheça pelo link da bio.' },
+    labL: 36, labFont: 29, val: 'top:300px', valT: 96, valS: 40, end: { lock: 120, name: 96, tag: 50, cta: 'top:1240px;font-size:40px;padding:22px 44px' }, cta: 'Conheça pelo link da bio.', br: { top: 1395, k: 20, p: 30, f: 30 } },
   45: { W: 1080, H: 1350, tgt_h: 1180, tgt_x: 470, tgt_y: 85, title: 'left:70px;right:70px;top:70px;font-size:80px', sel: 'left:28px;top:24px;font-size:22px;padding:10px 18px',
-    labL: 24, labFont: 27, val: 'top:70px', valT: 84, valS: 36, end: { lock: 110, name: 88, tag: 46, cta: 'top:930px;font-size:36px;padding:20px 40px' }, cta: 'Conheça pelo link no post.' },
+    labL: 24, labFont: 27, val: 'top:70px', valT: 84, valS: 36, end: { lock: 110, name: 88, tag: 46, cta: 'top:930px;font-size:36px;padding:20px 40px' }, cta: 'Conheça pelo link no post.', br: { top: 1050, k: 18, p: 28, f: 28 } },
 };
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--allow-file-access-from-files'] });
@@ -62,6 +67,10 @@ const FMT = {
       <div class="lock" style="gap:${Math.round(e.lock * .22)}px;font-size:${e.name}px">${sym(e.lock)}<span>NexoProcess</span></div>
       <div style="font-weight:600;font-size:${e.tag}px;line-height:1.25;color:#0d1c38">Mapeie. Analise. Melhore.<br><span class="em">Gere valor.</span></div></div></div>`, `${d}/fecho.png`, true);
     await render(f.W, f.H, `<div class="cta" style="${e.cta}">${f.cta}</div>`, `${d}/cta.png`);
+    const B = f.br;
+    await render(f.W, f.H, `<div class="br" style="top:${B.top}px"><div class="k" style="font-size:${B.k}px">Em breve nas plataformas digitais internacionais</div>
+      <div class="p" style="font-size:${B.p}px"><span>Paddle</span><s></s><span>Gumroad</span></div>
+      <div class="f" style="font-size:${B.f}px">🇺🇸 🇬🇧 🇨🇦 🇦🇺</div></div>`, `${d}/breve.png`);
   }
   // ---------- imagens estáticas (foto original + quadro original no iPhone + recorte original no MacBook)
   const still = `file://${W}/still_45.png`;
