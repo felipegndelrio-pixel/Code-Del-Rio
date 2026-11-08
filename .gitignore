@@ -28,3 +28,4 @@ marketing/video/reports/build_v2.log
 output/NexoProcess_Campanha_Google/_work/*
 !output/NexoProcess_Campanha_Google/_work/scripts/
 !output/NexoProcess_Campanha_Google/_work/geo.json
+__pycache__/
