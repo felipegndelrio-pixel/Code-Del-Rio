@@ -23,3 +23,8 @@ marketing/video/generated/_tmp_v2/
 marketing/video/assets/capturas-v2/peek*.png
 marketing/video/assets/**/chk*.png
 marketing/video/reports/build_v2.log
+
+# campanha Google: intermediários de render
+output/NexoProcess_Campanha_Google/_work/*
+!output/NexoProcess_Campanha_Google/_work/scripts/
+!output/NexoProcess_Campanha_Google/_work/geo.json
