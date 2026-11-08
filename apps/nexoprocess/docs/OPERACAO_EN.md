@@ -377,3 +377,81 @@ select public.nexo_revoke_purchase('paddle', 'txn_COLE_AQUI', 'cliente@exemplo.c
 
 ### 6.7 O que este adendo NÃO verificou
 Nomes de menu da Paddle; qualquer SQL contra um banco real com compras Paddle (conferidas só as colunas e a classificação pelo G3); a Paddle real.
+
+
+---
+
+## 7. Reaplicar o schema com segurança; compras e bloqueios fantasmas (bug de 08/11/2026)
+
+**O que aconteceu (FATO, reproduzido em PostgreSQL 16 local e visto no staging):** `schema-purchases.sql` tem um passo "licenças legadas viram compras Hotmart" que rodava **a cada aplicação**. Como `nexo_licenses` também é a **projeção** das compras (de qualquer plataforma), reaplicar o arquivo antigo criava, para cada compra `gumroad`/`paddle`, uma compra **`hotmart` fantasma, ativa, com o mesmo `transaction_id`**. Efeitos: (1) o acesso só por e-mail (`/api/license`, PT) passava a liberar esse comprador (furando a regra D3); (2) um reembolso na Gumroad/Paddle **não revogava** a fantasma, e o cliente reembolsado mantinha acesso. Dois defeitos parecidos: um e-mail que só tem bloqueio ganhava um bloqueio `legacy_transaction_missing` a mais a cada reaplicação (o defeito existe também para licenças legadas inválidas), e `schema-refund-history.sql` copiava licenças revogadas de qualquer plataforma para o histórico imutável de reembolsos.
+
+**A regra (vale já):**
+- **NUNCA reaplique o `schema-purchases.sql` nem o `schema-refund-history.sql` de um commit anterior à correção** em um banco que tenha compra `gumroad` ou `paddle`. Isso inclui os que estão na **v2.5.0-rc1 e na v2.6.0-rc2** (o passo defeituoso existe nos dois: FATO, `git show 31f0ed5:…` e `git show 5461f40:…`).
+- **A correção** está em `wip/paddle` (arquivos `schema-purchases.sql` e `schema-refund-history.sql`): a licença legada só vira compra `hotmart` se a transação **não** tiver compra em nenhuma plataforma; o histórico não recebe linha de outra plataforma; bloqueios `legacy_*` não são criados para e-mail que já tem bloqueio ou compra de outra plataforma; o backfill do histórico só roda antes de existir `nexo_purchases`. **A 1ª migração (banco só com dados Hotmart legados) dá exatamente o mesmo resultado de antes** (comparado linha a linha contra o arquivo da rc2, 9 casos). **Depois que o arquivo corrigido estiver no banco, reaplicá-lo é seguro** (testado 3 vezes seguidas: nada muda).
+- Produção: **enquanto o arquivo corrigido não estiver aplicado, não rode nenhum `schema-*.sql`.** Para a rc3, aplique **só** o arquivo do commit da rc3 (que já traz a correção), seguindo `PADDLE_ENTITLEMENT.md` §14.2b e §14.6 item 0, e rodando a consulta 7.1 antes e depois.
+
+### 7.1 Detectar fantasmas (SÓ LEITURA; rode em PRODUÇÃO e no STAGING)
+Supabase → SQL Editor → nova consulta (confira o nome do projeto). Esperado em banco saudável: **zero linhas nas três**. Linha em (A) ou (B) = candidata a fantasma: **não apague nada em produção**; guarde o resultado e chame a engenharia.
+```sql
+-- (A) Compras com a MESMA transação em mais de uma plataforma (candidatas a fantasma). Esperado em produção saudável: ZERO linhas.
+select h.platform, h.transaction_id, h.email, h.status, h.access_active, h.last_event, h.last_event_occurred_at,
+       (select string_agg(o.platform || ':' || o.status, ', ' order by o.platform) from public.nexo_purchases o
+         where o.transaction_id = h.transaction_id and o.platform <> h.platform) as tambem_em
+  from public.nexo_purchases h
+ where h.platform = 'hotmart'
+   and exists (select 1 from public.nexo_purchases o where o.transaction_id = h.transaction_id and o.platform <> 'hotmart')
+ order by h.last_event_occurred_at desc;
+
+-- (B) Bloqueios 'legacy_*' (hotmart) em e-mail que tem compra de outra plataforma ou bloqueio de outra plataforma. Esperado: ZERO linhas.
+select b.id, b.email, b.reason, b.created_at, b.resolved_at
+  from public.nexo_reconciliation_blocks b
+ where b.platform = 'hotmart' and b.reason like 'legacy\_%'
+   and (exists (select 1 from public.nexo_purchases p where p.email = b.email and p.platform <> 'hotmart')
+        or exists (select 1 from public.nexo_reconciliation_blocks o where o.email = b.email and o.id <> b.id and o.platform is distinct from 'hotmart'))
+ order by b.created_at desc;
+
+-- (C) Histórico imutável de reembolsos com transação que é de compra NÃO-Hotmart. Esperado: ZERO linhas.
+select r.email, r.transaction, r.event, r.refunded_at
+  from public.nexo_refunded_transactions r
+ where exists (select 1 from public.nexo_purchases p where p.transaction_id = r.transaction and p.platform <> 'hotmart');
+```
+Como ler: **(A)** lista compras `hotmart` cuja transação também existe em `gumroad`/`paddle` (a coluna `tambem_em` mostra qual); **(B)** lista bloqueios `legacy_*` sobrando; **(C)** lista o que entrou no histórico imutável por engano (esse histórico **não** pode ser corrigido por SQL: avise a engenharia, é caso a decidir).
+
+### 7.2 Limpar o STAGING (escrita; só o staging; só depois de ver o resultado de 7.1)
+**Staging apenas.** Antes: confira o projeto, rode 7.1 e anote **quantas** linhas vieram em (A). No staging de 08/11/2026 o esperado é **1** (a compra `hotmart` fantasma criada ao aplicar o schema; a contagem de compras foi de 1 para 2).
+
+1. Compras fantasmas. O bloco abaixo apaga **somente** compras `hotmart` cuja transação existe em outra plataforma e recalcula o acesso desses e-mails. Ele **aborta sem apagar nada** se a contagem real for diferente de `v_esperado` (ajuste o número para o que 7.1 (A) mostrou; para o caso de 08/11/2026, `1`):
+```sql
+-- (b) STAGING: remove SÓ as compras 'hotmart' fantasmas (mesma transação existe em outra plataforma) e recalcula o acesso desses e-mails.
+-- Ajuste v_esperado se o seu SELECT da etapa 1 trouxe outra contagem. Se a contagem real for diferente, NADA é apagado (o bloco aborta).
+do $$
+declare
+  v_esperado int := 1;
+  v_n int;
+  v_emails text[];
+  v_e text;
+begin
+  with d as (
+    delete from public.nexo_purchases h
+     where h.platform = 'hotmart'
+       and exists (select 1 from public.nexo_purchases o where o.transaction_id = h.transaction_id and o.platform <> 'hotmart')
+    returning h.email
+  )
+  select count(*), array_agg(email) into v_n, v_emails from d;
+  if v_n <> v_esperado then
+    raise exception 'esperado % fantasma(s), achei %: nada foi apagado', v_esperado, v_n;
+  end if;
+  foreach v_e in array v_emails loop
+    perform public.nexo_refresh_license_access(v_e);
+  end loop;
+  raise notice 'removidas % compra(s) hotmart fantasma(s)', v_n;
+end
+$$;
+```
+2. Bloqueios fantasmas (só se 7.1 (B) trouxe linhas): resolva cada um pelo `id` (fica registrado, não se apaga), trocando `<ID>`:
+```sql
+select public.nexo_resolve_reconciliation_block(<ID>, 'bloqueio legacy fantasma criado ao reaplicar o schema (08/11/2026)');
+```
+3. Rode 7.1 de novo: **zero linhas**. Confira também que o comprador de teste continua entrando pela tela EN (e-mail + chave/transação) e **não** entra pelo caminho só por e-mail.
+
+**Verificado:** os dois blocos foram executados num PostgreSQL 16 local com fantasmas criados de verdade pelo arquivo antigo: o bloco aborta quando a contagem não bate (nada apagado), apaga só as fantasmas (a compra Hotmart legítima fica), restaura o D3 (`nexo_lookup_license` volta a nulo para o e-mail gumroad) e a resolução de bloqueio mantém o original aberto. **NÃO verificado:** no Supabase real (nomes de menu, permissões do SQL Editor).

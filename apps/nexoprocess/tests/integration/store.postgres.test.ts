@@ -382,6 +382,81 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     expect(await openBlocks('manual@it.test')).toEqual([]);
   });
 
+
+  // ---------------------------------------------------------------- Reaplicação do schema (regressão do staging, 08/11/2026)
+  // nexo_licenses é a PROJEÇÃO das compras; reaplicar schema-purchases.sql transformava a projeção de uma compra gumroad/paddle
+  // em compra 'hotmart' fantasma (ativa, sem revogação por reembolso, furando a D3) e criava bloqueios 'legacy_*' fantasmas.
+  const migrate = async () => {
+    const { execFileSync } = await import('node:child_process');
+    execFileSync('psql', [PG!, '-X', '-v', 'ON_ERROR_STOP=1', '-f', 'apps/nexoprocess/api/_lib/schema-purchases.sql'], { stdio: 'ignore' });
+  };
+  const GUM_TX = 'RGRGrgrgRGRGrgrg-_91Qw';
+  const PD_TX = 'txn_01hv8wptq8987qeep44cyrewp9';
+
+  it('reaplicar o schema 2x: nenhuma compra fantasma; gumroad e paddle continuam sem acesso só por e-mail (D3); Hotmart igual', async () => {
+    await reset();
+    const s = store();
+    await s.grant({ email: 'rg-hot@it.test', transaction: 'HRG1', event: 'PURCHASE_APPROVED' });
+    await s.grant({ platform: 'gumroad', email: 'rg-gum@it.test', transaction: GUM_TX, product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' });
+    await s.grant({ platform: 'paddle', email: 'rg-pd@it.test', transaction: PD_TX, product_id: PD_PRODUCT, event: 'PADDLE_TRANSACTION_COMPLETED' });
+    const snapshot = async () => ({ hot: await purchases('rg-hot@it.test'), gum: await purchases('rg-gum@it.test'), pd: await purchases('rg-pd@it.test') });
+    const before = await snapshot();
+    await migrate();
+    await migrate();
+    expect(await snapshot()).toEqual(before);
+    for (const e of ['rg-gum@it.test', 'rg-pd@it.test']) {
+      expect((await purchases(e)).every((p) => p.platform !== 'hotmart')).toBe(true);
+      expect(await s.lookup(e)).toBeNull(); // D3: só por e-mail não concede
+    }
+    expect(await s.lookup('rg-hot@it.test')).toBe('active');
+    expect(await openBlocks('rg-gum@it.test')).toEqual([]);
+  });
+
+  it('reembolso gumroad seguido de reaplicação do schema não cria compra hotmart ativa (nem fantasma de reembolso)', async () => {
+    await reset();
+    const s = store();
+    const e = 'rg-ref@it.test';
+    await s.grant({ platform: 'gumroad', email: e, transaction: GUM_TX, product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' });
+    await s.revoke({ platform: 'gumroad', email: e, transaction: GUM_TX, product_id: GUM_PRODUCT_DB, event: 'GUMROAD_REFUNDED' });
+    await migrate();
+    await migrate();
+    expect(await purchases(e)).toEqual([{ platform: 'gumroad', transaction_id: GUM_TX, status: 'refunded', access_active: false, refunded_amount: 0 }]);
+    expect(await s.lookup(e)).toBeNull();
+    const r = await fetch(`${REST}/nexo_refunded_transactions?email=eq.${encodeURIComponent(e)}&select=email`, { headers: auth() });
+    expect(await r.json()).toEqual([]); // a reaplicação não grava transação de outra plataforma no histórico imutável
+  });
+
+  it('e-mail só com bloqueio (id inválido gumroad): reaplicar o schema não cria bloqueio hotmart fantasma; resolvido o original, o acesso não fica cortado', async () => {
+    await reset();
+    const s = store();
+    const e = 'rg-blk@it.test';
+    await s.grant({ platform: 'gumroad', email: e, transaction: 'AB==CD', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' }); // id inválido → bloqueio
+    expect(await openBlocks(e)).toEqual([{ reason: 'transaction_invalid' }]);
+    await migrate();
+    await migrate();
+    expect(await openBlocks(e)).toEqual([{ reason: 'transaction_invalid' }]); // continua 1 só
+    const r = await fetch(`${REST}/nexo_reconciliation_blocks?email=eq.${encodeURIComponent(e)}&resolved_at=is.null&select=id`, { headers: auth() });
+    const [{ id }] = (await r.json()) as { id: number }[];
+    const res = await fetch(`${REST}/rpc/nexo_resolve_reconciliation_block`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_id: id, p_resolution: 'teste G3' }) });
+    expect(res.ok).toBe(true);
+    await migrate();
+    expect(await openBlocks(e)).toEqual([]);
+  });
+
+  it('1ª migração legada intacta: licença antiga válida vira compra hotmart; id inválido vira bloqueio; reaplicar não muda nada', async () => {
+    await reset();
+    const post = (row: Record<string, unknown>) => fetch(`${REST}/nexo_licenses`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    expect((await post({ email: 'leg-ok@it.test', status: 'active', product_id: '123', transaction: 'HLEG1', event: 'PURCHASE_APPROVED' })).ok).toBe(true);
+    expect((await post({ email: 'leg-bad@it.test', status: 'active', product_id: '123', transaction: 'HLEG 2 inválido', event: 'PURCHASE_APPROVED' })).ok).toBe(true);
+    await migrate();
+    expect(await purchases('leg-ok@it.test')).toEqual([{ platform: 'hotmart', transaction_id: 'HLEG1', status: 'active', access_active: true, refunded_amount: 0 }]);
+    expect(await purchases('leg-bad@it.test')).toEqual([]);
+    expect(await openBlocks('leg-bad@it.test')).toEqual([{ reason: 'legacy_transaction_invalid' }]);
+    await migrate();
+    expect(await purchases('leg-ok@it.test')).toHaveLength(1);
+    expect(await openBlocks('leg-bad@it.test')).toEqual([{ reason: 'legacy_transaction_invalid' }]);
+  });
+
   it('nexo_purchase_state: service_role lê; anon e authenticated são negados', async () => {
     await reset();
     await raw().grant({ platform: 'gumroad', email: 'g-perm@it.test', transaction: 'PERM1', product_id: GUM_PRODUCT_DB, event: 'GUMROAD_SALE_APPROVED' });

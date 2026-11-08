@@ -243,6 +243,8 @@ Cloudflare > Workers & Pages > `nexoprocess` > Settings > Variables and Secrets 
 Já devem existir no Preview as do staging: `LICENSE_PRIVATE_JWK`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (do Supabase **de staging**). `PADDLE_SIGNATURE_TOLERANCE_SEC` só se o item 12 da §14.4 mandar. **As variáveis só valem no próximo deployment**: crie todas **antes** do passo (c). **Faça também o passo (b2) (schema no banco de staging) antes do (c).**
 
 ### 14.2b Passo (b2): aplicar o schema da `wip/paddle` no **Supabase de STAGING** (antes do build)
+> **ATENÇÃO (08/11/2026): o SHA do build tem de ser o do commit que traz a CORREÇÃO DE REAPLICAÇÃO do schema.** O arquivo das versões anteriores (rc1, rc2 e commits da `wip/paddle` até `e34d127`) cria **compras `hotmart` fantasmas e ativas** ao ser reaplicado em banco com compra Gumroad/Paddle: foi o que aconteceu no staging. Se o staging já tem o fantasma, limpe com `OPERACAO_EN.md` §7.2 (e confira com §7.1) **antes** de testar; depois da correção aplicada, reaplicar é seguro.
+
 **Por que é obrigatório:** o staging está com o schema da rc2. Sem este passo falta a função `nexo_purchase_owner` (a rota `/api/paddle-license` responde erro e o teste dá falso negativo) e `nexo_lookup_license` ainda conta compras `paddle` pelo acesso só por e-mail (regra D3 não aplicada). O arquivo é **idempotente** e roda numa única transação (`begin`…`commit`): pode rodar de novo sem problema, e se der erro nada é aplicado. Os pré-requisitos (`schema.sql` e `schema-refund-history.sql`) já devem estar no banco desde a rc2; se a consulta 1 abaixo acusar tabela ausente, **pare** e avise a engenharia.
 
 1. **Clone no commit fixo** (é o mesmo clone do passo (c); se já fez, só confira o SHA):
@@ -256,7 +258,7 @@ git rev-parse HEAD          # tem de ser igual ao SHA informado
 notepad apps\nexoprocess\api\_lib\schema-purchases.sql
 ```
 2. **Confirme o projeto:** abra o Supabase e confira, no canto superior esquerdo, que o projeto selecionado é o de **STAGING** (não o de produção). Só continue se o nome for o do staging.
-3. **Consulta ANTES** (SQL Editor > New query > cole, Run). Anote os números:
+3. **Consulta ANTES** (rode também as três consultas de `OPERACAO_EN.md` §7.1, só leitura, e anote as contagens) (SQL Editor > New query > cole, Run). Anote os números:
 ```sql
 select
   (select count(*) from public.nexo_purchases)              as compras,
@@ -269,7 +271,7 @@ select
 ```
    Esperado **antes**: `tem_purchase_state = true`, `tem_purchase_owner = false`, `lookup_exclui_paddle = false`.
 4. **Aplicar:** no Notepad (arquivo `schema-purchases.sql` do commit fixo), **Ctrl+A, Ctrl+C**; no Supabase abra **outra** New query, **Ctrl+V** e **Run**. Esperado: sucesso, sem erro (avisos "already exists, skipping" são normais).
-5. **Consulta DEPOIS** (a mesma do item 3, Run de novo). Esperado **depois**: `compras`, `eventos`, `bloqueios` e `licencas` **iguais** aos de antes (o schema não apaga nem cria compras); `tem_purchase_state = true`, `tem_purchase_owner = true`, `lookup_exclui_paddle = true`. Se qualquer um divergir, **não prossiga** e avise a engenharia.
+5. **Consulta DEPOIS** (a mesma do item 3, Run de novo; rode de novo as três de §7.1: **zero linhas**). Esperado **depois**: `compras`, `eventos`, `bloqueios` e `licencas` **iguais** aos de antes (o schema não apaga nem cria compras); `tem_purchase_state = true`, `tem_purchase_owner = true`, `lookup_exclui_paddle = true`. Se qualquer um divergir, **não prossiga** e avise a engenharia.
 6. Anote (sem valores sensíveis) as contagens antes/depois e o nome do projeto.
 
 ### 14.3 Passo (c): build e deploy de staging (Windows, PowerShell, **uma sessão só**)
@@ -358,7 +360,7 @@ select platform, transaction_id, email, status, access_active, amount, currency,
 6. Efeito no servidor: o build ajusta apenas o CSP de `/en/*` (`script-src` ganha `https://cdn.paddle.com`; `frame-src` e `connect-src` ganham as origens). O app (`/entrar`, `/app`) continua com `script-src 'self'`.
 
 ### 14.6 Ir para a produção (somente depois de tudo acima)
-0. **Schema no banco de PRODUÇÃO, ANTES do deploy da rc3 (obrigatório).** O banco de produção está com o schema anterior: sem `nexo_purchase_owner` o `/api/paddle-license` falha, e sem a nova `nexo_lookup_license` o acesso só por e-mail ainda contaria compras `paddle`. Repita **exatamente o passo (b2)** (14.2b), mas no Supabase de **PRODUÇÃO** (confira o nome do projeto antes de colar), com a consulta ANTES e DEPOIS: contagens iguais, `tem_purchase_owner = true`, `lookup_exclui_paddle = true`. Só então faça o deploy. Rodar o schema **não** altera compras existentes (Hotmart/Gumroad seguem iguais); ainda assim, é uma escrita no banco de produção: ação do fundador, com o commit da rc3 aberto no Notepad.
+0. **Schema no banco de PRODUÇÃO, ANTES do deploy da rc3 (obrigatório).** **Primeiro rode `OPERACAO_EN.md` §7.1 (só leitura) em produção e guarde o resultado; se (A) ou (B) trouxer linhas, NÃO aplique nada e chame a engenharia.** O arquivo a aplicar é **somente** o do commit da rc3 (com a correção de reaplicação); **nunca** o da rc1/rc2. O banco de produção está com o schema anterior: sem `nexo_purchase_owner` o `/api/paddle-license` falha, e sem a nova `nexo_lookup_license` o acesso só por e-mail ainda contaria compras `paddle`. Repita **exatamente o passo (b2)** (14.2b), mas no Supabase de **PRODUÇÃO** (confira o nome do projeto antes de colar), com a consulta ANTES e DEPOIS: contagens iguais, `tem_purchase_owner = true`, `lookup_exclui_paddle = true`. Só então faça o deploy. Rodar o schema **não** altera compras existentes (Hotmart/Gumroad seguem iguais); ainda assim, é uma escrita no banco de produção: ação do fundador, com o commit da rc3 aberto no Notepad.
 1. Conta **live** aprovada pela Paddle (DADO DO USUÁRIO: a Paddle já disse que aceita pessoa física no Brasil e revisa o site no ar). Seguir o checklist oficial: https://developer.paddle.com/build/go-live-checklist .
 2. Recriar produto, preço e **destino de notificação** na conta live (sandbox e live **não compartilham** nada, P7). Destino com `traffic_source` = **Platform only**. Novo segredo do destino.
 3. Trocar as variáveis para live: `PADDLE_ENV=production`, `PADDLE_API_KEY` (`pdl_live_…`), `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRODUCT_ID`; build com `VITE_PADDLE_CLIENT_TOKEN` (`live_…`), `VITE_PADDLE_ENV=production`, `VITE_PADDLE_PRICE_ID`. O servidor recusa chave cujo prefixo não bate com `PADDLE_ENV`.

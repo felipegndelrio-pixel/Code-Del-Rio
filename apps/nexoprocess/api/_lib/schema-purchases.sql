@@ -78,6 +78,10 @@ create index if not exists nexo_purchases_email_access_idx
   on public.nexo_purchases (email, access_active, last_event_occurred_at desc);
 
 -- Known legacy transactions become Hotmart purchases; conflicts do not overwrite newer data.
+-- REAPLICAÇÃO SEGURA: nexo_licenses também é a PROJEÇÃO das compras (nexo_refresh_license_access grava nela o
+-- transaction_id da compra de qualquer plataforma). Por isso só migra a licença cuja transação NÃO tem compra
+-- registrada em QUALQUER plataforma; senão, reaplicar o schema criaria uma compra 'hotmart' fantasma (ativa) para
+-- cada compra gumroad/paddle, furando a D3 e sobrevivendo a reembolsos. Na 1ª migração (sem compras) nada muda.
 insert into public.nexo_purchases (
   platform, transaction_id, email, product_id, status, access_active,
   last_event_occurred_at, last_event, updated_at
@@ -98,9 +102,13 @@ select
 from public.nexo_licenses l
 where l.transaction ~ '^[A-Za-z0-9_-]{1,64}$'
   and l.email = lower(btrim(l.email))
+  and not exists (select 1 from public.nexo_purchases p0 where p0.transaction_id = l.transaction)
+order by l.updated_at, l.email
 on conflict (platform, transaction_id) do nothing;
 
 -- The immutable legacy refund history remains authoritative for known refunds.
+-- REAPLICAÇÃO SEGURA: não cria nem atualiza linha 'hotmart' para transação que pertence a OUTRA plataforma.
+-- (Para linhas Hotmart novas ou já existentes o comportamento é o de sempre.)
 insert into public.nexo_purchases (
   platform, transaction_id, email, product_id, status, access_active,
   last_event_occurred_at, last_event, updated_at
@@ -111,6 +119,7 @@ select 'hotmart', r.transaction, lower(btrim(r.email)),
 from public.nexo_refunded_transactions r
 where r.transaction ~ '^[A-Za-z0-9_-]{1,64}$'
   and r.email = lower(btrim(r.email))
+  and not exists (select 1 from public.nexo_purchases p0 where p0.transaction_id = r.transaction and p0.platform <> 'hotmart')
 on conflict (platform, transaction_id) do update
   set status = 'refunded', access_active = false,
       last_event_occurred_at = greatest(public.nexo_purchases.last_event_occurred_at, excluded.last_event_occurred_at),
@@ -119,6 +128,11 @@ on conflict (platform, transaction_id) do update
   where public.nexo_purchases.email = excluded.email;
 
 -- Invalid/missing legacy identifiers become explicit blocks; no synthetic purchase is made.
+-- REAPLICAÇÃO SEGURA: não vale para e-mail que tenha compra de OUTRA plataforma nem para e-mail que JÁ tenha algum
+-- bloqueio (resolvido ou não). Motivo: depois da 1ª aplicação a projeção reescreve a licença legada com transação nula
+-- (e e-mails que só têm bloqueio, ex. id inválido gumroad, também são projetados assim); sem esta trava, cada reaplicação
+-- criaria um bloqueio 'legacy_*' a mais, 'hotmart' e fantasma, que continuaria cortando o acesso depois de resolvido o
+-- original. Na 1ª migração não há bloqueios nem compras de outra plataforma, então o resultado é o de sempre.
 insert into public.nexo_reconciliation_blocks (email, platform, transaction_id, product_id, reason, event_type, created_at)
 select lower(btrim(l.email)), 'hotmart',
        case when l.transaction ~ '^[A-Za-z0-9_-]{1,64}$' then l.transaction else null end,
@@ -134,6 +148,8 @@ from public.nexo_licenses l
 where l.email = lower(btrim(l.email))
   and (l.transaction is null or l.transaction !~ '^[A-Za-z0-9_-]{1,64}$'
        or l.product_id is null or l.product_id !~ '^[A-Za-z0-9._:-]{1,128}$')
+  and not exists (select 1 from public.nexo_purchases p0 where p0.email = lower(btrim(l.email)) and p0.platform <> 'hotmart')
+  and not exists (select 1 from public.nexo_reconciliation_blocks b0 where b0.email = lower(btrim(l.email)))
   and not exists (
     select 1 from public.nexo_reconciliation_blocks b
      where b.email = lower(btrim(l.email))

@@ -33,6 +33,8 @@ create table if not exists public.nexo_refunded_transactions (
 drop index if exists public.nexo_refunded_transactions_email_idx;
 
 -- 2) Migrar transações de licenças já revogadas para o histórico.
+-- SÓ NA PRIMEIRA APLICAÇÃO (antes de existir nexo_purchases): depois, nexo_licenses é a projeção das compras de
+-- qualquer plataforma, e copiá-la aqui gravaria, num histórico imutável, transações que não são reembolsos Hotmart.
 insert into public.nexo_refunded_transactions (
   email,
   transaction,
@@ -44,6 +46,7 @@ select email, transaction, product_id, event, updated_at
 from public.nexo_licenses
 where status = 'revoked'
   and transaction ~ '^[A-Za-z0-9_-]{1,64}$'
+  and to_regclass('public.nexo_purchases') is null
 on conflict (email, transaction) do nothing;
 
 -- 3) Histórico imutável: bloquear UPDATE, DELETE e TRUNCATE.

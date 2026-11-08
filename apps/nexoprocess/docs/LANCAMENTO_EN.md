@@ -1,5 +1,8 @@
 # Lançamento EN (Gumroad) — runbook do fundador
 
+> **ATENÇÃO (08/11/2026): NÃO reaplique `schema-purchases.sql` nem `schema-refund-history.sql` de um commit anterior à correção** (inclui a rc1 e a **v2.6.0-rc2**). Reaplicar o arquivo antigo em banco com compra `gumroad`/`paddle` cria compras `hotmart` **fantasmas e ativas** (liberam o comprador pelo e-mail e sobrevivem a reembolso). A correção está em `wip/paddle` (candidata rc3). Antes e depois de qualquer aplicação no banco real, rode `OPERACAO_EN.md` §7.1 (só leitura). Detalhes e limpeza: `OPERACAO_EN.md` §7.
+
+
 Versão 2, de 01/11/2026 (v1 de 31/10/2026), branch `wip/en-foundation`. **Escrito por Sonnet; revisar** (a política pede Opus alto para schema e reembolso). Feito para o iPhone. **Nenhum segredo neste arquivo**: os valores ficam só nos painéis (Cloudflare, Supabase, Gumroad).
 
 Quem executa: o fundador (esta sessão de engenharia não tem acesso a Cloudflare, Supabase nem Gumroad).
@@ -12,6 +15,8 @@ Ordem: sem pular etapas. Cada etapa tem um "pronto quando" verificável.
   - Siga a seção **"Troca inicial e retomada após rollback"** de `docs/DEPLOY_CLOUDFLARE.md`, passos 1 a 7: exportar `nexo_licenses`, impressão digital, divergência zero.
   - **Não pule esse procedimento.**
 - **Se já for a rc1:** a etapa 3 abaixo só reaplica `schema-purchases.sql`, que é idempotente e não muda o Hotmart.
+  - **Correção de 08/11/2026:** a frase acima valia só para o arquivo da rc1/rc2, que **não** é seguro de reaplicar com compras Gumroad/Paddle no banco (ver o aviso abaixo). Use **somente** o arquivo corrigido (rc3).
+
 
 ## 1. Gumroad (o fundador já está fazendo)
 
