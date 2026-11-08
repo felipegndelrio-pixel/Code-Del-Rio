@@ -345,18 +345,20 @@ Paddle → **Events > Notifications**: status de cada notificação (`delivered`
 **6.3.4 Entrava e deixou de entrar.** Rode **P-D** e leia `status`: `refunded` (reembolso total aprovado pela Paddle), `charged_back` (chargeback **ou aviso de chargeback**, D-P8), `refund_pending_approval`/`partially_refunded` (acesso **mantido**; se o app negar, é bloqueio: consulta B). Confira no painel da Paddle (Transactions) que o reembolso/disputa existe. Foi engano seu: corrija na Paddle; se o app ainda negar, avise a engenharia **antes** de mexer no banco.
 
 ### 6.4 Concessão manual (compra Paddle conferida no painel da Paddle)
-Escrita: confira cada valor antes. Use a plataforma **`paddle_manual`** (não `paddle`): compras `paddle` só valem pela ativação por transação (regra D3); `paddle_manual` vale também no acesso só por e-mail, como `gumroad_manual`.
+**Regra (decisão do revisor, 08/11/2026):** a concessão manual para quem entra pela tela EN usa **`platform = 'paddle'` e o `txn_…` real** da compra. **Não use `paddle_manual`** e não há mudança de código prevista: a ativação (`/api/paddle-license`) só enxerga `platform = 'paddle'`, e compras `paddle` não valem pelo acesso só por e-mail (regra D3).
+
+Escrita: confira cada valor antes.
 ```sql
 select public.nexo_grant_purchase(
-  'paddle_manual',                       -- plataforma da concessão manual
-  'txn_COLE_AQUI_EM_MINUSCULAS',         -- id da transação como a Paddle mostra (txn_ + 26 caracteres)
+  'paddle',                              -- plataforma (sempre 'paddle')
+  'txn_COLE_AQUI_EM_MINUSCULAS',         -- id real da transação (txn_ + 26 caracteres), como a Paddle mostra
   'cliente@exemplo.com',                 -- e-mail da compra, minúsculo
   'pro_COLE_AQUI',                       -- id do produto (PADDLE_PRODUCT_ID)
   'PADDLE_TRANSACTION_COMPLETED',        -- precisa conter COMPLETE ou APPROVED
   39, null, 'USD', null, null            -- valor, reembolso, moeda, id do evento, data
 );
 ```
-Esperado: `{"result": "active", "status": "active"}`. Depois, peça ao cliente para entrar. **Atenção (A VALIDAR):** o acesso de `paddle_manual` entra pelo caminho **só por e-mail** do app **PT** (`/api/license`); a entrada EN pela Paddle (`/api/paddle-license`) confere `platform = 'paddle'` e **não** enxerga `paddle_manual`. Se o cliente usa a tela EN, conceda com `platform = 'paddle'` e o **`txn_` real** (o mesmo comando trocando `'paddle_manual'` por `'paddle'`), que é o que a ativação por e-mail + transação consulta. Avise a engenharia em qualquer concessão manual.
+Esperado: `{"result": "active", "status": "active"}`. Depois, peça ao cliente para entrar com **e-mail + id da transação** (passe o `txn_…` só por resposta ao e-mail da compra). Se o webhook da mesma compra chegar depois, ele é idempotente: a compra já existe e o estado é o do evento mais recente. Avise a engenharia em qualquer concessão manual.
 
 ### 6.5 Revogação manual (reembolso/chargeback que não chegou)
 ```sql
@@ -374,4 +376,4 @@ select public.nexo_revoke_purchase('paddle', 'txn_COLE_AQUI', 'cliente@exemplo.c
 | `PADDLE_API_KEY`/`PADDLE_ENV` apontados no 503 (`invalida`) | prefixo da chave (`pdl_live_`/`pdl_sdbx_`) não bate com `PADDLE_ENV` |
 
 ### 6.7 O que este adendo NÃO verificou
-Nomes de menu da Paddle; qualquer SQL contra um banco real com compras Paddle (conferidas só as colunas e a classificação pelo G3); o caminho de `paddle_manual` no app EN (ver aviso em 6.4); a Paddle real.
+Nomes de menu da Paddle; qualquer SQL contra um banco real com compras Paddle (conferidas só as colunas e a classificação pelo G3); a Paddle real.
