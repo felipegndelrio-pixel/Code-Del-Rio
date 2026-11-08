@@ -269,3 +269,109 @@ order by quando desc;
 - Nenhuma consulta SQL deste guia foi executada contra o seu banco de produção (não há acesso); os nomes de tabelas e colunas vêm de `api/_lib/schema-purchases.sql`. As funções `nexo_*` citadas têm testes de integração (`tests/integration/store.postgres.test.ts`).
 - O comando PowerShell e os nomes de menu da Cloudflare, Gumroad e Supabase estão marcados **A VALIDAR**.
 - O estado de produção (deploy, V5=200, KYC da Stripe) é informação do revisor.
+
+---
+
+## 6. Canal Paddle (adendo; só vale se a Paddle for ligada)
+
+Adicionado em 08/11/2026 na `wip/paddle`. Desenho e fatos oficiais: `PADDLE_ENTITLEMENT.md`. **Nada aqui foi executado contra a Paddle real** (conta ainda não existe): as consultas SQL seguem o schema (`platform = 'paddle'`), o fluxo vem dos testes. Mesmas regras do início deste guia: SELECT é só leitura; **nunca** cole segredo, chave de API ou segredo do destino em chat, e-mail ou repositório.
+
+Fatos do canal que mudam o suporte (ver `PADDLE_ENTITLEMENT.md`): o comprador entra com **e-mail da compra + id da transação (`txn_…`)**, não com chave; a compra só existe no banco depois que o **webhook assinado** da Paddle chega; ids ficam como a Paddle os manda (sem `==`).
+
+### 6.1 Consultas do Supabase (só leitura)
+
+**P-A. Compras Paddle das últimas 72 h**
+```sql
+select platform, transaction_id, email, status, access_active, amount, currency, refunded_amount, last_event, last_event_occurred_at
+  from public.nexo_purchases
+ where platform like 'paddle%' and last_event_occurred_at > now() - interval '72 hours'
+ order by last_event_occurred_at desc;
+```
+Esperado: `status = 'active'`, `access_active = true`, `last_event = 'PADDLE_TRANSACTION_COMPLETED'`, `transaction_id` começando por `txn_`.
+
+**P-B. Compras Paddle com problema**
+```sql
+select platform, transaction_id, email, status, access_active, refunded_amount, last_event, last_event_occurred_at
+  from public.nexo_purchases
+ where platform like 'paddle%' and (access_active = false or status <> 'active')
+ order by last_event_occurred_at desc;
+```
+Esperado: só reembolsos e disputas que você conhece. Estados possíveis: `refunded`, `partially_refunded` (acesso mantido), `refund_pending_approval` (acesso mantido), `charged_back` (**inclui o aviso de chargeback**, D-P8), `active` depois de reversão.
+
+**P-C. Eventos da Paddle recebidos (confere se o webhook está chegando)**
+```sql
+select provider_event_id, transaction_id, event_type, occurred_at, received_at, applied
+  from public.nexo_purchase_events
+ where platform = 'paddle' and received_at > now() - interval '48 hours'
+ order by received_at desc;
+```
+`provider_event_id` é `evt_…` (compra) ou `adj_…:<status>` (reembolso/chargeback). Venda feita e **nenhuma** linha aqui = o webhook não está chegando (ver 6.3).
+
+**P-D. Uma compra pelo id da transação**
+```sql
+select platform, transaction_id, email, status, access_active, amount, currency, refunded_amount, last_event, last_event_occurred_at
+  from public.nexo_purchases
+ where platform like 'paddle%' and transaction_id = 'txn_COLE_AQUI_EM_MINUSCULAS';
+```
+
+**P-E. Bloqueios abertos de e-mails com compra Paddle** (continua valendo a consulta B da seção 1.2: um bloqueio aberto corta o acesso de todas as compras do e-mail).
+
+### 6.2 Painel da Paddle (A VALIDAR os nomes de menu)
+Paddle → **Events > Notifications**: status de cada notificação (`delivered`, `needs_retry`, `failed`) e as tentativas; **Transactions**: a compra e o reembolso. Na conta live a Paddle tenta até 60 vezes em cerca de 2 dias e, esgotadas, dá para **reenviar** a notificação (*replay*) pela API (fonte: `PADDLE_ENTITLEMENT.md` §3).
+
+### 6.3 Árvore "comprador não entrou pela Paddle"
+
+| Mensagem na tela | O que significa | Ir para |
+|---|---|---|
+| "We couldn’t find an active purchase matching this email address and transaction ID." (404) | compra ainda não gravada, e-mail diferente do da compra, id errado ou compra reembolsada/em disputa | 6.3.1 |
+| "Enter the transaction ID of your purchase (it starts with txn_)." (400) | id digitado fora do formato | pedir para copiar o id inteiro (`txn_` + 26 caracteres) |
+| "Finishing your purchase…" por até ~30 s e depois a mensagem 404 | o pagamento terminou, mas o webhook não chegou a tempo | 6.3.2 |
+| "We couldn’t verify your license right now…" (502) | banco fora do ar | 2.4 (mesma regra) |
+| "License activation is temporarily unavailable…" (503) | configuração do servidor (rota `/api/paddle-license` só precisa de `LICENSE_PRIVATE_JWK` e `SUPABASE_*`) | 2.5 |
+| "Access expired…" (401) | passou de 30 dias sem renovar | 2.6 |
+| Entrava e deixou de entrar | reembolso ou chargeback | 6.3.4 |
+
+**6.3.1 404.** (1) Peça o **e-mail usado no checkout** e o **número do pedido/fatura** do recibo da Paddle (não peça cartão). (2) Rode **P-D** com o `txn_…` do cliente, se ele souber; senão **P-A** e procure o e-mail. (3) Sem linha nenhuma: a compra não chegou por webhook → 6.3.2. (4) Linha existe e `email` é outro: o cliente digitou outro e-mail (a Paddle também pode ter o e-mail atualizado no cadastro do cliente depois da compra); peça o e-mail **da compra**. (5) `access_active = false`: veja o `status` (6.3.4). (6) Linha ativa e o app nega: rode a consulta B (bloqueio aberto → 2.8).
+
+**6.3.2 Webhook não chegou (a compra não está no banco).**
+1. Paddle > **Events > Notifications**: a notificação de `transaction.completed` daquela compra está `delivered`, `needs_retry` ou `failed`? Anote só o status e o código de resposta.
+2. `needs_retry`: a Paddle ainda está tentando; espere. Veja o log da função (`paddle … → 401 assinatura inválida (expirada)` = relógio/tolerância, ver `PADDLE_ENTITLEMENT.md` §14 item 12; `cliente indisponível` = chave de API errada ou Paddle fora; `falha ao gravar` = banco).
+3. `failed` (tentativas esgotadas): corrija a causa e **reenvie** a notificação (replay) pela Paddle; ou conceda à mão (6.4).
+4. Nenhuma notificação para a compra: confira o **destino** (endereço `/api/paddle-webhook`, três eventos assinados, ativo) e o **WAF** (caminho liberado).
+5. Se o log disser `ignorado (outro_produto)` ou `(assinatura)`: o `PADDLE_PRODUCT_ID` não confere com o preço vendido, ou a compra é recorrente. Avise a engenharia.
+
+**6.3.3 O comprador não acha o `txn_…`.** Quem volta do checkout pela página de venda entra sozinho (e-mail e id vêm preenchidos). Quem fechou a aba: o id está no recibo **se** a Paddle o mostrar (A VALIDAR; `PADDLE_ENTITLEMENT.md` §14 item 11). Se não mostrar: ache a compra pelo e-mail (P-A) e **passe o `transaction_id` ao cliente** só por resposta ao e-mail da compra, ou conceda à mão (6.4).
+
+**6.3.4 Entrava e deixou de entrar.** Rode **P-D** e leia `status`: `refunded` (reembolso total aprovado pela Paddle), `charged_back` (chargeback **ou aviso de chargeback**, D-P8), `refund_pending_approval`/`partially_refunded` (acesso **mantido**; se o app negar, é bloqueio: consulta B). Confira no painel da Paddle (Transactions) que o reembolso/disputa existe. Foi engano seu: corrija na Paddle; se o app ainda negar, avise a engenharia **antes** de mexer no banco.
+
+### 6.4 Concessão manual (compra Paddle conferida no painel da Paddle)
+Escrita: confira cada valor antes. Use a plataforma **`paddle_manual`** (não `paddle`): compras `paddle` só valem pela ativação por transação (regra D3); `paddle_manual` vale também no acesso só por e-mail, como `gumroad_manual`.
+```sql
+select public.nexo_grant_purchase(
+  'paddle_manual',                       -- plataforma da concessão manual
+  'txn_COLE_AQUI_EM_MINUSCULAS',         -- id da transação como a Paddle mostra (txn_ + 26 caracteres)
+  'cliente@exemplo.com',                 -- e-mail da compra, minúsculo
+  'pro_COLE_AQUI',                       -- id do produto (PADDLE_PRODUCT_ID)
+  'PADDLE_TRANSACTION_COMPLETED',        -- precisa conter COMPLETE ou APPROVED
+  39, null, 'USD', null, null            -- valor, reembolso, moeda, id do evento, data
+);
+```
+Esperado: `{"result": "active", "status": "active"}`. Depois, peça ao cliente para entrar. **Atenção (A VALIDAR):** o acesso de `paddle_manual` entra pelo caminho **só por e-mail** do app **PT** (`/api/license`); a entrada EN pela Paddle (`/api/paddle-license`) confere `platform = 'paddle'` e **não** enxerga `paddle_manual`. Se o cliente usa a tela EN, conceda com `platform = 'paddle'` e o **`txn_` real** (o mesmo comando trocando `'paddle_manual'` por `'paddle'`), que é o que a ativação por e-mail + transação consulta. Avise a engenharia em qualquer concessão manual.
+
+### 6.5 Revogação manual (reembolso/chargeback que não chegou)
+```sql
+select public.nexo_revoke_purchase('paddle', 'txn_COLE_AQUI', 'cliente@exemplo.com',
+  'pro_COLE_AQUI', 'PADDLE_REFUNDED');   -- ou 'PADDLE_CHARGEBACK'
+```
+**Nunca** use nomes com `DISPUTE_WON` ou `CHARGEBACK` + `WARNING`, nem `PADDLE_CREDIT` (o SQL os classificaria errado ou bloquearia o e-mail inteiro; ver `PADDLE_ENTITLEMENT.md` §4.3). Reversão de chargeback só com a compra em `charged_back`, usando `PADDLE_CHARGEBACK_REVERSED`.
+
+### 6.6 Sinais de alerta (juntar à tabela 1.5)
+| Sinal | Primeira ação |
+|---|---|
+| Venda na Paddle sem linha em P-A | 6.3.2 (webhook) |
+| Várias notificações `needs_retry`/`failed` na Paddle | log da função e variáveis `PADDLE_*` (nomes em `PADDLE_ENTITLEMENT.md` §9) |
+| Log com `assinatura inválida` em sequência | segredo do destino diferente do da Cloudflare, ou tolerância (§14 item 12) |
+| `PADDLE_API_KEY`/`PADDLE_ENV` apontados no 503 (`invalida`) | prefixo da chave (`pdl_live_`/`pdl_sdbx_`) não bate com `PADDLE_ENV` |
+
+### 6.7 O que este adendo NÃO verificou
+Nomes de menu da Paddle; qualquer SQL contra um banco real com compras Paddle (conferidas só as colunas e a classificação pelo G3); o caminho de `paddle_manual` no app EN (ver aviso em 6.4); a Paddle real.
