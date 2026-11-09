@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Teste D1 — validação de token no Safari</title>
+<style>body{font:16px/1.4 -apple-system,system-ui,sans-serif;margin:16px;max-width:42rem}pre{white-space:pre-wrap;word-break:break-all;background:#f2f2f2;padding:8px;border-radius:6px}textarea{width:100%;height:7rem;font:13px monospace}button{font-size:16px;padding:10px 14px;margin:6px 0}.ok{color:#0a7d2c}.bad{color:#b00020}</style>
+</head>
+<body>
+<h1>Teste D1 (sem dado pessoal)</h1>
+<p>Esta página não envia nada para lugar nenhum, não lê o app e não usa e-mail nem token. Ela só testa o Safari e confere a chave PÚBLICA que você colar.</p>
+
+<h2>Parte 1 — o Safari consegue assinar e verificar?</h2>
+<button id="b1">Rodar parte 1</button>
+<pre id="o1">(não rodou)</pre>
+
+<h2>Parte 2 — a chave pública do build é legível?</h2>
+<p>Cole a linha VITE_LICENSE_PUBLIC_JWK como está no Cloudflare/build (é a chave PÚBLICA, começa com { e tem "kty"). NUNCA cole a privada (a que tem "d").</p>
+<textarea id="t2" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+<button id="b2">Rodar parte 2</button>
+<pre id="o2">(não rodou)</pre>
+
+<script>
+'use strict';
+const ALG = { name: 'ECDSA', namedCurve: 'P-256' }, SIGN = { name: 'ECDSA', hash: 'SHA-256' };
+// Mesmas funções do app (src/license/token.ts): base64url e importKey jwk com key_ops.
+function toB64url(bytes) { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function fromB64url(s) { const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)); return Uint8Array.from(b, (c) => c.charCodeAt(0)); }
+const line = (ok, text) => `<span class="${ok ? 'ok' : 'bad'}">${ok ? 'OK ' : 'FALHOU '}</span>${text}\n`;
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+document.getElementById('b1').onclick = async () => {
+  const o = document.getElementById('o1'); let h = '';
+  h += `Navegador: ${esc(navigator.userAgent)}\nContexto seguro (https): ${window.isSecureContext}\nWebCrypto (crypto.subtle): ${!!(window.crypto && crypto.subtle)}\nProtocolo: ${esc(location.protocol)}\nData/hora do aparelho: ${new Date().toISOString()}\n\n`;
+  try {
+    const kp = await crypto.subtle.generateKey(ALG, true, ['sign', 'verify']);
+    const pubRaw = await crypto.subtle.exportKey('jwk', kp.publicKey);
+    const privJwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    h += line(true, `gerou um par P-256 (membros da pública exportada pelo Safari: ${Object.keys(pubRaw).join(', ')})`);
+    const msg = new TextEncoder().encode('v1.teste');
+    const sig = new Uint8Array(await crypto.subtle.sign(SIGN, kp.privateKey, msg));
+    h += line(sig.length === 64, `assinatura de ${sig.length} bytes (esperado 64, formato r||s)`);
+    const sig2 = fromB64url(toB64url(sig));
+    h += line(sig2.length === 64 && sig2.every((v, i) => v === sig[i]), 'base64url ida e volta igual');
+    const variants = {
+      'exportada crua': pubRaw,
+      'sem key_ops/ext (como o license-keys.mjs gera)': (({ key_ops, ext, ...k }) => k)(pubRaw),
+      'chave privada inteira (o app descarta o d)': privJwk,
+    };
+    for (const [name, jwk] of Object.entries(variants)) {
+      try {
+        const { d, ...pub } = jwk; void d;
+        const key = await crypto.subtle.importKey('jwk', { ...pub, key_ops: ['verify'] }, ALG, false, ['verify']);
+        const ok = await crypto.subtle.verify(SIGN, key, sig2, msg);
+        h += line(ok, `importKey + verify com a pública ${name}`);
+      } catch (e) { h += line(false, `${name}: ${esc(e && e.name)} ${esc(e && e.message)}`); }
+    }
+    h += '\nSe TUDO acima deu OK, o motor do Safari NÃO é a causa (hipótese b descartada).\n';
+  } catch (e) { h += line(false, `erro geral: ${esc(e && e.name)} ${esc(e && e.message)}\n(hipótese b: o Safari rejeitou algo do WebCrypto)`); }
+  o.innerHTML = h;
+};
+
+document.getElementById('b2').onclick = async () => {
+  const o = document.getElementById('o2'); const raw = document.getElementById('t2').value; let h = '';
+  const smart = /[“”„‟″‘’]/.test(raw);
+  h += line(!smart, smart ? 'tem aspas “inteligentes”: o JSON.parse do app FALHA e o app fica sem chave (mesma mensagem de erro do app). Cole com aspas retas ".' : 'sem aspas inteligentes');
+  let jwk = null;
+  try { jwk = JSON.parse(raw.trim()); h += line(true, 'JSON.parse (o mesmo que o app faz) funcionou'); } catch { h += line(false, 'JSON.parse falhou: o app trata como SEM chave pública (LICENSE.publicJwk = null) e mostra "não conseguiu validá-lo"'); }
+  if (jwk && typeof jwk === 'object') {
+    h += `membros: ${Object.keys(jwk).join(', ')}\n`;
+    h += line(jwk.kty === 'EC' && jwk.crv === 'P-256', `kty=${esc(jwk.kty)} crv=${esc(jwk.crv)} (esperado EC e P-256)`);
+    for (const n of ['x', 'y']) h += line(typeof jwk[n] === 'string' && jwk[n].length === 43 && /^[A-Za-z0-9_-]+$/.test(jwk[n]), `${n} tem ${typeof jwk[n] === 'string' ? jwk[n].length : 'nenhum'} caracteres (esperado 43, só A-Z a-z 0-9 - _)`);
+    h += line(!('d' in jwk), '"d" ausente (a parte privada NÃO está aqui)');
+    if ('d' in jwk) h += '\nATENÇÃO: você colou a chave com "d" (PRIVADA). Apague o texto agora e use só a pública.\n';
+    else {
+      try {
+        const { d, ...pub } = jwk; void d;
+        await crypto.subtle.importKey('jwk', { ...pub, key_ops: ['verify'] }, ALG, false, ['verify']);
+        h += line(true, 'o Safari importou a chave pública');
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${jwk.x}${jwk.y}`)));
+        const fp = [...digest.slice(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join('');
+        h += `\nImpressão digital desta chave: ${fp}\nCompare com a impressão digital do PAR no servidor (node apps/nexoprocess/scripts/license-keys.mjs imprime a do par gerado; o check-sale-env imprime a do build). Se for DIFERENTE da do servidor, a chave do bundle não é a do servidor (hipótese a).\n`;
+      } catch (e) { h += line(false, `importKey: ${esc(e && e.name)} ${esc(e && e.message)}`); }
+    }
+  }
+  o.innerHTML = h;
+};
+</script>
+</body>
+</html>
