@@ -143,6 +143,13 @@ $h = [Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.
 
 Se os 8 caracteres forem diferentes dos do build, **não publique**: a pública do build e a privada do servidor não são o mesmo par. **A VALIDAR:** este comando PowerShell não foi executado por esta sessão (sem PowerShell no ambiente); o cálculo equivalente foi conferido em Node e em Python (vetor fixo `e2655e92`). Se o PowerShell mostrar outra coisa para a mesma chave, avise antes de confiar nele.
 
+### 4.3 Conferir o deploy: `nexo:check-deploy` (PASSO OBRIGATÓRIO depois de TODO deploy, staging e produção)
+Motivo (D1, 09/11/2026): o login em produção falhou com "o acesso foi confirmado, mas este aparelho não conseguiu validá-lo" porque a chave pública embutida no app não era a do par que o servidor usa, e nada avisou. A conferência acima (4.2) é antes do deploy e depende de você comparar à mão; esta é automática e olha o que está **no ar**.
+```bash
+npm run nexo:check-deploy -- https://SEU-DOMINIO
+```
+O comando abre a página, lê os arquivos JS publicados, acha a chave pública que o app recebeu, calcula a impressão digital (8 hex) e compara com `GET /api/license-key-fingerprint` (a rota calcula a mesma impressão digital a partir da `LICENSE_PRIVATE_JWK` **do ambiente daquele domínio**; ela expõe só os 8 hex, nunca a chave). Saída `OK` e código 0 = iguais. **Qualquer `FALHOU` = o deploy NÃO está pronto**: diferentes (par trocado), bundle sem chave, chave com aspas “inteligentes” ou x/y com tamanho errado, rota com 503 (variável faltando ou inválida; o nome vem na resposta) ou `build-id: unversioned` (não passou pelo build de venda). Corrija e rode de novo. Staging e produção têm pares **diferentes** de variáveis: rode contra cada domínio. Não imprime a chave; pode colar a saída no chat.
+
 ## 5. Verificação no iPhone (Safari)
 
 | # | Teste | Esperado |

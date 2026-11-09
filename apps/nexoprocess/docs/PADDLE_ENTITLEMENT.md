@@ -315,6 +315,9 @@ npx wrangler pages deploy dist --project-name nexoprocess --branch staging-en --
 - **Não use `--branch main`** com este build.
 - A VALIDAR: o endereço do repositório e o nome do ramo/projeto (aqui os do pedido do revisor).
 
+### 14.3b Depois do deploy de staging: `nexo:check-deploy` (obrigatório)
+`npm run nexo:check-deploy -- https://staging-en.nexoprocess.pages.dev` (e, na ida à produção, o mesmo contra o domínio de produção). Tem de terminar em `OK`. Se der `FALHOU`, não teste nada antes de corrigir: com par de chaves diferente nenhum comprador entra. Detalhe em `LANCAMENTO_EN.md` §4.3.
+
 ### 14.4 Passo (d): o teste (e a verificação por etapa)
 Cada linha com resultado e evidência. As com **"Bloqueia a venda"** precisam passar antes de qualquer venda real.
 

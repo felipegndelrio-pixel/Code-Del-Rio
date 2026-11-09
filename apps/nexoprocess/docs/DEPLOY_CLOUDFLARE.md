@@ -114,6 +114,12 @@ TEST_BASE_URL=https://SEU-PROJETO.pages.dev npm run nexo:test:csp:rotas
 curl -s -X POST https://SEU-PROJETO.pages.dev/api/license -H 'Content-Type: application/json' -d '{"email":"teste@exemplo.com"}'
 ```
 
+```bash
+# OBRIGATÓRIO depois de todo deploy: a chave pública do app publicado é a do servidor? (impressão digital do bundle × /api/license-key-fingerprint)
+npm run nexo:check-deploy -- https://SEU-PROJETO.pages.dev
+```
+Veja `LANCAMENTO_EN.md` §4.3 para ler o resultado.
+
 **PWA:** abra no Chrome do celular → menu → **Instalar app**. Entre com o e-mail uma vez com internet; depois funciona em modo avião. No iPhone: Safari → Compartilhar → **Adicionar à Tela de Início**.
 
 ## Passo 5 — Webhook na Hotmart

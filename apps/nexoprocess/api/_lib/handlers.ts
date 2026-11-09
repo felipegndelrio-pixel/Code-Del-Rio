@@ -1,5 +1,5 @@
 // Lógica das rotas, sem dependência da Vercel: Request → Response (testável).
-import { jwkProblems, parseJwkText, privateJwkProblem } from '../../src/license/jwk.mjs';
+import { jwkFingerprint, jwkProblems, parseJwkText, privateJwkProblem } from '../../src/license/jwk.mjs';
 import { normalizeEmail, signToken, verifyToken } from '../../src/license/token.js';
 import { parseHotmartText, readBodyLimited, redactPayload } from './hotmart.js';
 import { storeFromEnv, supabaseServiceKey, supabaseUrl, type Env, type LicenseStore } from './store.js';
@@ -65,6 +65,22 @@ export const licenseDepsFromEnv = (env: Env): LicenseDeps => {
     ...(problems.length ? { invalid: ['LICENSE_PRIVATE_JWK'], invalidDetail: problems } : {}),
   };
 };
+
+/**
+ * GET /api/license-key-fingerprint → { fp }: impressão digital (8 hex = 4 primeiros bytes do SHA-256 de x seguido de y) do par de
+ * licença do AMBIENTE, calculada da LICENSE_PRIVATE_JWK. É a mesma que o build de venda e o license-keys.mjs imprimem, e serve
+ * para `nexo:check-deploy` comparar a chave do servidor com a que está embutida no bundle publicado. x e y são públicos; o `d`
+ * nunca entra na resposta. Sem a variável → 503 com o NOME dela; chave malformada → 503 com o motivo (sem valores).
+ */
+export async function handleKeyFingerprint(req: Request, privateJwkRaw: string | undefined): Promise<Response> {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return json(405, { error: 'metodo' });
+  if (!privateJwkRaw?.trim()) return notConfigured('/api/license-key-fingerprint', ['LICENSE_PRIVATE_JWK']);
+  const { jwk, problems } = readPrivateJwk(privateJwkRaw);
+  if (!jwk) return notConfigured('/api/license-key-fingerprint', undefined, undefined, { invalid: ['LICENSE_PRIVATE_JWK'], detail: problems });
+  const bad = await privateJwkProblem(jwk);
+  if (bad) return notConfigured('/api/license-key-fingerprint', undefined, undefined, { invalid: ['LICENSE_PRIVATE_JWK'], detail: [bad] });
+  return json(200, { fp: await jwkFingerprint(jwk) });
+}
 
 export const webhookDepsFromEnv = (env: Env): WebhookDeps => ({
   store: storeFromEnv(env),
