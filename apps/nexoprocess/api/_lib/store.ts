@@ -36,6 +36,15 @@ export interface PurchaseOwner {
   blocked: boolean;
 }
 
+/** Evento de webhook recusado/ignorado com dado útil para o runbook. SEM e-mail e SEM corpo do evento. */
+export interface WebhookRejection {
+  platform: string;
+  provider_event_id: string | null;
+  event_type: string | null;
+  transaction_id: string | null;
+  reason: string;
+}
+
 export interface LicenseStore {
   kind: 'supabase' | 'allowlist' | 'memory';
   lookup(email: string): Promise<LicenseStatus | null>;
@@ -45,6 +54,8 @@ export interface LicenseStore {
   purchaseState?(platform: string, transaction: string): Promise<PurchaseState | null>;
   /** Dono (e-mail) e estado de uma compra, ou null. Usado pela Paddle (ativação e revogação). */
   purchaseOwner?(platform: string, transaction: string): Promise<PurchaseOwner | null>;
+  /** Registro persistente de evento recusado/ignorado (nexo_webhook_rejections). Falha aqui nunca muda a resposta. */
+  recordWebhookRejection?(rec: WebhookRejection): Promise<void>;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -180,6 +191,21 @@ export function supabaseStore(
       return { email, status, access_active, blocked };
     },
 
+    async recordWebhookRejection(rec) {
+      const r = await fetchImpl(`${root}/rpc/nexo_record_webhook_rejection`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          p_platform: rec.platform,
+          p_provider_event_id: rec.provider_event_id,
+          p_event_type: rec.event_type,
+          p_transaction_id: rec.transaction_id,
+          p_reason: rec.reason,
+        }),
+      });
+      if (!r.ok) throw new Error(`Supabase recordWebhookRejection: HTTP ${r.status}`);
+    },
+
     async revoke(rec) {
       const { status } = await rpc(
         'nexo_revoke_purchase',
@@ -249,9 +275,11 @@ export function memoryStore(
 ): LicenseStore & {
   data: Map<string, LicenseRecord>;
   refunded: Map<string, Set<string>>;
+  rejections: WebhookRejection[];
 } {
   const data = new Map<string, LicenseRecord>();
   const refunded = new Map<string, Set<string>>();
+  const rejections: WebhookRejection[] = [];
 
   for (const [email, status] of Object.entries(initial)) {
     const normalizedEmail = normalizeEmail(email);
@@ -266,6 +294,11 @@ export function memoryStore(
     kind: 'memory',
     data,
     refunded,
+    rejections,
+
+    async recordWebhookRejection(rec) {
+      rejections.push({ ...rec });
+    },
 
     async lookup(email) {
       return data.get(normalizeEmail(email))?.status ?? null;

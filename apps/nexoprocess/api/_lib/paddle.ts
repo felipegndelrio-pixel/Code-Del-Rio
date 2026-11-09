@@ -9,12 +9,19 @@
 import { privateJwkProblem } from '../../src/license/jwk.mjs';
 import { normalizeEmail, signToken, verifyToken } from '../../src/license/token.js';
 import { maskEmail, notConfigured as notConfiguredBase, safeEqual } from './handlers.js';
-import type { LicenseStore } from './store.js';
+import type { LicenseStore, WebhookRejection } from './store.js';
 
 export const PADDLE_PLATFORM = 'paddle';
 export const PADDLE_API_BASE = { production: 'https://api.paddle.com', sandbox: 'https://sandbox-api.paddle.com' } as const;
 export const PADDLE_BODY_MAX_BYTES = 64 * 1024;
-export const DEFAULT_TOLERANCE_SEC = 5; // padrão dos SDKs oficiais da Paddle
+/**
+ * Tolerância da assinatura: 300 s (decisão do revisor, 09/11/2026). O padrão dos SDKs oficiais é 5 s, mas a doc não diz
+ * se uma retentativa é reassinada com `ts` novo. Reentrega de evento autêntico é idempotente (provider_event_id em
+ * nexo_purchase_events), então uma janela maior não permite gravar duas vezes. Máximo configurável: 600.
+ */
+export const DEFAULT_TOLERANCE_SEC = 300;
+/** Compra desconhecida num ajuste: abaixo disto → 503 (a Paddle reenvia); acima → 200 ignorado e registrado. */
+export const UNKNOWN_PURCHASE_GRACE_MS = 48 * 3600 * 1000;
 
 /** Nomes gravados. O SQL (schema-purchases.sql) classifica por eles: ver docs/PADDLE_ENTITLEMENT.md §4.3. */
 export const EVENTS = {
@@ -247,6 +254,8 @@ export interface PaddleDeps {
   ttlDays?: number;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Limite para gravar um evento recusado (padrão 2000 ms); estourar só vira log. */
+  recordTimeoutMs?: number;
   now?: () => number;
   missing?: string[];
   invalid?: string[];
@@ -298,11 +307,63 @@ const json = (status: number, body: unknown) =>
 
 const configProblem = (route: string, deps: PaddleDeps) => notConfiguredBase(route, deps.missing, undefined, { invalid: deps.invalid, detail: deps.invalidDetail });
 
+// ---------------------------------------------------------------- registro de eventos recusados (R3)
+
+const REJ_RE = { evt: /^evt_[a-z\d]{26}$/, type: /^[a-z_]{1,32}(\.[a-z_]{1,32}){0,3}$/, txn: RE.txn };
+
+/** Ids e nome do evento de um corpo ASSINADO porém inválido, só se casarem o formato (nunca e-mail nem corpo). */
+export function peekEnvelopeIds(text: string): { event_id: string | null; event_type: string | null; transaction: string | null } {
+  let o: unknown;
+  try {
+    o = JSON.parse(text);
+  } catch {
+    return { event_id: null, event_type: null, transaction: null };
+  }
+  if (!isObj(o)) return { event_id: null, event_type: null, transaction: null };
+  const ok = (v: unknown, re: RegExp) => (typeof v === 'string' && re.test(v) ? v : null);
+  const d = isObj(o.data) ? o.data : {};
+  return { event_id: ok(o.event_id, REJ_RE.evt), event_type: ok(o.event_type, REJ_RE.type), transaction: ok(d.transaction_id, REJ_RE.txn) ?? ok(d.id, REJ_RE.txn) };
+}
+
+/** Grava o motivo, sem e-mail e sem corpo. Falha ou demora não mudam a resposta do webhook (só log). */
+async function recordRejection(deps: PaddleDeps, reason: string, ev: { event_id: string | null; event_type: string | null }, transaction: string | null): Promise<void> {
+  const store = deps.store;
+  if (!store?.recordWebhookRejection) return;
+  const rec: WebhookRejection = {
+    platform: PADDLE_PLATFORM,
+    provider_event_id: ev.event_id && REJ_RE.evt.test(ev.event_id) ? ev.event_id : null,
+    event_type: ev.event_type && REJ_RE.type.test(ev.event_type) ? ev.event_type : null,
+    transaction_id: transaction && REJ_RE.txn.test(transaction) ? transaction : null,
+    reason,
+  };
+  try {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, rej) => {
+      timer = setTimeout(() => rej(new Error('tempo esgotado')), deps.recordTimeoutMs ?? 2000);
+    });
+    try {
+      await Promise.race([store.recordWebhookRejection(rec), timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    console.error(`paddle: não consegui registrar o evento recusado (${reason}) — ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/** Transação candidata de um evento rejeitado (só se tiver o formato txn_). */
+const candidateTransaction = (ev: PaddleEnvelope): string | null => {
+  const t = ev.data.transaction_id ?? ev.data.id;
+  return typeof t === 'string' && RE.txn.test(t) ? t : null;
+};
+
 // ---------------------------------------------------------------- rota do webhook
 
 /**
  * POST /api/paddle-webhook. 200 só quando o evento foi tratado ou deliberadamente ignorado;
- * 401 assinatura inválida; 503 (a Paddle reenvia) quando a API da Paddle ou o armazenamento falham.
+ * 401 assinatura inválida; 503 (a Paddle reenvia) quando a API da Paddle ou o armazenamento falham,
+ * e quando um ajuste chega para compra ainda não gravada e recente (< 48 h): a concessão pode estar atrasada.
+ * Recusas e ignorados com dado útil (menos o 401) ficam em nexo_webhook_rejections.
  */
 export async function handlePaddleWebhook(req: Request, deps: PaddleDeps): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'metodo' });
@@ -318,9 +379,12 @@ export async function handlePaddleWebhook(req: Request, deps: PaddleDeps): Promi
     console.log(`paddle → 401 assinatura inválida (${sig.reason})`);
     return json(401, { error: 'assinatura_invalida' });
   }
-  const ev = parseEnvelope(new TextDecoder().decode(body));
+  const text = new TextDecoder().decode(body);
+  const ev = parseEnvelope(text);
   if (!ev) {
     console.error('paddle: evento assinado com formato inesperado');
+    const ids = peekEnvelopeIds(text);
+    await recordRejection(deps, 'evento_invalido', ids, ids.transaction);
     return json(400, { error: 'evento_invalido' });
   }
   const a = decide(ev, deps.productId);
@@ -331,6 +395,7 @@ export async function handlePaddleWebhook(req: Request, deps: PaddleDeps): Promi
   if (a.kind === 'reject') {
     // 200: reenviar não conserta um id fora do formato; fica no log para o runbook manual.
     console.error(`paddle ${ev.event_type} → rejeitado (${a.reason}); nada gravado`);
+    await recordRejection(deps, a.reason, ev, candidateTransaction(ev));
     return json(200, { ignored: a.reason });
   }
   const store = deps.store;
@@ -344,6 +409,7 @@ export async function handlePaddleWebhook(req: Request, deps: PaddleDeps): Promi
       }
       if (c.kind !== 'ok') {
         console.error(`paddle ${ev.event_type}: cliente sem e-mail utilizável (${c.kind}); nada gravado`);
+        await recordRejection(deps, `cliente_${c.kind}`, { event_id: ev.event_id, event_type: ev.event_type }, a.transaction);
         return json(200, { ignored: `cliente_${c.kind}` });
       }
       const g = await store.grant({ platform: PADDLE_PLATFORM, email: c.email, transaction: a.transaction, product_id: deps.productId, event: EVENTS.grant, amount: a.amount, currency: a.currency, provider_event_id: a.eventId, occurred_at: a.occurredAt });
@@ -354,7 +420,15 @@ export async function handlePaddleWebhook(req: Request, deps: PaddleDeps): Promi
     if (!store.purchaseOwner) return configProblem('/api/paddle-webhook', { ...deps, missing: [...(deps.missing ?? []), 'SUPABASE_URL'] });
     const owner = await store.purchaseOwner(PADDLE_PLATFORM, a.transaction);
     if (!owner) {
-      console.log(`paddle ${ev.event_type} → ignorado (transacao_desconhecida) tx=${a.transaction}`);
+      // Ordem de entrega não garantida: o ajuste pode chegar antes da concessão. Recente → 503 e a Paddle reenvia
+      // (no sandbox são só 3 reenvios em ~2 min; no live, ~60 em ~2 dias). Antigo → não é nossa: ignora e registra.
+      const age = nowMs - Date.parse(a.occurredAt);
+      if (age < UNKNOWN_PURCHASE_GRACE_MS) {
+        console.log(`paddle ${ev.event_type} → 503 (compra_ainda_nao_registrada) tx=${a.transaction}`);
+        return json(503, { error: 'compra_ainda_nao_registrada' });
+      }
+      console.log(`paddle ${ev.event_type} → ignorado (transacao_desconhecida, ≥ 48 h) tx=${a.transaction}`);
+      await recordRejection(deps, 'transacao_desconhecida', { event_id: ev.event_id, event_type: ev.event_type }, a.transaction);
       return json(200, { ignored: 'transacao_desconhecida' });
     }
     // C1: reversão só quando a compra está charged_back; senão o SQL abriria um bloqueio de conciliação.

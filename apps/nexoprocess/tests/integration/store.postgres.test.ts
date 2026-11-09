@@ -59,7 +59,7 @@ async function purchases(email: string) {
 }
 async function reset() {
   const psql = psqlSession();
-  await psql.run("delete from public.nexo_purchase_events where transaction_id in (select transaction_id from public.nexo_purchases where email like '%@it.test'); delete from public.nexo_reconciliation_blocks where email like '%@it.test'; delete from public.nexo_purchases where email like '%@it.test'; delete from public.nexo_licenses where email like '%@it.test';");
+  await psql.run("delete from public.nexo_purchase_events where transaction_id in (select transaction_id from public.nexo_purchases where email like '%@it.test'); delete from public.nexo_reconciliation_blocks where email like '%@it.test'; delete from public.nexo_purchases where email like '%@it.test'; delete from public.nexo_licenses where email like '%@it.test'; delete from public.nexo_webhook_rejections;");
   psql.end();
 }
 
@@ -505,9 +505,9 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     now: () => PD_NOW,
     fetchImpl: (async () => new Response(JSON.stringify({ data: { id: PD_CTM, email } }), { status: 200 })) as unknown as typeof fetch,
   });
-  const pdSend = async (email: string, payload: unknown) => {
+  const pdSend = async (email: string, payload: unknown, tsAgoSec = 0) => {
     const body = JSON.stringify(payload);
-    const ts = Math.floor(PD_NOW / 1000);
+    const ts = Math.floor(PD_NOW / 1000) - tsAgoSec;
     const h1 = createHmac('sha256', PD_SECRET).update(`${ts}:${body}`).digest('hex');
     return handlePaddleWebhook(new Request('https://x.test/api/paddle-webhook', { method: 'POST', body, headers: { 'paddle-signature': `ts=${ts};h1=${h1}` } }), await pdDeps(email));
   };
@@ -636,6 +636,103 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     await raw().grant({ platform: 'paddle', email: e, transaction: 'txn_a=b', product_id: PD_PRODUCT, event: 'PADDLE_TRANSACTION_COMPLETED' }); // id inválido → bloqueio
     expect(await openBlocks(e)).toEqual([{ reason: 'transaction_invalid' }]);
     expect((await pdActivate(e, txn)).status).toBe(404);
+    await reset();
+  });
+
+  // ---------------------------------------------------------------- R1/R2/R3 (09/11/2026)
+  const rejectionRows = async () => {
+    const r = await fetch(`${REST}/nexo_webhook_rejections?select=*&order=id`, { headers: auth() });
+    expect(r.ok).toBe(true);
+    return (await r.json()) as Record<string, unknown>[];
+  };
+  const eventCount = async (txn: string) => {
+    const r = await fetch(`${REST}/nexo_purchase_events?transaction_id=eq.${txn}&select=provider_event_id`, { headers: auth() });
+    expect(r.ok).toBe(true);
+    return ((await r.json()) as unknown[]).length;
+  };
+
+  it('R1: reentrega do mesmo evento dentro da janela de 300 s (assinatura de 250 s atrás) não regrava; 301 s → 401 e nada muda', async () => {
+    await reset();
+    const e = 'p-window@it.test';
+    const txn = pdId('txn', 'window1');
+    const evt = pdId('evt', 'window1');
+    const grant = (tsAgo: number) =>
+      pdSend(e, { event_id: evt, event_type: 'transaction.completed', occurred_at: minute(0), notification_id: pdId('ntf', 'n'), data: { id: txn, status: 'completed', customer_id: PD_CTM, currency_code: 'USD', subscription_id: null, items: [{ price: { product_id: PD_PRODUCT } }], details: { totals: { grand_total: '10000' } } } }, tsAgo);
+    expect((await grant(0)).status).toBe(200);
+    expect(await eventCount(txn)).toBe(1);
+    expect((await grant(250)).status).toBe(200);
+    expect((await grant(299)).status).toBe(200);
+    expect(await eventCount(txn)).toBe(1);
+    expect(await purchases(e)).toEqual([{ platform: 'paddle', transaction_id: txn, status: 'active', access_active: true, refunded_amount: 0 }]);
+    expect((await grant(301)).status).toBe(401);
+    expect(await eventCount(txn)).toBe(1);
+  });
+
+  it('R2: reembolso recente de compra ainda desconhecida → 503 (a Paddle reenvia); concessão atrasada e reenvio do reembolso → refunded, sem acesso e sem bloqueio', async () => {
+    await reset();
+    const e = 'p-late@it.test';
+    const txn = pdId('txn', 'late1');
+    const adj = pdId('adj', 'late1');
+    const recent = (agoMs: number) => new Date(PD_NOW - agoMs).toISOString();
+    const refund = () =>
+      pdSend(e, { event_id: pdId('evt', 'late1a'), event_type: 'adjustment.created', occurred_at: recent(60_000), notification_id: pdId('ntf', 'n'), data: { id: adj, action: 'refund', type: 'full', status: 'approved', transaction_id: txn, customer_id: PD_CTM, totals: { total: '10000' } } });
+    const first = await refund();
+    expect(first.status).toBe(503);
+    expect(await first.json()).toEqual({ error: 'compra_ainda_nao_registrada' });
+    expect((await refund()).status).toBe(503); // 2º reenvio
+    expect(await purchases(e)).toEqual([]);
+    expect(await rejectionRows()).toEqual([]); // 503 não é recusa: nada registrado
+    const g = await pdSend(e, { event_id: pdId('evt', 'late1g'), event_type: 'transaction.completed', occurred_at: recent(120_000), notification_id: pdId('ntf', 'n'), data: { id: txn, status: 'completed', customer_id: PD_CTM, currency_code: 'USD', subscription_id: null, items: [{ price: { product_id: PD_PRODUCT } }], details: { totals: { grand_total: '10000' } } } });
+    expect(g.status).toBe(200);
+    expect((await refund()).status).toBe(200); // o reenvio agora encontra a compra
+    expect(await purchases(e)).toEqual([expect.objectContaining({ platform: 'paddle', transaction_id: txn, status: 'refunded', access_active: false })]);
+    expect((await pdActivate(e, txn)).status).toBe(404);
+    expect(await openBlocks(e)).toEqual([]);
+  });
+
+  it('R3: ajuste de transação desconhecida há 48 h ou mais → 200 e uma linha em nexo_webhook_rejections, sem e-mail e sem corpo; id fora do formato e cliente 404 também', async () => {
+    await reset();
+    const old = (agoMs: number) => new Date(PD_NOW - agoMs).toISOString();
+    const txn = pdId('txn', 'unknown1');
+    const adjustEvt = pdId('evt', 'unk1');
+    const res = await pdSend('p-unk@it.test', { event_id: adjustEvt, event_type: 'adjustment.created', occurred_at: old(48 * 3600_000), notification_id: pdId('ntf', 'n'), data: { id: pdId('adj', 'unk1'), action: 'refund', type: 'full', status: 'approved', transaction_id: txn, customer_id: PD_CTM, totals: { total: '10000' } } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ignored: 'transacao_desconhecida' });
+    // id fora do formato (cliente) → 200 e registro
+    const bad = await pdSend('p-bad@it.test', { event_id: pdId('evt', 'bad1'), event_type: 'transaction.completed', occurred_at: minute(0), notification_id: pdId('ntf', 'n'), data: { id: pdId('txn', 'bad1'), status: 'completed', customer_id: 'ctm_ruim', currency_code: 'USD', subscription_id: null, items: [{ price: { product_id: PD_PRODUCT } }], details: { totals: { grand_total: '10000' } } } });
+    expect(bad.status).toBe(200);
+    const rows = await rejectionRows();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ platform: 'paddle', provider_event_id: adjustEvt, event_type: 'adjustment.created', transaction_id: txn, reason: 'transacao_desconhecida' });
+    expect(rows[1]).toMatchObject({ platform: 'paddle', event_type: 'transaction.completed', transaction_id: pdId('txn', 'bad1'), reason: 'id_fora_do_formato' });
+    expect(Object.keys(rows[0]).sort()).toEqual(['event_type', 'id', 'platform', 'provider_event_id', 'reason', 'received_at', 'transaction_id']);
+    expect(JSON.stringify(rows)).not.toMatch(/@|it\.test/);
+    expect(await purchases('p-unk@it.test')).toEqual([]);
+  });
+
+  it('R3: função só do service_role (anon/authenticated negados); valores fora do formato viram null/invalido; reaplicar o schema 3x não muda as linhas', async () => {
+    await reset();
+    await raw().recordWebhookRejection!({ platform: 'paddle', provider_event_id: 'evento com espaço e@x.com', event_type: 'Tem Espaço', transaction_id: 'txn_x y', reason: 'Motivo Ruim!' });
+    await raw().recordWebhookRejection!({ platform: 'paddle', provider_event_id: pdId('evt', 'ok1'), event_type: 'adjustment.updated', transaction_id: pdId('txn', 'ok1'), reason: 'transacao_desconhecida' });
+    const before = await rejectionRows();
+    expect(before).toHaveLength(2);
+    expect(before[0]).toMatchObject({ provider_event_id: null, event_type: null, transaction_id: null, reason: 'invalido' });
+    expect(before[1]).toMatchObject({ provider_event_id: pdId('evt', 'ok1'), reason: 'transacao_desconhecida' });
+    expect(JSON.stringify(before)).not.toContain('@');
+    for (let i = 0; i < 3; i++) await migrate();
+    expect(await rejectionRows()).toEqual(before);
+    const secret = process.env.PGRST_JWT_SECRET;
+    expect(secret, 'PGRST_JWT_SECRET é necessário para o teste de permissão').toBeTruthy();
+    const b64 = (x: unknown) => Buffer.from(JSON.stringify(x)).toString('base64url');
+    const jwtBody = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 600 })}`;
+    const authed = `${jwtBody}.${createHmac('sha256', secret!).update(jwtBody).digest('base64url')}`;
+    for (const headers of [{}, { Authorization: `Bearer ${authed}` }] as Record<string, string>[]) {
+      const rpc = await fetch(`${REST}/rpc/nexo_record_webhook_rejection`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_platform: 'paddle', p_provider_event_id: null, p_event_type: null, p_transaction_id: null, p_reason: 'x' }) });
+      expect([401, 403]).toContain(rpc.status);
+      expect(((await rpc.json()) as { code?: string }).code).toBe('42501');
+      const table = await fetch(`${REST}/nexo_webhook_rejections?select=id`, { headers });
+      expect([401, 403]).toContain(table.status);
+    }
     await reset();
   });
 

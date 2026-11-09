@@ -6,7 +6,10 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { licenseDepsFromEnv } from '../../api/_lib/handlers';
 import {
   decide,
+  DEFAULT_TOLERANCE_SEC,
   EVENTS,
+  peekEnvelopeIds,
+  UNKNOWN_PURCHASE_GRACE_MS,
   fetchPaddleCustomerEmail,
   handlePaddleLicense,
   handlePaddleWebhook,
@@ -17,7 +20,7 @@ import {
   type PaddleDeps,
   type PaddleEnvelope,
 } from '../../api/_lib/paddle';
-import type { GrantResult, LicenseRecord, LicenseStatus, LicenseStore, PurchaseOwner } from '../../api/_lib/store';
+import type { GrantResult, LicenseRecord, LicenseStatus, LicenseStore, PurchaseOwner, WebhookRejection } from '../../api/_lib/store';
 import { signToken, verifyToken } from '../../src/license/token';
 
 let priv: JsonWebKey;
@@ -100,8 +103,8 @@ function paddleApi(respond: () => Response | Promise<Response> = () => new Respo
   return { calls, fetchImpl };
 }
 
-type Call = { op: string; rec?: Omit<LicenseRecord, 'status'>; args?: unknown[] };
-function fakeStore(opts: { owner?: PurchaseOwner | null; grant?: GrantResult; revoke?: LicenseStatus; fail?: boolean; noOwnerMethod?: boolean } = {}) {
+type Call = { op: string; rec?: Omit<LicenseRecord, 'status'>; args?: unknown[]; rejection?: WebhookRejection };
+function fakeStore(opts: { owner?: PurchaseOwner | null; grant?: GrantResult; revoke?: LicenseStatus; fail?: boolean; noOwnerMethod?: boolean; recordFail?: 'throw' | 'hang' | 'noMethod' } = {}) {
   const calls: Call[] = [];
   const store: LicenseStore = {
     kind: 'memory',
@@ -120,6 +123,13 @@ function fakeStore(opts: { owner?: PurchaseOwner | null; grant?: GrantResult; re
       return opts.revoke ?? 'revoked';
     },
   };
+  if (opts.recordFail !== 'noMethod') {
+    store.recordWebhookRejection = async (rejection) => {
+      calls.push({ op: 'reject', rejection });
+      if (opts.recordFail === 'throw') throw new Error('banco fora');
+      if (opts.recordFail === 'hang') await new Promise(() => {});
+    };
+  }
   if (!opts.noOwnerMethod) {
     store.purchaseOwner = async (...args) => {
       calls.push({ op: 'purchaseOwner', args });
@@ -179,6 +189,11 @@ describe('verifyPaddleSignature', () => {
     expect(await check(sign(body, SECRET, NOW_SEC - 6))).toEqual({ ok: false, reason: 'expirada' });
     expect(await check(sign(body, SECRET, NOW_SEC + 6))).toEqual({ ok: false, reason: 'expirada' });
     expect(await check(sign(body, SECRET, NOW_SEC - 60), body, 120)).toEqual({ ok: true });
+  });
+  it('R1: padrão 300 s — 299 s de atraso ou de adianto → ok; 301 s → expirada (decisão do revisor, 09/11/2026)', async () => {
+    expect(DEFAULT_TOLERANCE_SEC).toBe(300);
+    for (const d of [299, 300, -299]) expect(await check(sign(body, SECRET, NOW_SEC - d), body, DEFAULT_TOLERANCE_SEC), String(d)).toEqual({ ok: true });
+    for (const d of [301, -301]) expect(await check(sign(body, SECRET, NOW_SEC - d), body, DEFAULT_TOLERANCE_SEC), String(d)).toEqual({ ok: false, reason: 'expirada' });
   });
 });
 
@@ -288,6 +303,18 @@ describe('handlePaddleWebhook: assinatura e configuração', () => {
     expect(logs.join('\n')).not.toContain(SECRET);
     expect(logs.join('\n')).not.toContain(API_KEY_SBX);
   });
+  it('R1: no handler, assinatura de 299 s atrás passa (200) e de 301 s atrás é 401; dentro da janela a mesma entrega repetida chega ao banco igual (idempotência é do banco)', async () => {
+    const body = JSON.stringify(completed());
+    const d = deps({ fetchImpl: paddleApi().fetchImpl });
+    expect((await handlePaddleWebhook(req(body, sign(body, SECRET, NOW_SEC - 299)), d)).status).toBe(200);
+    expect((await handlePaddleWebhook(req(body, sign(body, SECRET, NOW_SEC - 301)), d)).status).toBe(401);
+    // reentrega do MESMO evento: mesma chave de idempotência (provider_event_id) nas duas gravações
+    const fs = fakeStore();
+    const d2 = deps({ store: fs.store, fetchImpl: paddleApi().fetchImpl });
+    for (const ago of [10, 120]) await handlePaddleWebhook(req(body, sign(body, SECRET, NOW_SEC - ago)), d2);
+    const keys = fs.calls.filter((c) => c.op === 'grant').map((c) => c.rec?.provider_event_id);
+    expect(keys).toEqual([EVT, EVT]);
+  });
   it('só POST; corpo acima de 64 KB → 413 antes de qualquer verificação', async () => {
     expect((await handlePaddleWebhook(req('', null, 'GET'), deps())).status).toBe(405);
     const big = 'x'.repeat(64 * 1024 + 1);
@@ -333,7 +360,7 @@ describe('handlePaddleWebhook: concessão', () => {
       const res = await post(deps({ store: fs.store, fetchImpl: paddleApi(r).fetchImpl }), completed());
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({ ignored: expect.stringMatching(/^cliente_/) });
-      expect(fs.calls).toEqual([]);
+      expect(fs.calls.filter((c) => c.op !== 'reject')).toEqual([]); // nada de licença; só o registro R3
     }
   });
   it('outro produto, assinatura, evento não tratado → 200 ignorado, sem API e sem gravar', async () => {
@@ -353,7 +380,7 @@ describe('handlePaddleWebhook: concessão', () => {
     const fs = fakeStore();
     const res = await post(deps({ store: fs.store, fetchImpl: paddleApi().fetchImpl }), completed({ id: 'txn_ABC' }));
     expect(res.status).toBe(200);
-    expect(fs.calls).toEqual([]);
+    expect(fs.calls.filter((c) => c.op !== 'reject')).toEqual([]); // nada de licença; só o registro R3
     expect(logs.join('\n')).toMatch(/rejeitado \(id_fora_do_formato\)/);
   });
   it('falha do armazenamento → 503 (a Paddle reenvia); concessão bloqueada pelo banco é reportada', async () => {
@@ -412,9 +439,33 @@ describe('handlePaddleWebhook: reembolso, chargeback e reversão', () => {
   it('crédito → ignorado sem consultar o banco; compra desconhecida → ignorado sem gravar', async () => {
     const credit = await run(adjustment({ action: 'credit' }));
     expect(credit.fs.calls).toEqual([]);
-    const unknown = await run(adjustment(), null);
-    expect(await unknown.res.json()).toEqual({ ignored: 'transacao_desconhecida' });
+    const unknown = await run(adjustment({}, 'adjustment.created', 'evt_01hvgf2skkg8dsk5dczemw2bx1'), null);
+    // R2: ajuste de compra desconhecida e RECENTE (2 s) → 503, a Paddle reenvia (a concessão pode estar atrasada)
+    expect(unknown.res.status).toBe(503);
+    expect(await unknown.res.json()).toEqual({ error: 'compra_ainda_nao_registrada' });
     expect(revokes(unknown.fs)).toEqual([]);
+    expect(unknown.fs.calls.filter((c) => c.op === 'reject')).toEqual([]);
+  });
+  it('R2: limite de 48 h — 47 h 59 min → 503; exatamente 48 h → 200 ignorado e registrado; 3 dias → idem', async () => {
+    const at = (ms: number) => new Date(NOW_MS - ms).toISOString();
+    const recent = await run(adjustment({}, 'adjustment.created', 'evt_01hvgf2skkg8dsk5dczemw2bx1'), null);
+    expect(recent.res.status).toBe(503);
+    const justUnder = await post(deps({ store: fakeStore({ owner: null }).store }), { ...adjustment(), occurred_at: at(UNKNOWN_PURCHASE_GRACE_MS - 60_000) });
+    expect(justUnder.status).toBe(503);
+    for (const ms of [UNKNOWN_PURCHASE_GRACE_MS, 3 * 24 * 3600_000]) {
+      const fs = fakeStore({ owner: null });
+      const res = await post(deps({ store: fs.store }), { ...adjustment(), occurred_at: at(ms) });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ignored: 'transacao_desconhecida' });
+      expect(revokes(fs)).toEqual([]);
+      expect(fs.calls.filter((c) => c.op === 'reject')).toEqual([
+        { op: 'reject', rejection: { platform: 'paddle', provider_event_id: 'evt_01hvgf2skkg8dsk5dczemw2bx1', event_type: 'adjustment.created', transaction_id: TXN, reason: 'transacao_desconhecida' } },
+      ]);
+    }
+  });
+  it('R2: reversão de chargeback para compra desconhecida e recente também → 503 (mesma regra)', async () => {
+    const r = await run(adjustment({ action: 'chargeback_reverse' }), null);
+    expect(r.res.status).toBe(503);
   });
   it('falha do armazenamento → 503; store sem purchaseOwner → 503 nao_configurado', async () => {
     const fail = await post(deps({ store: fakeStore({ fail: true }).store }), adjustment());
@@ -422,6 +473,72 @@ describe('handlePaddleWebhook: reembolso, chargeback e reversão', () => {
     const none = await post(deps({ store: fakeStore({ noOwnerMethod: true }).store }), adjustment());
     expect(none.status).toBe(503);
     expect(((await none.json()) as { error: string }).error).toBe('nao_configurado');
+  });
+});
+
+describe('R3: registro de eventos recusados/ignorados (nexo_webhook_rejections)', () => {
+  const rejects = (fs: ReturnType<typeof fakeStore>) => fs.calls.filter((c) => c.op === 'reject').map((c) => c.rejection);
+
+  it('id fora do formato → 200 ignorado e registrado com ids válidos, sem e-mail e sem corpo', async () => {
+    const fs = fakeStore();
+    const res = await post(deps({ store: fs.store, fetchImpl: paddleApi().fetchImpl }), completed({ customer_id: 'ctm_ruim' }));
+    expect(res.status).toBe(200);
+    expect(rejects(fs)).toEqual([{ platform: 'paddle', provider_event_id: EVT, event_type: 'transaction.completed', transaction_id: TXN, reason: 'id_fora_do_formato' }]);
+    expect(JSON.stringify(fs.calls)).not.toMatch(/@|notification_id|grand_total/);
+  });
+  it('ajuste com id fora do formato → registrado; transação só entra se tiver o formato txn_', async () => {
+    const fs = fakeStore();
+    await post(deps({ store: fs.store }), adjustment({ id: 'adj_ruim' }));
+    expect(rejects(fs)).toEqual([{ platform: 'paddle', provider_event_id: 'evt_01hvgf2skkg8dsk5dczemw2bx1', event_type: 'adjustment.created', transaction_id: TXN, reason: 'id_fora_do_formato' }]);
+    const fs2 = fakeStore();
+    await post(deps({ store: fs2.store }), adjustment({ id: 'adj_ruim', transaction_id: 'txn_ruim' }));
+    expect(rejects(fs2)[0]).toMatchObject({ transaction_id: null, reason: 'id_fora_do_formato' });
+  });
+  it('cliente 404 ou sem e-mail → registrado (cliente_not_found / cliente_no_email), com a transação', async () => {
+    for (const [r, reason] of [
+      [() => new Response('', { status: 404 }), 'cliente_not_found'],
+      [() => new Response(JSON.stringify({ data: { email: 'sem-arroba' } }), { status: 200 }), 'cliente_no_email'],
+    ] as [() => Response, string][]) {
+      const fs = fakeStore();
+      const res = await post(deps({ store: fs.store, fetchImpl: paddleApi(r).fetchImpl }), completed());
+      expect(res.status).toBe(200);
+      expect(rejects(fs)).toEqual([{ platform: 'paddle', provider_event_id: EVT, event_type: 'transaction.completed', transaction_id: TXN, reason }]);
+      expect(JSON.stringify(fs.calls)).not.toContain('sem-arroba');
+    }
+  });
+  it('corpo assinado mas inválido → 400 e registrado com o que casa o formato (nada do corpo)', async () => {
+    const fs = fakeStore();
+    const bad = { event_id: EVT, event_type: 'transaction.completed', occurred_at: 'não é data', data: { id: TXN, email_do_comprador: 'x@y.com' } };
+    const res = await post(deps({ store: fs.store }), bad);
+    expect(res.status).toBe(400);
+    expect(rejects(fs)).toEqual([{ platform: 'paddle', provider_event_id: EVT, event_type: 'transaction.completed', transaction_id: TXN, reason: 'evento_invalido' }]);
+    expect(JSON.stringify(fs.calls)).not.toContain('x@y.com');
+    const fs2 = fakeStore();
+    const raw = '{"isto não é json';
+    expect((await handlePaddleWebhook(req(raw, sign(raw)), deps({ store: fs2.store }))).status).toBe(400);
+    expect(rejects(fs2)).toEqual([{ platform: 'paddle', provider_event_id: null, event_type: null, transaction_id: null, reason: 'evento_invalido' }]);
+  });
+  it('401 (assinatura inválida, ausente, velha) NÃO é registrado; ignorados sem dado útil também não', async () => {
+    const fs = fakeStore();
+    const d = deps({ store: fs.store, fetchImpl: paddleApi().fetchImpl });
+    expect((await post(d, completed(), null)).status).toBe(401);
+    expect((await post(d, completed(), 'ts=1;h1=zz')).status).toBe(401);
+    expect((await post(d, completed(), sign(JSON.stringify(completed()), 'errado'))).status).toBe(401);
+    for (const p of [adjustment({ action: 'credit' }), completed({}, { event_type: 'transaction.paid' }), completed({ items: [{ price: { product_id: 'pro_01gsz4t5hdjse780zja8vvr7jh' } }] })]) expect((await post(d, p)).status).toBe(200);
+    expect(rejects(fs)).toEqual([]);
+  });
+  it('falha ou demora ao registrar não muda o código de resposta (só log)', async () => {
+    for (const recordFail of ['throw', 'hang', 'noMethod'] as const) {
+      const fs = fakeStore({ recordFail });
+      const d = deps({ store: fs.store, fetchImpl: paddleApi().fetchImpl, recordTimeoutMs: 30 });
+      expect((await post(d, completed({ customer_id: 'ctm_ruim' }))).status, recordFail).toBe(200);
+      expect((await post(d, { event_id: EVT, event_type: 'x.y', occurred_at: 'ruim', data: {} })).status, recordFail).toBe(400);
+    }
+  });
+  it('peekEnvelopeIds só devolve ids no formato (lixo e e-mail nunca passam)', () => {
+    expect(peekEnvelopeIds(JSON.stringify({ event_id: EVT, event_type: 'adjustment.created', data: { transaction_id: TXN } }))).toEqual({ event_id: EVT, event_type: 'adjustment.created', transaction: TXN });
+    expect(peekEnvelopeIds(JSON.stringify({ event_id: 'a@b.com', event_type: 'Tem Espaço', data: { id: 'txn_x' } }))).toEqual({ event_id: null, event_type: null, transaction: null });
+    expect(peekEnvelopeIds('[1,2]')).toEqual({ event_id: null, event_type: null, transaction: null });
   });
 });
 
@@ -508,7 +625,7 @@ describe('paddleDepsFromEnv', () => {
   const ok = { PADDLE_WEBHOOK_SECRET: SECRET, PADDLE_ENV: 'sandbox', PADDLE_PRODUCT_ID: PRODUCT, PADDLE_API_KEY: API_KEY_SBX };
   it('completo e válido', () => {
     const d = paddleDepsFromEnv(ok, { ...base, missing: [] });
-    expect(d).toMatchObject({ webhookSecret: SECRET, env: 'sandbox', productId: PRODUCT, apiKey: API_KEY_SBX, toleranceSec: 5, missing: [] });
+    expect(d).toMatchObject({ webhookSecret: SECRET, env: 'sandbox', productId: PRODUCT, apiKey: API_KEY_SBX, toleranceSec: 300, missing: [] });
     expect(d.invalid).toBeUndefined();
   });
   it('lista só os NOMES que faltam', () => {

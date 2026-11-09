@@ -314,6 +314,15 @@ select platform, transaction_id, email, status, access_active, amount, currency,
  where platform like 'paddle%' and transaction_id = 'txn_COLE_AQUI_EM_MINUSCULAS';
 ```
 
+**P-F. Eventos da Paddle recusados ou ignorados com dado útil (últimas 72 h)** — só leitura; a tabela **não guarda e-mail nem corpo do evento**
+```sql
+select id, received_at, reason, event_type, provider_event_id, transaction_id
+  from public.nexo_webhook_rejections
+ where platform = 'paddle' and received_at > now() - interval '72 hours'
+ order by id desc;
+```
+Como ler `reason`: `transacao_desconhecida` = reembolso/chargeback de uma compra que nunca gravamos (≥ 48 h depois do evento; pode ser outro produto da conta ou uma concessão que nunca chegou: confira o `transaction_id` no painel da Paddle); `cliente_not_found` / `cliente_no_email` = a compra não pôde ser concedida porque a Paddle não devolveu e-mail utilizável (conceda à mão, 6.4); `id_fora_do_formato` / `valor_do_reembolso_invalido` / `evento_invalido` = evento assinado com dado inesperado (chame a engenharia com o `provider_event_id`). **Assinatura inválida (401) não aparece aqui de propósito** (só no log da função). Linhas novas depois de uma venda que não entrou = comece por aqui.
+
 **P-E. Bloqueios abertos de e-mails com compra Paddle** (continua valendo a consulta B da seção 1.2: um bloqueio aberto corta o acesso de todas as compras do e-mail).
 
 ### 6.2 Painel da Paddle (A VALIDAR os nomes de menu)
@@ -371,6 +380,8 @@ select public.nexo_revoke_purchase('paddle', 'txn_COLE_AQUI', 'cliente@exemplo.c
 | Sinal | Primeira ação |
 |---|---|
 | Venda na Paddle sem linha em P-A | 6.3.2 (webhook) |
+| `compra_ainda_nao_registrada` (503) no log do `/api/paddle-webhook` | reembolso/chargeback chegou antes da compra: normal por alguns minutos (a Paddle reenvia). Persistindo por horas: a concessão não chegou (6.3.2); depois de 48 h o evento vai para P-F |
+| Linhas novas em P-F | ler `reason` (6.1 P-F) |
 | Várias notificações `needs_retry`/`failed` na Paddle | log da função e variáveis `PADDLE_*` (nomes em `PADDLE_ENTITLEMENT.md` §9) |
 | Log com `assinatura inválida` em sequência | segredo do destino diferente do da Cloudflare, ou tolerância (§14 item 12) |
 | `PADDLE_API_KEY`/`PADDLE_ENV` apontados no 503 (`invalida`) | prefixo da chave (`pdl_live_`/`pdl_sdbx_`) não bate com `PADDLE_ENV` |

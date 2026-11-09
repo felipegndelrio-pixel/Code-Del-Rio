@@ -260,6 +260,51 @@ begin
 end
 $$;
 
+-- Registro persistente de webhooks recusados ou ignorados COM dado útil (hoje a Paddle: id fora do formato, cliente sem
+-- e-mail/404, ajuste de transação desconhecida há 48 h ou mais, corpo assinado inválido). SEM e-mail e SEM corpo do evento:
+-- só ids no formato da Paddle e o motivo. Aditivo e reaplicável (create if not exists; nenhuma linha é tocada ao reaplicar).
+create table if not exists public.nexo_webhook_rejections (
+  id bigint generated always as identity primary key,
+  platform text not null,
+  provider_event_id text,
+  event_type text,
+  transaction_id text,
+  reason text not null,
+  received_at timestamptz not null default now(),
+  constraint nexo_webhook_rejections_platform_format check (platform ~ '^[a-z][a-z0-9_-]{0,31}$'),
+  constraint nexo_webhook_rejections_event_id_format check (provider_event_id is null or provider_event_id ~ '^[A-Za-z0-9_:.-]{1,100}$'),
+  constraint nexo_webhook_rejections_event_type_format check (event_type is null or event_type ~ '^[a-z_]{1,32}([.][a-z_]{1,32}){0,3}$'),
+  constraint nexo_webhook_rejections_transaction_format check (transaction_id is null or transaction_id ~ '^[A-Za-z0-9_-]{1,64}$'),
+  constraint nexo_webhook_rejections_reason_format check (reason ~ '^[a-z0-9_]{1,64}$')
+);
+create index if not exists nexo_webhook_rejections_received_idx on public.nexo_webhook_rejections (received_at desc);
+
+-- Valor fora do formato vira null (o motivo, 'invalido'): registrar nunca deve falhar por causa do conteúdo. Só service_role executa.
+create or replace function public.nexo_record_webhook_rejection(
+  p_platform text, p_provider_event_id text, p_event_type text, p_transaction_id text, p_reason text
+)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_platform text := lower(btrim(coalesce(p_platform, '')));
+  v_evt text := nullif(btrim(p_provider_event_id), '');
+  v_type text := nullif(btrim(p_event_type), '');
+  v_txn text := nullif(btrim(p_transaction_id), '');
+  v_reason text := coalesce(nullif(btrim(p_reason), ''), 'invalido');
+begin
+  if v_platform !~ '^[a-z][a-z0-9_-]{0,31}$' then
+    raise exception 'nexo_record_webhook_rejection: plataforma inválida' using errcode = '22023';
+  end if;
+  if v_evt is not null and v_evt !~ '^[A-Za-z0-9_:.-]{1,100}$' then v_evt := null; end if;
+  if v_type is not null and v_type !~ '^[a-z_]{1,32}([.][a-z_]{1,32}){0,3}$' then v_type := null; end if;
+  if v_txn is not null and v_txn !~ '^[A-Za-z0-9_-]{1,64}$' then v_txn := null; end if;
+  if v_reason !~ '^[a-z0-9_]{1,64}$' then v_reason := 'invalido'; end if;
+  insert into public.nexo_webhook_rejections (platform, provider_event_id, event_type, transaction_id, reason)
+  values (v_platform, v_evt, v_type, v_txn, v_reason);
+end
+$$;
+
 create or replace function public.nexo_add_reconciliation_block(
   p_email text, p_platform text, p_transaction text, p_product text,
   p_reason text, p_event text, p_created_at timestamptz
@@ -613,10 +658,13 @@ $$;
 alter table public.nexo_purchases enable row level security;
 alter table public.nexo_purchase_events enable row level security;
 alter table public.nexo_reconciliation_blocks enable row level security;
+alter table public.nexo_webhook_rejections enable row level security;
 
 revoke all on table public.nexo_purchases from public;
 revoke all on table public.nexo_purchase_events from public;
 revoke all on table public.nexo_reconciliation_blocks from public;
+revoke all on table public.nexo_webhook_rejections from public;
+revoke all on function public.nexo_record_webhook_rejection(text, text, text, text, text) from public;
 revoke all on function public.nexo_refresh_license_access(text) from public;
 revoke all on function public.nexo_lookup_license(text) from public;
 revoke all on function public.nexo_purchase_state(text, text) from public;
@@ -642,6 +690,8 @@ begin
       execute pg_catalog.format('revoke all on table public.nexo_purchases from %I', r);
       execute pg_catalog.format('revoke all on table public.nexo_purchase_events from %I', r);
       execute pg_catalog.format('revoke all on table public.nexo_reconciliation_blocks from %I', r);
+      execute pg_catalog.format('revoke all on table public.nexo_webhook_rejections from %I', r);
+      execute pg_catalog.format('revoke all on function public.nexo_record_webhook_rejection(text, text, text, text, text) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_refresh_license_access(text) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_lookup_license(text) from %I', r);
       execute pg_catalog.format('revoke all on function public.nexo_purchase_state(text, text) from %I', r);
@@ -664,6 +714,8 @@ begin
     grant select on table public.nexo_purchases to service_role;
     grant select on table public.nexo_purchase_events to service_role;
     grant select on table public.nexo_reconciliation_blocks to service_role;
+    grant select on table public.nexo_webhook_rejections to service_role;
+    grant execute on function public.nexo_record_webhook_rejection(text, text, text, text, text) to service_role;
     grant execute on function public.nexo_lookup_license(text) to service_role;
     grant execute on function public.nexo_purchase_state(text, text) to service_role;
     grant execute on function public.nexo_purchase_owner(text, text) to service_role;
