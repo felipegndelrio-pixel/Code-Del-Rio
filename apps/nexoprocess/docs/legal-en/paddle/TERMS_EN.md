@@ -1,23 +1,21 @@
 ---
-status: draft
+status: approved
 ---
 # NexoProcess — Terms of Use (Paddle channel)
 
-Last updated: 06/11/2026
-
-> DRAFT for the Paddle sales channel. TO VALIDATE (lawyer and founder) before use. Not the approved text for the Gumroad channel.
+Last updated: 09/11/2026
 
 ## 1. What NexoProcess is
 NexoProcess is a web app (installable as a PWA) to map, measure and improve business processes. By using it you agree to these Terms.
 
 Developed by Felipe Del Rio, an individual based in Brazil. Contact: {{SUPPORT_EMAIL}}
 
-TO VALIDATE: who sells to you. Paddle's documentation describes Paddle as the merchant of record, the legal entity that sells to the end customer and handles payments, sales tax, refunds and chargebacks. The exact wording of the seller relationship must follow Paddle's seller terms and buyer terms, which have not been reviewed.
+Paddle acts as merchant of record for these purchases. According to Paddle's documentation, the merchant of record is the legal entity that sells to the end customer and handles payments, sales tax, refunds and chargebacks.
 
 ## 2. What you buy
-- US$ 39, one-time. TO VALIDATE: price and currency as configured in the Paddle catalog.
-- Taxes are calculated and added at checkout by Paddle, based on your location.
-- After payment you sign in with the **e-mail used at checkout** and the **transaction ID** of your purchase (it starts with txn_). If you are sent back to the app after paying, both are filled in for you. TO VALIDATE: where buyers find the transaction ID in the Paddle receipt.
+- US$ 39, one-time; taxes may be added at checkout.
+- If taxes apply, Paddle calculates them at checkout based on your location.
+- After payment you sign in with the **e-mail used at checkout** and the **transaction ID** of your purchase (it starts with txn_). If you are sent back to the app after paying, both are filled in for you. If you cannot find it, contact support at {{SUPPORT_EMAIL}} with the e-mail used at checkout.
 - The license is personal. No fixed device limit for personal use. Excessive or shared use may lead to access being disabled.
 - **Updates:** v1 fixes and improvements are included while v1 is offered. No fixed period is guaranteed.
 
@@ -47,7 +45,7 @@ To the extent permitted by law, our total liability is limited to the amount you
 Changes are posted here with a new date. They do not reduce rights for purchases already made.
 
 ## 9. Governing law
-Brazilian law applies, without removing mandatory consumer rights of your country of residence. TO VALIDATE: interaction with Paddle's buyer terms.
+Brazilian law applies, without removing mandatory consumer rights of your country of residence.
 
 ## 10. Contact
 {{SUPPORT_EMAIL}}

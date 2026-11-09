@@ -236,15 +236,28 @@ describe('copy da landing: atualizações (K1)', () => {
 });
 
 
-describe('variante Paddle dos textos legais (docs/legal-en/paddle): rascunho que o build de venda recusa', () => {
+describe('variante Paddle dos textos legais (docs/legal-en/paddle): aprovada pelo fundador, sem pontos em aberto', () => {
   const dir = new URL('../../docs/legal-en/paddle', import.meta.url).pathname;
-  it('os 3 textos existem, estão em rascunho e têm pontos TO VALIDATE (nada foi aprovado por engano)', () => {
+  it('os 3 textos existem, estão approved e sem TO VALIDATE/DRAFT; o gate aceita', () => {
     expect(LEGAL_FILES).toHaveLength(3);
-    const problems: string[] = legalGate(dir);
-    for (const f of LEGAL_FILES as string[]) {
-      expect(problems.some((p) => p.startsWith(f) && /status "draft"/.test(p)), f).toBe(true);
-      expect(problems.some((p) => p.startsWith(f) && /TO VALIDATE/.test(p)), f).toBe(true);
-    }
+    expect(legalGate(dir)).toEqual([]);
+  });
+  it('o gate recusa a mesma variante se um deles voltar a rascunho ou ganhar TO VALIDATE', () => {
+    const d = mkdtempSync(join(tmpdir(), 'paddle-legal-'));
+    for (const f of LEGAL_FILES as string[]) writeFileSync(join(d, f), readFileSync(join(dir, f), 'utf8'));
+    expect(legalGate(d)).toEqual([]);
+    writeFileSync(join(d, 'TERMS_EN.md'), readFileSync(join(dir, 'TERMS_EN.md'), 'utf8').replace('status: approved', 'status: draft'));
+    writeFileSync(join(d, 'REFUND_EN.md'), `${readFileSync(join(dir, 'REFUND_EN.md'), 'utf8')}\nTO VALIDATE: x\n`);
+    const problems = legalGate(d);
+    expect(problems.some((p) => p.startsWith('TERMS_EN.md') && /status "draft"/.test(p))).toBe(true);
+    expect(problems.some((p) => p.startsWith('REFUND_EN.md') && /TO VALIDATE/.test(p))).toBe(true);
+  });
+  it('os textos não prometem prazo nem afirmam o que a doc da Paddle não prova', () => {
+    const all = (LEGAL_FILES as string[]).map((f) => readFileSync(join(dir, f), 'utf8')).join('\n');
+    expect(all).toMatch(/merchant of record/i);
+    expect(all).toContain('https://www.paddle.com/legal/privacy');
+    expect(all).toMatch(/We do not promise a processing time/);
+    expect(all).not.toMatch(/independent controller|within \d+ (business )?days of approval/i);
   });
   it('os textos aprovados da Gumroad continuam sem menção à Paddle', () => {
     for (const f of ['TERMS_EN.md', 'PRIVACY_EN.md', 'REFUND_EN.md']) expect(readFileSync(new URL(`../../docs/legal-en/${f}`, import.meta.url), 'utf8')).not.toMatch(/paddle/i);

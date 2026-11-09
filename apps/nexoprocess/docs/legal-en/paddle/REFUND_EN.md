@@ -1,20 +1,18 @@
 ---
-status: draft
+status: approved
 ---
 # NexoProcess — Refund Policy (Paddle channel)
 
-Last updated: 06/11/2026
-
-> DRAFT for the Paddle sales channel. TO VALIDATE (lawyer and founder) before use. Not the approved text for the Gumroad channel.
+Last updated: 09/11/2026
 
 ## 1. Refund window
-You can ask for a refund within **7 days** of purchase. TO VALIDATE: that this window is accepted under the seller agreement with Paddle.
+You can ask for a refund within **7 days** of purchase by contacting support. Paddle, as merchant of record, processes approved refunds.
 
 ## 2. How to ask
-Contact support at {{SUPPORT_EMAIL}} using the e-mail you used at checkout and your transaction ID. TO VALIDATE: whether buyers can also request refunds directly from the Paddle receipt or customer portal.
+Contact support at {{SUPPORT_EMAIL}} using the e-mail you used at checkout and your transaction ID.
 
 ## 3. How refunds are processed
-Paddle's documentation says refunds are returned to the original payment method, and that most refunds in live accounts require Paddle's approval before they are completed. TO VALIDATE: processing time and any case in which Paddle may refuse a refund.
+According to Paddle's documentation, refunds are returned to the original payment method, and most refunds in live accounts require Paddle's approval before they are completed. We do not promise a processing time.
 
 ## 4. What happens to your access
 - After a **full refund**, access to NexoProcess ends on your devices at the next online license check.

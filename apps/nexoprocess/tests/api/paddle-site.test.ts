@@ -154,7 +154,7 @@ describe('modo staging-paddle (check-sale-env --staging-paddle e nexo:build:stag
   writeFileSync(join(CLEAN, 'index.html'), '<body>ok</body>');
   const GOOD = { VITE_LICENSE_PUBLIC_JWK: pub, VITE_HOTMART_CHECKOUT_URL: 'https://pay.hotmart.com/x', VITE_SUPPORT_EMAIL: 's@example.com', VITE_GUMROAD_CHECKOUT_URL: 'https://x.gumroad.com/l/n', VITE_EN_TERMS_URL: 'https://e.com/t', VITE_EN_PRIVACY_URL: 'https://e.com/p', VITE_EN_REFUND_URL: 'https://e.com/r', VITE_CF_WA_TOKEN: 'abcdef0123456789abcdef0123456789' };
   const SANDBOX = { VITE_PADDLE_CLIENT_TOKEN: 'test_0123456789abcdef0123456789', VITE_PADDLE_ENV: 'sandbox', VITE_PADDLE_PRICE_ID: `pri_${'a1'.repeat(13)}` };
-  // NEXO_LEGAL_PADDLE_DIR NÃO é definido: vale o diretório REAL docs/legal-en/paddle, que está em rascunho.
+  // NEXO_LEGAL_PADDLE_DIR NÃO é definido: vale o diretório REAL docs/legal-en/paddle (aprovado pelo fundador em 09/11/2026).
   const run = (script: string, args: string[], over: Record<string, string>, legalDir = legal('approved')) => {
     const env: Record<string, string> = { PATH: process.env.PATH ?? '', NEXO_EN_SITE_DIR: CLEAN, NEXO_LEGAL_DIR: legalDir, ...GOOD, ...over };
     const r = spawnSync(process.execPath, [`${ROOT}scripts/${script}`, ...args], { env, encoding: 'utf8' });
@@ -162,7 +162,7 @@ describe('modo staging-paddle (check-sale-env --staging-paddle e nexo:build:stag
   };
   const staging = (over: Record<string, string>, legalDir?: string) => run('check-sale-env.mjs', ['--staging-paddle'], over, legalDir);
 
-  it('4 combinações ambiente × token: só sandbox + test_ passa (com os textos Paddle reais em rascunho)', () => {
+  it('4 combinações ambiente × token: só sandbox + test_ passa (com os textos Paddle reais aprovados)', () => {
     const ok = staging(SANDBOX);
     expect(ok.code).toBe(0);
     for (const [name, over] of [
@@ -188,7 +188,7 @@ describe('modo staging-paddle (check-sale-env --staging-paddle e nexo:build:stag
     expect(staging({ VITE_PADDLE_CLIENT_TOKEN: SANDBOX.VITE_PADDLE_CLIENT_TOKEN, VITE_PADDLE_ENV: 'sandbox' }).code).toBe(1);
   });
   it('build de venda NORMAL continua recusando rascunho Paddle, mesmo em sandbox/test_ e mesmo com a variável de ambiente', () => {
-    const r = run('check-sale-env.mjs', [], { ...SANDBOX, VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test', NEXO_STAGING_PADDLE: '1' });
+    const r = run('check-sale-env.mjs', [], { ...SANDBOX, VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test', NEXO_STAGING_PADDLE: '1', NEXO_LEGAL_PADDLE_DIR: legal('draft') });
     expect(r.code).toBe(1);
     expect(r.out).toMatch(/Texto legal Paddle não aprovado/);
   });

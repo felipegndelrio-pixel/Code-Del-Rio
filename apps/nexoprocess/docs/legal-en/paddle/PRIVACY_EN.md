@@ -1,11 +1,9 @@
 ---
-status: draft
+status: approved
 ---
 # NexoProcess — Privacy Policy (Paddle channel)
 
-Last updated: 06/11/2026
-
-> DRAFT for the Paddle sales channel. TO VALIDATE (lawyer and founder) before use. Not the approved text for the Gumroad channel.
+Last updated: 09/11/2026
 
 ## 1. Summary
 Your process data stays on your device. We only handle the data needed to check your purchase and to count visits to our public pages.
@@ -28,7 +26,7 @@ The public pages under `/en/` (the sales page and the legal pages) use **Cloudfl
 The app itself (what you use after signing in) does **not** load this script and sends nothing to Cloudflare Web Analytics.
 
 ### 3.2 Checkout script (sales page only)
-The sales page loads Paddle's checkout script (`cdn.paddle.com`) so you can pay without leaving the page. The app itself does not load it. TO VALIDATE: what Paddle collects through this script and its legal basis, according to Paddle's own privacy policy.
+The sales page loads Paddle's checkout script (`cdn.paddle.com`) so you can pay without leaving the page. The app itself does not load it. Paddle processes the data you enter in its checkout under its own privacy policy: https://www.paddle.com/legal/privacy
 
 You can block the analytics script with your browser or a content blocker; the public pages work without it.
 
@@ -36,7 +34,7 @@ You can block the analytics script with your browser or a content blocker; the p
 A purchase record: e-mail, product, transaction identifier, status, amount and currency paid, event and date. Server logs show the e-mail masked. Your processes and spreadsheets are **not** sent or stored. Purchase records are kept while the license is valid and for up to 5 years for tax and accounting.
 
 ## 5. Third parties
-- **Paddle** sells the product as merchant of record, processes the payment, calculates and collects taxes, and handles refunds and chargebacks. We do not receive card data. TO VALIDATE: whether Paddle acts as an independent controller of your payment data, and where its privacy policy governs.
+- **Paddle** sells the product as merchant of record, processes the payment, calculates and collects taxes, and handles refunds and chargebacks. We do not receive card data. Paddle processes the data you enter in its checkout under its own privacy policy: https://www.paddle.com/legal/privacy
 - **Cloudflare** hosts the app and the API (it receives technical request metadata: IP, user agent, time, URL) and provides the analytics on the public pages only (section 3.1).
 - **Supabase** stores the purchase record (database).
 - No advertising cookies or external fonts are used, and the app has no analytics.
@@ -49,7 +47,7 @@ A purchase record: e-mail, product, transaction identifier, status, amount and c
 ## 7. Controller, legal bases and your rights
 Controller of the purchase record: Felipe Del Rio, an individual based in Brazil. Contact: {{SUPPORT_EMAIL}}
 
-You may ask for access, correction, deletion and objection by e-mail to {{SUPPORT_EMAIL}}. We reply within 30 days. Legal bases: contract (the license) and legitimate interest (cookieless analytics on the public pages). For data held by Paddle, see Paddle's privacy policy (TO VALIDATE).
+You may ask for access, correction, deletion and objection by e-mail to {{SUPPORT_EMAIL}}. We reply within 30 days. Legal bases: contract (the license) and legitimate interest (cookieless analytics on the public pages). For data held by Paddle, see Paddle's privacy policy: https://www.paddle.com/legal/privacy
 
 ## 8. Children
 Not intended for children under 16.
