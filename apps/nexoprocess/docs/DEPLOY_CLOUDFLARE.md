@@ -230,7 +230,7 @@ Execute esta sequência em janela de baixo movimento. Na primeira troca e após 
 
 - **V3 — rota da API:** `GET https://nexoprocess.pages.dev/api/license` deve responder HTTP `405` com JSON `{"error":"metodo"}`; nunca deve retornar o HTML da aplicação.
 - **V4 — sem compra:** em janela anônima, `/entrar` com um e-mail sem compra ativa deve recusar o acesso.
-- **V5 — licença ativa:** em sessão privada do fundador, `/entrar` com o e-mail da licença ativa deve liberar o acesso. Não registre nem compartilhe esse e-mail nos logs de revisão.
+- **V5 — licença ativa:** em sessão privada do fundador, `/entrar` com o e-mail da licença ativa deve liberar o acesso. **O critério é "entrou no app" (a tela do app abre e continua aberta ao recarregar), nunca só HTTP 200 da API:** em 12/11/2026 a rota respondeu 200 com token, mas o app recusou o token (chave pública do bundle ≠ par do servidor) e o comprador não entrou. Rode também `npm run nexo:check-deploy` (LANCAMENTO_EN §4.3). Não registre nem compartilhe esse e-mail nos logs de revisão.
 - **V6 — webhook:** um evento de teste suportado pela Hotmart deve criar/atualizar a licença e aparecer nos logs. Para comprovar também revogação ponta a ponta, use uma compra de teste que possa ser reembolsada; compra real só com aprovação explícita do custo. Verifique a linha/projeção após aprovação e revogação.
 
 Falha em qualquer V3–V6 ou erro 5xx em `/api/*` dispara o rollback do app descrito abaixo. Após rollback, preserve o banco e repita a sequência de retomada antes de publicar novamente.

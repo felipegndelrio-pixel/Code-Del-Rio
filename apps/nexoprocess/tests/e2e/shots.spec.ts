@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
 import { prepare } from './helpers';
 
 // Gera capturas para a documentação quando DOCS_SHOTS=1 (viewport, não página inteira).
 test.skip(!process.env.DOCS_SHOTS, 'somente sob demanda');
-const DIR = new URL('../../docs/screenshots/', import.meta.url).pathname;
+const DIR = fileURLToPath(new URL('../../docs/screenshots/', import.meta.url));
 
 for (const theme of ['dark', 'light'] as const) {
   test(`capturas (${theme})`, async ({ page }, info) => {

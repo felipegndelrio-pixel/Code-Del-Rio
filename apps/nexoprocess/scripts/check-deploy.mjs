@@ -3,6 +3,7 @@
 // Lê o HTML e os assets JS do site, acha a VITE_LICENSE_PUBLIC_JWK que o app recebeu, calcula a impressão digital
 // (8 hex = SHA-256 de x seguido de y) e compara com GET /api/license-key-fingerprint. Imprime só impressões digitais e motivos,
 // nunca a chave. Saída 0 = iguais; 1 = diferentes, ausentes ou malformadas; 2 = uso incorreto.
+import { pathToFileURL } from 'node:url';
 import { jwkFingerprint, jwkProblems } from '../src/license/jwk.mjs';
 
 const TIMEOUT_MS = 15_000;
@@ -137,7 +138,7 @@ export async function checkDeploy(baseUrl, log = console.log) {
   return 0;
 }
 
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('check-deploy.mjs')) {
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const url = process.argv[2];
   if (!url) {
     console.error('Uso: npm run nexo:check-deploy -- https://seu-dominio');

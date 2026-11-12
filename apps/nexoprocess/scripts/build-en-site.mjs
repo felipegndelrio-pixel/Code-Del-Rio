@@ -3,9 +3,11 @@
 // o check-sale-env recusa o build de venda com qualquer página assim (poka-yoke contra publicar rascunho).
 // Uso: npm run nexo:site:en  (a saída é versionada).
 import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isLegalDraft, parseLegal } from './lib/en-site.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = [
   { md: 'TERMS_EN.md', out: 'terms.html', title: 'Terms of Use' },
   { md: 'PRIVACY_EN.md', out: 'privacy.html', title: 'Privacy Policy' },
@@ -89,11 +91,11 @@ ${draft ? '<div class="draft" role="note"><strong>DRAFT.</strong> This text has 
 `;
 }
 
-if (process.argv[1] && new URL(`file://${process.argv[1]}`).href === import.meta.url) {
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   for (const p of PAGES) {
-    const md = readFileSync(`${ROOT}docs/legal-en/${p.md}`, 'utf8');
+    const md = readFileSync(join(ROOT, 'docs', 'legal-en', p.md), 'utf8');
     const draft = isLegalDraft(md);
-    writeFileSync(`${ROOT}public/en/${p.out}`, page({ title: p.title, body: mdToHtml(parseLegal(md).body), draft }));
+    writeFileSync(join(ROOT, 'public', 'en', p.out), page({ title: p.title, body: mdToHtml(parseLegal(md).body), draft }));
     console.log(`${p.out}: ${draft ? 'DRAFT (o build de venda será recusado)' : 'sem marcadores de rascunho'}`);
   }
 }

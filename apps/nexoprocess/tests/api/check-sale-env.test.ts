@@ -4,6 +4,7 @@ import { createHash, generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Poka-yoke do build de venda: sem as 4 variáveis do EN o app sairia sem compra e sem links legais.
 const pub = JSON.stringify(generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ format: 'jwk' }));
@@ -33,7 +34,7 @@ const run = (over: Record<string, string | undefined>) => {
     if (v === undefined) delete env[k];
     else env[k] = v;
   }
-  const r = spawnSync(process.execPath, ['apps/nexoprocess/scripts/check-sale-env.mjs'], { env, encoding: 'utf8', cwd: new URL('../../../../', import.meta.url).pathname });
+  const r = spawnSync(process.execPath, ['apps/nexoprocess/scripts/check-sale-env.mjs'], { env, encoding: 'utf8', cwd: fileURLToPath(new URL('../../../../', import.meta.url)) });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 };
 
@@ -94,7 +95,7 @@ describe('check-sale-env', () => {
     });
   });
   it('license-keys.mjs imprime as duas linhas e a impressão digital, igual à da pública', () => {
-    const r = spawnSync(process.execPath, ['apps/nexoprocess/scripts/license-keys.mjs'], { encoding: 'utf8', cwd: new URL('../../../../', import.meta.url).pathname });
+    const r = spawnSync(process.execPath, ['apps/nexoprocess/scripts/license-keys.mjs'], { encoding: 'utf8', cwd: fileURLToPath(new URL('../../../../', import.meta.url)) });
     expect(r.status).toBe(0);
     const lines = r.stdout.split('\n');
     const privJwk = JSON.parse(lines[lines.findIndex((l) => l.startsWith('LICENSE_PRIVATE_JWK')) + 1]) as Record<string, string>;

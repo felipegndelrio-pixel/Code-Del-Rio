@@ -4,8 +4,10 @@
 import { readFileSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+// fileURLToPath (e não .pathname): no Windows .pathname dá '/C:/…' e o caminho vira 'C:\\:\\…' (ENOENT).
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST = join(ROOT, 'dist');
 const KB = 1024;
 const LIMITS = {

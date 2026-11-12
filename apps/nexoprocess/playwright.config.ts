@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 // Modo de venda (licença por e-mail): segundo build com chave pública SÓ DE TESTE.
@@ -90,7 +91,7 @@ export default defineConfig({
         VITE_PADDLE_ENV: 'sandbox',
         VITE_PADDLE_PRICE_ID: `pri_${'a1'.repeat(13)}`,
         VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test',
-        NEXO_EN_DIST: new URL('./dist-licenca-paddle', import.meta.url).pathname,
+        NEXO_EN_DIST: fileURLToPath(new URL('./dist-licenca-paddle', import.meta.url)),
         BUNDLE_REPORT: 'false',
       },
     },

@@ -5,11 +5,12 @@ import { generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error módulo .mjs sem tipos
 import { injectHtml, paddleConfig, parseOrigins, patchHeaders } from '../../scripts/lib/en-site.mjs';
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const INDEX = readFileSync(`${ROOT}public/en/index.html`, 'utf8');
 const HEADERS = readFileSync(`${ROOT}public/_headers`, 'utf8');
 const OK = { VITE_PADDLE_CLIENT_TOKEN: 'test_0123456789abcdef0123456789', VITE_PADDLE_ENV: 'sandbox', VITE_PADDLE_PRICE_ID: `pri_${'a1'.repeat(13)}`, VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test' };

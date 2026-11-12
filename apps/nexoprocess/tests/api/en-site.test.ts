@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CF_BEACON, LEGAL_FILES, LICENSE_OFFLINE_DAYS, draftPages, injectDist, injectHtml, isLegalDraft, legalGate, parseLegal } from '../../scripts/lib/en-site.mjs';
 import { mdToHtml, page } from '../../scripts/build-en-site.mjs';
 
-const SITE = new URL('../../public/en/', import.meta.url).pathname;
+const SITE = fileURLToPath(new URL('../../public/en/', import.meta.url));
 const ENV = { VITE_GUMROAD_CHECKOUT_URL: 'https://shop.example/l/nexo', VITE_SUPPORT_EMAIL: 'help@example.com' };
 const tmp = () => mkdtempSync(join(tmpdir(), 'en-site-'));
 
@@ -212,7 +213,7 @@ describe('aprovação do texto legal (K3)', () => {
     expect(legalGate(tmp()).length).toBe(3); // arquivos ausentes
   });
   it('o repositório hoje: os 3 textos estão approved, sem TO VALIDATE/DRAFT e com o contato pelo marcador do build', () => {
-    const dir = new URL('../../docs/legal-en', import.meta.url).pathname;
+    const dir = fileURLToPath(new URL('../../docs/legal-en', import.meta.url));
     expect(legalGate(dir)).toEqual([]);
     for (const f of LEGAL_FILES) {
       const md = readFileSync(join(dir, f), 'utf8');
@@ -237,7 +238,7 @@ describe('copy da landing: atualizações (K1)', () => {
 
 
 describe('variante Paddle dos textos legais (docs/legal-en/paddle): aprovada pelo fundador, sem pontos em aberto', () => {
-  const dir = new URL('../../docs/legal-en/paddle', import.meta.url).pathname;
+  const dir = fileURLToPath(new URL('../../docs/legal-en/paddle', import.meta.url));
   it('os 3 textos existem, estão approved e sem TO VALIDATE/DRAFT; o gate aceita', () => {
     expect(LEGAL_FILES).toHaveLength(3);
     expect(legalGate(dir)).toEqual([]);
