@@ -1,0 +1,17 @@
+# Fim de linha: LF em todo o repositório, em qualquer sistema.
+# Motivo: um clone no Windows com core.autocrlf=true trazia CRLF; o apps/nexoprocess/public/_headers com CR fazia o build
+# gerar um cabeçalho CSP com '\r' no meio e /en/ responder HTTP 500 (e o CR também quebra shell scripts). O índice do Git já
+# está 100% em LF: este arquivo não altera nenhum conteúdo versionado, só o que sai no disco do Windows.
+* text=auto eol=lf
+
+# Binários: nunca converter.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.xlsx binary
+*.zip binary
+*.pdf binary

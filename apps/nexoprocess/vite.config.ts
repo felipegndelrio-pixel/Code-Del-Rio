@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-import { injectDist } from './scripts/lib/en-site.mjs';
+import { assertDeployFiles, injectDist } from './scripts/lib/en-site.mjs';
 import tailwind from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
 import { viteSingleFile } from 'vite-plugin-singlefile';
@@ -79,7 +79,9 @@ export default defineConfig(({ mode }) => {
         enforce: 'post',
         closeBundle() {
           if (single) return;
-          injectDist(env.NEXO_EN_DIST || import.meta.dirname + '/dist', env, { sale: env.VITE_LICENSE_REQUIRED === 'true' }); // NEXO_EN_DIST: só para builds de teste com outro --outDir
+          const distDir = env.NEXO_EN_DIST || import.meta.dirname + '/dist'; // NEXO_EN_DIST: só para builds de teste com outro --outDir
+          injectDist(distDir, env, { sale: env.VITE_LICENSE_REQUIRED === 'true' });
+          assertDeployFiles(distDir); // falha o build se _headers/_redirects tiverem CR ou linha fora do formato
         },
       },
       {

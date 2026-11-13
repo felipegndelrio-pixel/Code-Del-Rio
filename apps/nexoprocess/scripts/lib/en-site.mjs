@@ -80,7 +80,9 @@ export function paddleScriptsHtml(cfg) {
  */
 export function patchHeaders(text, cfg) {
   if (!cfg.enabled) return text;
-  const lines = text.split('\n');
+  // Clone no Windows (core.autocrlf=true) vem com CRLF: sem normalizar, a linha do CSP termina em '\r', o regex /;\s*$/ não casa
+  // e o frame-src é colado DEPOIS do '\r' (valor de cabeçalho com CR no meio → /en/ responde 500). Sempre trabalha e devolve LF.
+  const lines = toLf(text).split('\n');
   const i = lines.findIndex((l) => l.trim() === '/en/*');
   if (i < 0) throw new Error('_headers sem o bloco /en/*');
   let done = false;
@@ -95,6 +97,40 @@ export function patchHeaders(text, cfg) {
   }
   if (!done) throw new Error('bloco /en/* sem Content-Security-Policy');
   return lines.join('\n');
+}
+
+/** CRLF (e CR solto no fim de linha) → LF. */
+export const toLf = (text) => text.replace(/\r\n?/g, '\n');
+
+/**
+ * Guarda do fim do build: o que vai para o Cloudflare Pages (dist/_headers e dist/_redirects) não pode ter '\r', e cada linha
+ * de um bloco de _headers precisa ser 'Nome: valor' (ou '! Nome', que destaca o cabeçalho herdado) INDENTADA, sob uma linha de caminho.
+ * Devolve a lista de problemas (vazia = ok); nunca devolve valores de cabeçalho.
+ */
+export function deployFilesProblems(headers, redirects) {
+  const problems = [];
+  if (headers !== undefined) {
+    if (headers.includes('\r')) problems.push('dist/_headers contém CR (\\r): o clone veio com CRLF e o build não normalizou.');
+    let inBlock = false;
+    headers.split(/\r?\n/).forEach((line, i) => {
+      const n = i + 1;
+      if (!line.trim() || line.trimStart().startsWith('#')) return;
+      if (/^\s/.test(line)) {
+        if (!inBlock) problems.push(`dist/_headers linha ${n}: cabeçalho antes de qualquer linha de caminho.`);
+        else if (!/^\s+(?:! ?[A-Za-z0-9-]+|[A-Za-z0-9-]+: \S.*)$/.test(line.replace(/\r$/, ''))) problems.push(`dist/_headers linha ${n}: linha de bloco fora do formato "  Nome: valor" (ou "  ! Nome").`);
+      } else if (/^(\/|\*|https:\/\/)\S*$/.test(line.replace(/\r$/, ''))) inBlock = true;
+      else problems.push(`dist/_headers linha ${n}: linha de caminho inválida ou cabeçalho sem indentação.`);
+    });
+  }
+  if (redirects !== undefined && redirects.includes('\r')) problems.push('dist/_redirects contém CR (\\r): o clone veio com CRLF e o build não normalizou.');
+  return problems;
+}
+
+/** Lê dist/_headers e dist/_redirects (se existirem) e lança erro se algum problema de deployFilesProblems aparecer. */
+export function assertDeployFiles(distDir) {
+  const read = (n) => (existsSync(join(distDir, n)) ? readFileSync(join(distDir, n), 'utf8') : undefined);
+  const problems = deployFilesProblems(read('_headers'), read('_redirects'));
+  if (problems.length) throw new Error(`Arquivos de deploy inválidos (Cloudflare Pages):\n- ${problems.join('\n- ')}`);
 }
 
 const MARKER_ANY = /\{\{[A-Z_]+\}\}/g;
@@ -135,12 +171,18 @@ export function injectDist(distDir, env, { sale }) {
   const dir = join(distDir, 'en');
   if (!existsSync(dir)) return [];
   const errors = [];
-  const headers = join(distDir, '_headers');
   const pcfg = paddleConfig(env);
-  if (pcfg.enabled && existsSync(headers)) writeFileSync(headers, patchHeaders(readFileSync(headers, 'utf8'), pcfg));
+  // Sempre grava LF (clone com CRLF no Windows), com ou sem Paddle.
+  for (const n of ['_headers', '_redirects']) {
+    const p = join(distDir, n);
+    if (!existsSync(p)) continue;
+    const text = readFileSync(p, 'utf8');
+    const lf = n === '_headers' && pcfg.enabled ? patchHeaders(text, pcfg) : toLf(text);
+    if (lf !== text) writeFileSync(p, lf);
+  }
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.html'))) {
     const p = join(dir, f);
-    const r = injectHtml(readFileSync(p, 'utf8'), env, { sale, file: `en/${f}` });
+    const r = injectHtml(toLf(readFileSync(p, 'utf8')), env, { sale, file: `en/${f}` });
     errors.push(...r.errors);
     if (!r.errors.length || !sale) writeFileSync(p, r.html);
   }

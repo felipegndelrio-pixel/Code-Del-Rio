@@ -34,7 +34,7 @@ export function mdToHtml(md) {
     if (list) out.push('</ul>');
     list = false;
   };
-  for (const raw of md.split('\n')) {
+  for (const raw of md.split(/\r?\n/)) {
     const line = raw.trimEnd();
     let m;
     if (!line.trim()) {
