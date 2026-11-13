@@ -114,12 +114,14 @@ describe('.gitattributes', () => {
     for (const ext of ['png', 'webp', 'woff2', 'xlsx']) expect(t).toMatch(new RegExp(`^\\*\\.${ext} binary$`, 'm'));
   });
   it('um clone com core.autocrlf=true NÃO traz CRLF nos arquivos do build (depende de o .gitattributes estar COMMITADO)', () => {
-    let tracked = '';
-    try {
-      tracked = execFileSync('git', ['ls-files', '--error-unmatch', '.gitattributes'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    } catch {
-      return; // ainda não commitado (o teste vale a partir do commit): nada a clonar
-    }
+    const tracked = (() => {
+      try {
+        return execFileSync('git', ['ls-files', '--error-unmatch', '.gitattributes'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      } catch {
+        return null; // ainda não commitado (o teste vale a partir do commit): nada a clonar
+      }
+    })();
+    if (tracked === null) return;
     expect(tracked).toBe('.gitattributes');
     const dest = mkdtempSync(join(tmpdir(), 'clone-'));
     try {
