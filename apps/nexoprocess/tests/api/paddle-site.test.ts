@@ -29,6 +29,14 @@ describe('paddleConfig', () => {
     expect(paddleConfig({ ...OK, VITE_PADDLE_PRICE_ID: 'pri_x' }).problems.join()).toMatch(/PRICE_ID inválido/);
     expect(paddleConfig({ ...OK, VITE_PADDLE_CSP_FRAME: 'http://x.test' }).problems.join()).toMatch(/CSP_FRAME/);
     expect(paddleConfig({ ...OK, VITE_PADDLE_CSP_FRAME: 'https://*.x.test' }).enabled).toBe(false);
+    // VITE_PADDLE_CSP_STYLE: mesmo padrão (https, sem curinga, sem caminho, até 6)
+    expect(paddleConfig({ ...OK, VITE_PADDLE_CSP_STYLE: 'https://sandbox-cdn.paddle.com' }).style).toEqual(['https://sandbox-cdn.paddle.com']);
+    expect(paddleConfig(OK).style).toEqual([]);
+    for (const bad of ['http://x.test', 'https://*.x.test', 'https://x.test/estilo.css', 'x.test', Array.from({ length: 7 }, (_, i) => `https://h${i}.test`).join(',')]) {
+      const c = paddleConfig({ ...OK, VITE_PADDLE_CSP_STYLE: bad });
+      expect(c.enabled, bad).toBe(false);
+      expect(c.problems.join(), bad).toMatch(/VITE_PADDLE_CSP_STYLE/);
+    }
     expect(paddleConfig({ ...OK, VITE_PADDLE_CLIENT_TOKEN: 'abc' }).enabled).toBe(false);
   });
   it('parseOrigins: vazio ok; lista; rejeita caminho e curinga', () => {
@@ -78,6 +86,18 @@ describe('_headers (patchHeaders)', () => {
     const app = out.split('\n').find((l: string) => l.includes('Content-Security-Policy') && l.includes('script-src'))!;
     expect(app).toContain("script-src 'self';");
     expect(app).not.toMatch(/paddle/i);
+  });
+  it('COM VITE_PADDLE_CSP_STYLE: a origem entra SÓ no style-src de /en/* (depois de self e unsafe-inline); nada fora desse bloco muda', () => {
+    const out = patchHeaders(HEADERS, paddleConfig({ ...OK, VITE_PADDLE_CSP_STYLE: 'https://sandbox-cdn.paddle.com,https://x-cdn.example.test' }));
+    expect(enBlock(out)).toContain("style-src 'self' 'unsafe-inline' https://sandbox-cdn.paddle.com https://x-cdn.example.test;");
+    expect(out.replace(enBlock(out), '')).toBe(HEADERS.replace(enBlock(HEADERS), ''));
+    // as demais diretivas de /en/* seguem como na variante sem STYLE (frame-src do OK continua)
+    expect(enBlock(out)).toContain("frame-src 'self' https://checkout.example.test");
+    expect(enBlock(out)).toContain("img-src 'self' data: blob:;");
+    // sem STYLE: style-src de /en/* fica igual ao original
+    expect(enBlock(patchHeaders(HEADERS, paddleConfig(OK)))).toContain("style-src 'self' 'unsafe-inline'; img-src");
+    // /entrar e /app: nenhuma linha de CSP fora de /en/* menciona a Paddle nem a origem de estilo
+    expect(out.replace(enBlock(out), '')).not.toMatch(/paddle/i);
   });
 });
 
@@ -137,6 +157,19 @@ describe('check-sale-env com Paddle', () => {
     expect(r.code).toBe(1);
     expect(r.out).toContain('VITE_PADDLE_CSP_FRAME');
   });
+  it('VITE_PADDLE_CSP_STYLE: ausente com Paddle ligada → AVISA sem recusar; presente → sem aviso; inválida → recusa', () => {
+    const warn = run(OK, dir('approved'));
+    expect(warn.code).toBe(0);
+    expect(warn.out).toContain('VITE_PADDLE_CSP_STYLE ausente');
+    const ok = run({ ...OK, VITE_PADDLE_CSP_STYLE: 'https://sandbox-cdn.paddle.com' }, dir('approved'));
+    expect(ok.code).toBe(0);
+    expect(ok.out).not.toContain('CSP_STYLE ausente');
+    const bad = run({ ...OK, VITE_PADDLE_CSP_STYLE: 'https://*.paddle.com' }, dir('approved'));
+    expect(bad.code).toBe(1);
+    expect(bad.out).toContain('VITE_PADDLE_CSP_STYLE');
+    // sem Paddle ligada o aviso não aparece
+    expect(run({}, dir('approved')).out).not.toContain('CSP_STYLE');
+  });
   it('Paddle parcial → recusa', () => {
     const r = run({ VITE_PADDLE_CLIENT_TOKEN: OK.VITE_PADDLE_CLIENT_TOKEN }, dir('approved'));
     expect(r.code).toBe(1);
@@ -183,6 +216,8 @@ describe('modo staging-paddle (check-sale-env --staging-paddle e nexo:build:stag
     expect(r.out).toContain('RASCUNHO');
     expect(r.out).toContain('VITE_PADDLE_CSP_FRAME ausente');
     expect(staging({ ...SANDBOX, VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test' }).out).not.toContain('CSP_FRAME ausente');
+    expect(r.out).toContain('VITE_PADDLE_CSP_STYLE ausente');
+    expect(staging({ ...SANDBOX, VITE_PADDLE_CSP_STYLE: 'https://sandbox-cdn.paddle.com' }).out).not.toContain('CSP_STYLE ausente');
   });
   it('modo staging sem Paddle configurada, ou incompleta, é recusado (não vira build de venda por engano)', () => {
     expect(staging({}).code).toBe(1);

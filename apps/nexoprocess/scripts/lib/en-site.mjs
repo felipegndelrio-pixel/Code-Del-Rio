@@ -20,7 +20,8 @@ const CF_TOKEN_RE = /^[A-Za-z0-9]{16,64}$/;
  * existem. Fatos da doc oficial (developer.paddle.com, 06/11/2026): script em https://cdn.paddle.com/paddle/v2/paddle.js (sempre
  * desse endereço); token de cliente começa com test_ (sandbox) ou live_; Paddle.Environment.set('sandbox') só para sandbox;
  * price id = pri_ + 26 caracteres. Hosts do checkout (iframe/rede) NÃO constam nas páginas consultadas: vêm de
- * VITE_PADDLE_CSP_FRAME / VITE_PADDLE_CSP_CONNECT (A VALIDAR no sandbox, ver PADDLE_ENTITLEMENT.md, checklist).
+ * VITE_PADDLE_CSP_FRAME / VITE_PADDLE_CSP_CONNECT / VITE_PADDLE_CSP_STYLE (a Paddle.js injeta uma folha de estilo de um host da Paddle;
+ * origens vistas no sandbox em 13/11/2026 em PADDLE_ENTITLEMENT.md §14.5; as do live são A VALIDAR).
  */
 export const PADDLE_SCRIPT = 'https://cdn.paddle.com/paddle/v2/paddle.js';
 export const PADDLE_BUTTON_MARKER = '{{PADDLE_BUY_BUTTON}}';
@@ -37,7 +38,7 @@ export function parseOrigins(raw) {
   return { list: [...new Set(list)], problem: null };
 }
 
-/** Estado da Paddle nas variáveis: { enabled, partial, problems, token, env, price, frame, connect }. */
+/** Estado da Paddle nas variáveis: { enabled, partial, problems, token, env, price, frame, connect, style }. */
 export function paddleConfig(env) {
   const v = (n) => (env[n] ?? '').trim();
   const present = PADDLE_NAMES.filter((n) => v(n));
@@ -47,7 +48,8 @@ export function paddleConfig(env) {
   const price = v('VITE_PADDLE_PRICE_ID');
   const frame = parseOrigins(env.VITE_PADDLE_CSP_FRAME);
   const connect = parseOrigins(env.VITE_PADDLE_CSP_CONNECT);
-  const anyPaddle = present.length > 0 || v('VITE_PADDLE_CSP_FRAME') || v('VITE_PADDLE_CSP_CONNECT');
+  const style = parseOrigins(env.VITE_PADDLE_CSP_STYLE);
+  const anyPaddle = present.length > 0 || v('VITE_PADDLE_CSP_FRAME') || v('VITE_PADDLE_CSP_CONNECT') || v('VITE_PADDLE_CSP_STYLE');
   if (anyPaddle) {
     for (const n of PADDLE_NAMES) if (!v(n)) problems.push(`${n} ausente (as variáveis VITE_PADDLE_* só valem juntas).`);
     if (token && !/^(test|live)_[A-Za-z0-9]{10,64}$/.test(token)) problems.push('VITE_PADDLE_CLIENT_TOKEN inválido (esperado test_… ou live_…, só letras e números).');
@@ -56,8 +58,9 @@ export function paddleConfig(env) {
     if (price && !/^pri_[a-z\d]{26}$/.test(price)) problems.push('VITE_PADDLE_PRICE_ID inválido (esperado pri_ + 26 caracteres).');
     if (frame.problem) problems.push(`VITE_PADDLE_CSP_FRAME: ${frame.problem}.`);
     if (connect.problem) problems.push(`VITE_PADDLE_CSP_CONNECT: ${connect.problem}.`);
+    if (style.problem) problems.push(`VITE_PADDLE_CSP_STYLE: ${style.problem}.`);
   }
-  return { enabled: !!anyPaddle && problems.length === 0, partial: !!anyPaddle && problems.length > 0, problems, token, env: mode, price, frame: frame.list, connect: connect.list };
+  return { enabled: !!anyPaddle && problems.length === 0, partial: !!anyPaddle && problems.length > 0, problems, token, env: mode, price, frame: frame.list, connect: connect.list, style: style.list };
 }
 
 const attr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -73,7 +76,7 @@ export function paddleScriptsHtml(cfg) {
 
 /**
  * Cabeçalhos: soma a Paddle SÓ ao CSP de /en/* (o app e o resto ficam com script-src 'self'). Sem Paddle, devolve o texto igual.
- * script-src recebe https://cdn.paddle.com; frame-src e connect-src recebem as origens informadas.
+ * script-src recebe https://cdn.paddle.com; frame-src, connect-src e style-src recebem as origens informadas (style-src: só depois de 'self' 'unsafe-inline').
  */
 export function patchHeaders(text, cfg) {
   if (!cfg.enabled) return text;
@@ -86,6 +89,7 @@ export function patchHeaders(text, cfg) {
     let l = lines[j].replace(/script-src ([^;]*)/, (m, v) => `script-src ${v} https://cdn.paddle.com`);
     if (cfg.frame.length) l = l.replace(/;\s*$/, '') + `; frame-src 'self' ${cfg.frame.join(' ')}`;
     if (cfg.connect.length) l = l.replace(/connect-src ([^;]*)/, (m, v) => `connect-src ${v} ${cfg.connect.join(' ')}`);
+    if (cfg.style.length) l = l.replace(/style-src ([^;]*)/, (m, v) => `style-src ${v} ${cfg.style.join(' ')}`);
     lines[j] = l;
     done = true;
   }

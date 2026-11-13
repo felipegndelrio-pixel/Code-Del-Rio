@@ -63,9 +63,11 @@ errors.push(...legalGate(legalDir).map((p) => `Texto legal EN não aprovado: ${p
       const bar = '#'.repeat(78);
       console.warn(`\n${bar}\n##  BUILD DE STAGING COM PADDLE EM SANDBOX. NÃO PUBLICAR EM PRODUÇÃO, NÃO VENDER.\n##  Os textos legais da variante Paddle estão em RASCUNHO e foram aceitos só por este modo.\n##  Vale somente para teste com cartão de teste no domínio de staging (docs/PADDLE_ENTITLEMENT.md §14).\n${bar}\n`);
       if (!pc.frame.length) console.warn('AVISO: VITE_PADDLE_CSP_FRAME ausente: o checkout será bloqueado pelo CSP de /en/ até você informar a origem (leia as violações no console do navegador, §14 item 14).');
+      if (!pc.style.length) console.warn('AVISO: VITE_PADDLE_CSP_STYLE ausente: a folha de estilo que a Paddle.js injeta será bloqueada pelo CSP de /en/ (style-src) até você informar a origem (§14.5).');
     }
   } else if (pc.enabled) {
     if (!pc.frame.length) errors.push('VITE_PADDLE_CSP_FRAME ausente (origem do checkout da Paddle; descubra no sandbox, PADDLE_ENTITLEMENT.md, checklist).');
+    if (!pc.style.length) console.warn('AVISO: VITE_PADDLE_CSP_STYLE ausente: a folha de estilo que a Paddle.js injeta será bloqueada pelo CSP de /en/ (style-src); confira no console do navegador com a conta live (§14.5).');
     const paddleLegal = process.env.NEXO_LEGAL_PADDLE_DIR || fileURLToPath(new URL('../docs/legal-en/paddle', import.meta.url));
     errors.push(...legalGate(paddleLegal).map((p) => `Texto legal Paddle não aprovado: ${p}`));
   }

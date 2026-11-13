@@ -91,6 +91,7 @@ export default defineConfig({
         VITE_PADDLE_ENV: 'sandbox',
         VITE_PADDLE_PRICE_ID: `pri_${'a1'.repeat(13)}`,
         VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test',
+        VITE_PADDLE_CSP_STYLE: 'https://style.example.test',
         NEXO_EN_DIST: fileURLToPath(new URL('./dist-licenca-paddle', import.meta.url)),
         BUNDLE_REPORT: 'false',
       },

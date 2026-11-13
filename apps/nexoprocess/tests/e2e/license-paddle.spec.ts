@@ -137,6 +137,9 @@ test('build: o CSP de /en/* ganhou a Paddle e o do app continua com script-src s
   const en = h.slice(h.indexOf('/en/*'), h.indexOf('\n\n', h.indexOf('/en/*')));
   expect(en).toContain('https://cdn.paddle.com');
   expect(en).toContain("frame-src 'self' https://checkout.example.test");
+  expect(en).toContain("style-src 'self' 'unsafe-inline' https://style.example.test;");
+  // A origem do estilo entra SÓ no style-src de /en/*: o resto do arquivo (app, /entrar) não menciona a Paddle nem o host.
+  expect(h.replace(en, '')).not.toMatch(/paddle|style\.example\.test/i);
   const app = h.split('\n').find((l) => l.includes('Content-Security-Policy') && !l.includes('static.cloudflareinsights'))!;
   expect(app).toContain("script-src 'self';");
   expect(app).not.toMatch(/paddle/i);
