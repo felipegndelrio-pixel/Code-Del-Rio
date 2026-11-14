@@ -29,3 +29,6 @@ output/NexoProcess_Campanha_Google/_work/*
 !output/NexoProcess_Campanha_Google/_work/scripts/
 !output/NexoProcess_Campanha_Google/_work/geo.json
 __pycache__/
+
+# filme: intermediários de render
+marketing/filme/work/
