@@ -383,5 +383,27 @@ select platform, transaction_id, email, status, access_active, amount, currency,
 4. Repetir os itens 9, 13 e 16 com **uma compra real do próprio fundador** e reembolso, como no teste de fumaça da Gumroad (`HANDOFF_EN.md`).
 5. **Reverter** (se algo falhar): remover as `VITE_PADDLE_*` e refazer o build (landing e entrada voltam ao estado só-Gumroad); as rotas `/api/paddle-*` ficam inertes sem tráfego.
 
+### 14.8 Lições do sandbox de 13–14/11/2026 (dados do fundador, revisados)
+1. **Token, preço, produto, chave de API e destino de notificação têm de ser da MESMA conta Paddle e do MESMO ambiente** (sandbox × live). O checkout só funcionou depois de alinhar token de cliente e price id na mesma conta sandbox.
+2. **"Delivered" não prova gravação.** O webhook respondeu 200, mas a compra foi ignorada como `outro_produto` porque o `PADDLE_PRODUCT_ID` do Preview era de outro produto/conta, **sem deixar rastro**. Correção na rc3: o evento passa a ser registrado em `nexo_webhook_rejections` com `reason='outro_produto'`, `txn_` e `evt_` (sem e-mail), e continua respondendo 200. Diagnóstico: `OPERACAO_EN.md` §6.1 **P-F** e §6.3.2 item 5.
+3. **Ler a aba Response do F12 (Network), não abrir o endpoint na barra de endereço.** Um GET em `/api/paddle-webhook` ou `/api/paddle-license` devolve 405 `metodo` por desenho e parece um erro; o que importa é o corpo da resposta do POST que o navegador ou a Paddle faz.
+4. **Retry é seguro, e a Paddle parece reassinar cada reenvio.** O reenvio (Retry) de um evento do dia anterior foi aceito com a tolerância de 300 s. **INFERÊNCIA forte (não prova):** a Paddle reassina cada reenvio com `ts` novo (a doc não diz). Fecha o item 12 do checklist se, no próximo reenvio, o `ts` do cabeçalho for visto como novo. Retry não duplica: a gravação é idempotente por `evt_…`.
+5. **Clone no Windows:** usar `core.autocrlf=false` até a rc3; a rc3 traz `.gitattributes` (`eol=lf`) e o build normaliza e valida o `_headers`.
+6. **Hotmart em produção:** `VITE_HOTMART_CHECKOUT_URL` recebeu o hotlink `go.hotmart.com` (página de vendas, que aponta de volta para o site) e o botão "Comprar na Hotmart" ficou em loop. O build de venda agora exige `https://pay.hotmart.com/<código>` (`check-sale-env`).
+
+### 14.9 Checklist único "Paddle LIVE" (marque na ordem; cada item com evidência)
+- [ ] 1. **Conta live aprovada** pela Paddle (site e domínio no ar revisados). §14.6 item 1.
+- [ ] 2. **Catálogo live** criado: produto, preço US$ 39 pagamento único (§14.6 item 1b confere preço, janela de 7 dias, reembolso pelo comprador e onde o recibo mostra o `txn_`). Anote `pro_…` e `pri_…` **da conta live**.
+- [ ] 3. **Chave de API live (`pdl_live_…`) só com a permissão `customer.read`.** Nada além disso.
+- [ ] 4. **Token de cliente `live_…`** (client-side token da conta live).
+- [ ] 5. **Destino de notificação live** apontando para `https://<domínio de produção>/api/paddle-webhook`, com os 3 eventos (`transaction.completed`, `adjustment.created`, `adjustment.updated`) e **`traffic_source` = Platform only**; guarde o segredo do destino.
+- [ ] 6. **Variáveis do servidor (Production)**: `PADDLE_ENV=production`, `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRODUCT_ID` (o do passo 2; ver lição 2), mais as já existentes. Conferir que **todas são da mesma conta live**.
+- [ ] 7. **Origens de CSP do LIVE descobertas pelo console** (§14.5) com o checkout live: `VITE_PADDLE_CSP_FRAME`, `VITE_PADDLE_CSP_CONNECT`, `VITE_PADDLE_CSP_STYLE`. Não copiar as do sandbox.
+- [ ] 8. **Build de venda com Paddle** (`npm run nexo:build:venda`, não o de staging): `VITE_PADDLE_CLIENT_TOKEN=live_…`, `VITE_PADDLE_ENV=production`, `VITE_PADDLE_PRICE_ID`, as três de CSP, `VITE_HOTMART_CHECKOUT_URL=https://pay.hotmart.com/<código>`; textos legais da Paddle em `approved`; clone limpo no commit/tag da rc3.
+- [ ] 9. **Schema no banco de produção** (§14.6 item 0, com `OPERACAO_EN.md` §7.1 antes e depois).
+- [ ] 10. **Deploy** e, logo depois, **`npm run nexo:check-deploy -- https://<domínio>`** terminando em `OK` (`LANCAMENTO_EN.md` §4.3).
+- [ ] 11. **Compra real do próprio fundador + reembolso** (§14.6 item 4): entrou no app (não só HTTP 200), a compra aparece em P-A, o reembolso revoga no próximo check; `OPERACAO_EN.md` P-F **sem** linhas inesperadas.
+- [ ] 12. **Reversão pronta** (§14.6 item 5) e ninguém mais usando o sandbox no domínio de produção.
+
 ### 14.7 O que registrar (sem segredos)
 Data, ambiente (sandbox/live), commit do build (`VITE_BUILD_ID`), resultado de cada linha, onde o `txn_…` aparece (item 11), a tolerância usada (item 12) e as origens de CSP encontradas (item 14, são públicas). Anexar prints sem dados pessoais.

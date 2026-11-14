@@ -28,7 +28,22 @@ let publicFingerprint = null;
     }
   }
 }
-if (!/^https:\/\/\S+$/.test(process.env.VITE_HOTMART_CHECKOUT_URL ?? '')) errors.push('VITE_HOTMART_CHECKOUT_URL ausente ou sem https:// (link do checkout da Hotmart).');
+{
+  // O botão "Comprar na Hotmart" precisa apontar para o CHECKOUT (https://pay.hotmart.com/<código>). O hotlink de página de vendas
+  // (go.hotmart.com/...) aponta de volta para o site e deixa o comprador em loop (produção, 13/11/2026).
+  const hot = (process.env.VITE_HOTMART_CHECKOUT_URL ?? '').trim();
+  if (!/^https:\/\/\S+$/.test(hot)) errors.push('VITE_HOTMART_CHECKOUT_URL ausente ou sem https:// (link do checkout da Hotmart).');
+  else if (!/^https:\/\/pay\.hotmart\.com\/[^\s/?#][^\s]*$/.test(hot)) {
+    const host = (() => {
+      try {
+        return new URL(hot).hostname;
+      } catch {
+        return '?';
+      }
+    })();
+    errors.push(`VITE_HOTMART_CHECKOUT_URL precisa começar com https://pay.hotmart.com/ seguido do código do produto (recebi o host "${host}"). Um link go.hotmart.com (página de vendas) aponta de volta para o site e deixa o comprador em loop: use o link de PAGAMENTO do produto.`);
+  }
+}
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((process.env.VITE_SUPPORT_EMAIL ?? '').trim())) errors.push('VITE_SUPPORT_EMAIL ausente ou inválido (e-mail de suporte mostrado ao comprador).');
 // EN (Gumroad): https e sem marcador de preenchimento ("<...>", "[...]", "{...}", "INSIRA", "SEU").
 const placeholder = /[<>[\]{}]|INSIRA|SEU[_ -]|YOUR[_ -]|PLACEHOLDER/i;

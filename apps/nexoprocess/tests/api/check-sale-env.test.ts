@@ -55,6 +55,26 @@ describe('check-sale-env', () => {
     expect(run({ VITE_EN_REFUND_URL: 'https://INSIRA.com/refund' }).code).toBe(1);
     expect(run({ VITE_GUMROAD_CHECKOUT_URL: 'https://[produto]' }).code).toBe(1);
   });
+  describe('VITE_HOTMART_CHECKOUT_URL (hotlink go.hotmart.com em produção deixou o botão em loop, 13/11/2026)', () => {
+    it('https://pay.hotmart.com/<código> (com e sem query) → passa', () => {
+      expect(run({ VITE_HOTMART_CHECKOUT_URL: 'https://pay.hotmart.com/A12345678B' }).code).toBe(0);
+      expect(run({ VITE_HOTMART_CHECKOUT_URL: 'https://pay.hotmart.com/A12345678B?off=abc123&checkoutMode=10' }).code).toBe(0);
+    });
+    it('go.hotmart.com e outros hosts → falha com mensagem clara (host citado, sem a URL inteira)', () => {
+      for (const url of ['https://go.hotmart.com/A12345678B', 'https://hotmart.com/pay', 'https://pay.hotmart.com.exemplo.com/x', 'https://exemplo.com/checkout', 'https://pay.hotmart.com', 'https://pay.hotmart.com/']) {
+        const r = run({ VITE_HOTMART_CHECKOUT_URL: url });
+        expect(r.code, url).toBe(1);
+        expect(r.out, url).toContain('VITE_HOTMART_CHECKOUT_URL precisa começar com https://pay.hotmart.com/');
+        expect(r.out, url).not.toContain('A12345678B');
+      }
+      expect(run({ VITE_HOTMART_CHECKOUT_URL: 'https://go.hotmart.com/A12345678B' }).out).toContain('"go.hotmart.com"');
+      expect(run({ VITE_HOTMART_CHECKOUT_URL: 'https://go.hotmart.com/A12345678B' }).out).toMatch(/loop/);
+    });
+    it('ausente ou sem https → mensagem própria', () => {
+      expect(run({ VITE_HOTMART_CHECKOUT_URL: undefined }).out).toContain('VITE_HOTMART_CHECKOUT_URL ausente ou sem https://');
+      expect(run({ VITE_HOTMART_CHECKOUT_URL: 'http://pay.hotmart.com/x' }).out).toContain('ausente ou sem https://');
+    });
+  });
   describe('VITE_LICENSE_PUBLIC_JWK (cópia à mão com caractere a menos passava no build)', () => {
     const k = JSON.parse(pub) as Record<string, string>;
     const cut = (v: string) => v.slice(0, v.length - 1);

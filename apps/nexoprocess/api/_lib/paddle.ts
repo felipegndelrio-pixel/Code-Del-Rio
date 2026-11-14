@@ -390,6 +390,9 @@ export async function handlePaddleWebhook(req: Request, deps: PaddleDeps): Promi
   const a = decide(ev, deps.productId);
   if (a.kind === 'ignore') {
     console.log(`paddle ${ev.event_type} → ignorado (${a.reason})`);
+    // 'outro_produto' (transaction.completed de outro product_id) fica registrado: com PADDLE_PRODUCT_ID de outra conta/produto
+    // o webhook responde 200 e NENHUMA compra entra, sem rastro. Os demais ignorados (crédito, evento não tratado…) são ruído.
+    if (a.reason === 'outro_produto') await recordRejection(deps, a.reason, ev, candidateTransaction(ev));
     return json(200, { ignored: a.reason });
   }
   if (a.kind === 'reject') {

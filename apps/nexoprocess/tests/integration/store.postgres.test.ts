@@ -710,6 +710,22 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     expect(await purchases('p-unk@it.test')).toEqual([]);
   });
 
+  it("R3: transaction.completed de OUTRO produto (PADDLE_PRODUCT_ID de outra conta) → 200, nenhuma compra e uma linha 'outro_produto' sem e-mail", async () => {
+    await reset();
+    const e = 'p-other@it.test';
+    const txn = pdId('txn', 'other1');
+    const evt = pdId('evt', 'other1');
+    const res = await pdSend(e, { event_id: evt, event_type: 'transaction.completed', occurred_at: minute(0), notification_id: pdId('ntf', 'n'), data: { id: txn, status: 'completed', customer_id: PD_CTM, currency_code: 'USD', subscription_id: null, items: [{ price: { product_id: 'pro_01gsz4t5hdjse780zja8vvr7jh' } }], details: { totals: { grand_total: '10000' } } } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ignored: 'outro_produto' });
+    expect(await purchases(e)).toEqual([]);
+    const rows = await rejectionRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ platform: 'paddle', provider_event_id: evt, event_type: 'transaction.completed', transaction_id: txn, reason: 'outro_produto' });
+    expect(JSON.stringify(rows)).not.toMatch(/@|it\.test/);
+    await reset();
+  });
+
   it('R3: função só do service_role (anon/authenticated negados); valores fora do formato viram null/invalido; reaplicar o schema 3x não muda as linhas', async () => {
     await reset();
     await raw().recordWebhookRejection!({ platform: 'paddle', provider_event_id: 'evento com espaço e@x.com', event_type: 'Tem Espaço', transaction_id: 'txn_x y', reason: 'Motivo Ruim!' });

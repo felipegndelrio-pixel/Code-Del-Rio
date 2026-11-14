@@ -102,7 +102,7 @@ git rev-parse HEAD          # anote: é o SHA publicado
 
 # 2) As 8 variáveis do build de venda, digitadas na própria sessão
 $env:VITE_LICENSE_PUBLIC_JWK       = Read-Host 'VITE_LICENSE_PUBLIC_JWK (linha publica)'
-$env:VITE_HOTMART_CHECKOUT_URL     = Read-Host 'VITE_HOTMART_CHECKOUT_URL'
+$env:VITE_HOTMART_CHECKOUT_URL     = Read-Host 'VITE_HOTMART_CHECKOUT_URL (https://pay.hotmart.com/CODIGO, NÃO go.hotmart.com)'
 $env:VITE_SUPPORT_EMAIL            = Read-Host 'VITE_SUPPORT_EMAIL'
 $env:VITE_GUMROAD_CHECKOUT_URL     = Read-Host 'VITE_GUMROAD_CHECKOUT_URL'
 $env:VITE_EN_TERMS_URL             = Read-Host 'VITE_EN_TERMS_URL'
@@ -149,6 +149,13 @@ Motivo (D1, 09/11/2026): o login em produção falhou com "o acesso foi confirma
 npm run nexo:check-deploy -- https://SEU-DOMINIO
 ```
 O comando abre a página, lê os arquivos JS publicados, acha a chave pública que o app recebeu, calcula a impressão digital (8 hex) e compara com `GET /api/license-key-fingerprint` (a rota calcula a mesma impressão digital a partir da `LICENSE_PRIVATE_JWK` **do ambiente daquele domínio**; ela expõe só os 8 hex, nunca a chave). Saída `OK` e código 0 = iguais. **Qualquer `FALHOU` = o deploy NÃO está pronto**: diferentes (par trocado), bundle sem chave, chave com aspas “inteligentes” ou x/y com tamanho errado, rota com 503 (variável faltando ou inválida; o nome vem na resposta) ou `build-id: unversioned` (não passou pelo build de venda). Corrija e rode de novo. **Critério de aceite dos testes de login (V2, V5 e os da seção 5): "entrou no app" — a tela do app abre e continua aberta depois de recarregar —, nunca só HTTP 200 da API.** O 200 só prova que o servidor assinou um token; se a chave pública do bundle não for a do servidor, o app recusa o token e o comprador não entra (D1, 12/11/2026). Staging e produção têm pares **diferentes** de variáveis: rode contra cada domínio. Não imprime a chave; pode colar a saída no chat.
+
+### 4.4 Lições de 13–14/11/2026 (resumo; detalhe em `PADDLE_ENTITLEMENT.md` §14.8; lista de ida ao live em §14.9)
+- **`VITE_HOTMART_CHECKOUT_URL` = `https://pay.hotmart.com/<código>`** (link de pagamento). O hotlink `go.hotmart.com` é a página de vendas, aponta de volta para o site e deixa o botão "Comprar na Hotmart" em loop (aconteceu em produção). O build de venda recusa qualquer outro host.
+- **Clone no Windows:** use `core.autocrlf=false` até a rc3 (a rc3 traz `.gitattributes`).
+- **Paddle: token, preço, produto, chave de API e destino têm de ser da MESMA conta e do mesmo ambiente.** Um `PADDLE_PRODUCT_ID` de outra conta faz o webhook responder 200 e a compra não entrar (rc3: aparece em `nexo_webhook_rejections` como `outro_produto`; `OPERACAO_EN.md` P-F).
+- **Ler a aba Response do F12**, não abrir o endpoint na barra de endereço (GET dá 405 por desenho). **"Delivered" na Paddle não prova gravação**, e **Retry é seguro** (idempotente).
+- Critério de aceite do login: "entrou no app", nunca só HTTP 200 (§4.3).
 
 ## 5. Verificação no iPhone (Safari)
 

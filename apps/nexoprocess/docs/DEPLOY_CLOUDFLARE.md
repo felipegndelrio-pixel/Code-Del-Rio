@@ -67,7 +67,7 @@ Trocar o par depois desconecta todos os compradores (cada um entra de novo com o
 | `NODE_VERSION` | `22` | texto |
 | `VITE_LICENSE_REQUIRED` | `true` | texto (build) |
 | `VITE_LICENSE_PUBLIC_JWK` | linha pública do passo 2 | texto (build) |
-| `VITE_HOTMART_CHECKOUT_URL` | link do checkout da Hotmart | texto (build) |
+| `VITE_HOTMART_CHECKOUT_URL` | link de PAGAMENTO da Hotmart: `https://pay.hotmart.com/<código>` (o build recusa `go.hotmart.com`, que é a página de vendas e faz o botão entrar em loop) | texto (build) |
 | `VITE_SUPPORT_EMAIL` | e-mail de suporte mostrado ao comprador | texto (build) |
 | `LICENSE_PRIVATE_JWK` | linha secreta do passo 2 | **Secret** |
 | `SUPABASE_URL` | Project URL | texto |

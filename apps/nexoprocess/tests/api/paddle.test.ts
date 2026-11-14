@@ -373,7 +373,9 @@ describe('handlePaddleWebhook: concessão', () => {
       expect(await res.json()).toHaveProperty('ignored');
     }
     expect(api.calls).toEqual([]);
-    expect(fs.calls).toEqual([]);
+    // nada de licença; só 'outro_produto' deixa registro (R3), os demais ignorados não
+    expect(fs.calls.filter((c) => c.op !== 'reject')).toEqual([]);
+    expect(fs.calls.filter((c) => c.op === 'reject').map((c) => c.rejection?.reason)).toEqual(['outro_produto']);
   });
   it('id fora do formato → 200 ignorado (reenviar não ajuda), nada gravado, erro no log', async () => {
     logs.length = 0;
@@ -524,8 +526,23 @@ describe('R3: registro de eventos recusados/ignorados (nexo_webhook_rejections)'
     expect((await post(d, completed(), null)).status).toBe(401);
     expect((await post(d, completed(), 'ts=1;h1=zz')).status).toBe(401);
     expect((await post(d, completed(), sign(JSON.stringify(completed()), 'errado'))).status).toBe(401);
-    for (const p of [adjustment({ action: 'credit' }), completed({}, { event_type: 'transaction.paid' }), completed({ items: [{ price: { product_id: 'pro_01gsz4t5hdjse780zja8vvr7jh' } }] })]) expect((await post(d, p)).status).toBe(200);
+    for (const p of [adjustment({ action: 'credit' }), completed({}, { event_type: 'transaction.paid' }), completed({ subscription_id: 'sub_01hvccbx32q2gb40sqx7n42430' })]) expect((await post(d, p)).status).toBe(200);
     expect(rejects(fs)).toEqual([]);
+  });
+  it("'outro_produto' → 200 e registrado com txn e evt (sem e-mail), e sem chamar a API de clientes; só ele entre os ignorados", async () => {
+    const api = paddleApi();
+    const fs = fakeStore();
+    const other = completed({ items: [{ price: { product_id: 'pro_01gsz4t5hdjse780zja8vvr7jh' } }] });
+    const res = await post(deps({ store: fs.store, fetchImpl: api.fetchImpl }), other);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ignored: 'outro_produto' });
+    expect(rejects(fs)).toEqual([{ platform: 'paddle', provider_event_id: EVT, event_type: 'transaction.completed', transaction_id: TXN, reason: 'outro_produto' }]);
+    expect(api.calls).toEqual([]);
+    expect(fs.calls.filter((c) => c.op !== 'reject')).toEqual([]);
+    expect(JSON.stringify(fs.calls)).not.toMatch(/@|buyer/);
+    // falha ao registrar não muda a resposta
+    const failing = await post(deps({ store: fakeStore({ recordFail: 'throw' }).store }), other);
+    expect(failing.status).toBe(200);
   });
   it('falha ou demora ao registrar não muda o código de resposta (só log)', async () => {
     for (const recordFail of ['throw', 'hang', 'noMethod'] as const) {
