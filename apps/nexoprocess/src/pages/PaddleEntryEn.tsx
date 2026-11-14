@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Callout, Field, Input } from '../components/ui';
 import { useI18n } from '../i18n/I18nProvider';
 import { activatePaddle, activatePaddleWithRetry } from '../license/config';
+import { looksLikeGumroadLicenseKey } from '../license/credential-kind';
 import { endDemo } from '../license/demo';
 
 /** Lê e remove o fragmento do retorno do checkout. Valores fora do formato são descartados. */
@@ -25,7 +26,17 @@ export function takeReturnParams(): { txn: string; email: string } {
   return { txn, email };
 }
 
-export default function PaddleEntryEn({ volta }: { volta: string }) {
+export default function PaddleEntryEn({
+  volta,
+  prefill,
+  onGumroadKey,
+}: {
+  volta: string;
+  /** Vindo do formulário da Gumroad: e-mail e id da transação já digitados (um novo valor de `n` refaz o preenchimento e foca o bloco). */
+  prefill?: { email: string; txn: string; n: number };
+  /** Chamado (sem rede) quando o campo do id tem formato de license key da Gumroad. */
+  onGumroadKey?: (email: string, key: string) => void;
+}) {
   const { t, locale } = useI18n();
   const nav = useNavigate();
   const [email, setEmail] = useState('');
@@ -35,6 +46,7 @@ export default function PaddleEntryEn({ volta }: { volta: string }) {
   const [error, setError] = useState<string | null>(null);
   const errRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
 
   const run = async (e: string, id: string, retry: boolean) => {
     setError(null);
@@ -64,13 +76,32 @@ export default function PaddleEntryEn({ volta }: { volta: string }) {
     if (error) errRef.current?.focus();
   }, [error]);
 
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.email) setEmail(prefill.email);
+    setTxn(prefill.txn);
+    setError(null);
+    // Depois do foco do aviso do formulário da Gumroad (efeito do pai roda depois do deste filho): leva o leitor ao bloco da Paddle.
+    const id = window.setTimeout(() => {
+      sectionRef.current?.scrollIntoView?.({ block: 'center' });
+      sectionRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [prefill?.n]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const submit = (ev: FormEvent) => {
     ev.preventDefault();
+    // License key da Gumroad no campo do id da transação: não chama a API; leva ao formulário da Gumroad.
+    if (looksLikeGumroadLicenseKey(txn)) {
+      setError(t('paddle.error.isGumroad'));
+      onGumroadKey?.(email.trim(), txn.trim());
+      return;
+    }
     void run(email, txn, false);
   };
 
   return (
-    <section aria-labelledby="paddle-title" className="mt-6 rounded-2xl border border-line/15 bg-surface p-5 shadow-card">
+    <section ref={sectionRef} id="paddle-entry" tabIndex={-1} aria-labelledby="paddle-title" className="mt-6 rounded-2xl border border-line/15 bg-surface p-5 shadow-card outline-none">
       <h2 id="paddle-title" className="text-lg font-bold">
         {t('paddle.title')}
       </h2>

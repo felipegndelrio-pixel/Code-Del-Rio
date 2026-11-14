@@ -88,6 +88,9 @@ export const en: Record<MessageKey, string> = {
   'paddle.finishing': 'Finishing your purchase…',
   'paddle.finishing.body': 'We are waiting for the payment confirmation. This can take up to half a minute.',
   'paddle.error.notFound': 'We couldn’t find an active purchase matching this email address and transaction ID. If you just paid, wait a few minutes and try again.',
+  'login.key.isPaddle': 'This looks like a Paddle transaction ID. Use the Paddle sign-in below.',
+  'login.key.isPaddle.noBlock': 'This looks like a Paddle transaction ID, not a Gumroad license key. Your Gumroad receipt has the license key.',
+  'paddle.error.isGumroad': 'This looks like a Gumroad license key. Use the Gumroad sign-in above.',
   'paddle.error.txn': 'Enter the transaction ID of your purchase (it starts with txn_).',
 
   'shell.skip': 'Skip to content',

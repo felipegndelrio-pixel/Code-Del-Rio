@@ -56,6 +56,21 @@ test('EN: ?lang=en mostra a entrada Gumroad; e-mail + license key válidos entra
   expect(s).toMatchObject({ key: KEY, lang: 'en' });
 });
 
+test('EN sem Paddle: id de transação da Paddle no campo da license key → aviso, nenhuma chamada à API', async ({ page }) => {
+  await prepare(page);
+  const calls = await api(page, ok());
+  const seen: string[] = [];
+  page.on('request', (r) => {
+    if (new URL(r.url()).pathname.startsWith('/api/')) seen.push(new URL(r.url()).pathname);
+  });
+  await page.goto('/entrar?lang=en');
+  await signIn(page, BUYER, 'txn_01hv8wptq8987qeep44cyrewp9');
+  await expect(page.getByText('This looks like a Paddle transaction ID, not a Gumroad license key. Your Gumroad receipt has the license key.')).toBeVisible();
+  await expect(page).toHaveURL(/\/entrar/);
+  expect(calls).toEqual([]);
+  expect(seen).toEqual([]);
+});
+
 test('EN: preferência salva vale sem ?lang; links legais e de compra configurados aparecem', async ({ page }) => {
   await prepare(page);
   await api(page, ok());

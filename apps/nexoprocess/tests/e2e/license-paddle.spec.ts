@@ -144,3 +144,49 @@ test('build: o CSP de /en/* ganhou a Paddle e o do app continua com script-src s
   expect(app).toContain("script-src 'self';");
   expect(app).not.toMatch(/paddle/i);
 });
+
+// ---------------------------------------------------------------- formulário errado (UX): sem chamada de rede, sem entrar
+
+const GUMROAD_KEY = '85DB562A-C11D4B06-A2335A6B-8C079166';
+const apiRequests = (page: Page) => {
+  const seen: string[] = [];
+  page.on('request', (r) => {
+    if (new URL(r.url()).pathname.startsWith('/api/')) seen.push(`${r.method()} ${new URL(r.url()).pathname}`);
+  });
+  return seen;
+};
+
+test('id da transação da Paddle digitado no formulário da Gumroad: aviso, nenhuma chamada à API, e o bloco da Paddle vem preenchido e focado', async ({ page }) => {
+  await prepare(page);
+  const seen = apiRequests(page);
+  await api(page, { grantedAfter: 99 });
+  await page.goto('/entrar?lang=en');
+  const gumroad = page.locator('form').first();
+  await gumroad.getByLabel('Email used for purchase').fill(BUYER);
+  await gumroad.getByLabel('License key').fill(TXN);
+  await gumroad.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByText('This looks like a Paddle transaction ID. Use the Paddle sign-in below.')).toBeVisible();
+  const section = page.getByRole('region', { name: 'Bought with Paddle?' });
+  await expect(section.getByLabel('Transaction ID')).toHaveValue(TXN);
+  await expect(section.getByLabel('Email used for purchase')).toHaveValue(BUYER);
+  await expect(section).toBeFocused();
+  await expect(page).toHaveURL(/\/entrar/);
+  expect(seen).toEqual([]); // nenhuma chamada a /api/*
+});
+
+test('license key da Gumroad digitada no bloco da Paddle: aviso, nenhuma chamada à API, e o formulário da Gumroad vem preenchido e focado', async ({ page }) => {
+  await prepare(page);
+  const seen = apiRequests(page);
+  await api(page, { grantedAfter: 99 });
+  await page.goto('/entrar?lang=en');
+  const section = page.getByRole('region', { name: 'Bought with Paddle?' });
+  await section.getByLabel('Email used for purchase').fill(BUYER);
+  await section.getByLabel('Transaction ID').fill(GUMROAD_KEY);
+  await section.getByRole('button', { name: 'Sign in with Paddle' }).click();
+  await expect(section.getByText('This looks like a Gumroad license key. Use the Gumroad sign-in above.')).toBeVisible();
+  const gumroad = page.locator('form').first();
+  await expect(gumroad.getByLabel('License key')).toHaveValue(GUMROAD_KEY);
+  await expect(gumroad.getByLabel('Email used for purchase')).toHaveValue(BUYER);
+  await expect(gumroad.getByLabel('License key')).toBeFocused();
+  expect(seen).toEqual([]);
+});

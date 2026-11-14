@@ -89,6 +89,9 @@ export const pt = {
   'paddle.finishing': 'Finalizando a sua compra…',
   'paddle.finishing.body': 'Estamos aguardando a confirmação do pagamento. Pode levar até meio minuto.',
   'paddle.error.notFound': 'Não encontramos uma compra ativa para este e-mail e id de transação. Se você acabou de pagar, aguarde alguns minutos e tente de novo.',
+  'login.key.isPaddle': 'Isto parece um id de transação da Paddle. Use a entrada da Paddle logo abaixo.',
+  'login.key.isPaddle.noBlock': 'Isto parece um id de transação da Paddle, não uma license key da Gumroad. O recibo da Gumroad traz a license key.',
+  'paddle.error.isGumroad': 'Isto parece uma license key da Gumroad. Use a entrada da Gumroad logo acima.',
   'paddle.error.txn': 'Informe o id da transação da compra (começa com txn_).',
 
   'shell.skip': 'Pular para o conteúdo',

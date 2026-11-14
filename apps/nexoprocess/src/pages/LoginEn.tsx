@@ -10,6 +10,7 @@ import { Button, Callout, Field, Input } from '../components/ui';
 import { SupportLink } from '../components/SupportLink';
 import { useI18n } from '../i18n/I18nProvider';
 import { activateGumroad, LICENSE } from '../license/config';
+import { looksLikePaddleTransactionId } from '../license/credential-kind';
 import { endDemo } from '../license/demo';
 import PaddleEntryEn from './PaddleEntryEn';
 
@@ -21,7 +22,8 @@ export default function LoginEn({ volta, motivo, onDemo }: { volta: string; moti
   const [email, setEmail] = useState('');
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ message: string; buy: boolean } | null>(null);
+  const [error, setError] = useState<{ message: string; buy: boolean; tone?: 'bad' | 'warn' } | null>(null);
+  const [paddlePrefill, setPaddlePrefill] = useState<{ email: string; txn: string; n: number } | undefined>(undefined);
   const errRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,6 +33,14 @@ export default function LoginEn({ volta, motivo, onDemo }: { volta: string; moti
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    // Id da transação da Paddle digitado no campo da license key da Gumroad: não chama a API; leva ao bloco da Paddle.
+    if (looksLikePaddleTransactionId(key)) {
+      if (LICENSE.paddleEnabled) {
+        setPaddlePrefill({ email: email.trim(), txn: key.trim().toLowerCase(), n: Date.now() });
+        setError({ message: t('login.key.isPaddle'), buy: false, tone: 'warn' });
+      } else setError({ message: t('login.key.isPaddle.noBlock'), buy: false, tone: 'warn' });
+      return;
+    }
     setBusy(true);
     const r = await activateGumroad({ email, licenseKey: key }, locale);
     setBusy(false);
@@ -110,7 +120,7 @@ export default function LoginEn({ volta, motivo, onDemo }: { volta: string; moti
           </Field>
           {error && (
             <div id="entrar-erro" ref={errRef} tabIndex={-1} className="outline-none">
-              <Callout tone="bad" title={error.message}>
+              <Callout tone={error.tone ?? 'bad'} title={error.message}>
                 {error.buy && LICENSE.gumroadCheckoutUrl && (
                   <p>
                     {t('login.buy.prompt')}{' '}
@@ -127,7 +137,23 @@ export default function LoginEn({ volta, motivo, onDemo }: { volta: string; moti
           </Button>
         </form>
 
-        {LICENSE.paddleEnabled && <PaddleEntryEn volta={volta} />}
+        {LICENSE.paddleEnabled && (
+          <PaddleEntryEn
+            volta={volta}
+            prefill={paddlePrefill}
+            onGumroadKey={(e, k) => {
+              // Inverso: license key da Gumroad digitada no bloco da Paddle. Leva de volta ao formulário da Gumroad, já preenchido.
+              if (e) setEmail(e);
+              setKey(k);
+              setError(null);
+              window.setTimeout(() => {
+                const input = document.querySelector<HTMLInputElement>('input[name="license_key"]');
+                input?.scrollIntoView?.({ block: 'center' });
+                input?.focus();
+              }, 0);
+            }}
+          />
+        )}
 
         <div className="mt-4 rounded-2xl border border-dashed border-line/30 p-4">
           <p className="text-sm font-semibold text-ink">{t('login.demo.title')}</p>
