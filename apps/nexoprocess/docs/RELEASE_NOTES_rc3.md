@@ -22,8 +22,8 @@ PT e Hotmart em runtime; textos legais da Gumroad; regras D3 (Gumroad e Paddle n
 3. **Schema da tag** no banco de produção (`schema-purchases.sql` **do commit da rc3**, nunca o da rc1/rc2; `PADDLE_ENTITLEMENT.md` §14.6 item 0; roda uma vez).
 4. **§7.1 de novo** (zero linhas; contagens iguais às de antes).
 5. **Deploy** do build de venda feito no clone limpo da tag (`core.autocrlf=false` ou clone novo com a rc3).
-6. **`npm run nexo:check-deploy -- https://<domínio>`** terminando em `OK`.
-7. **Verificações C2, C3 e C6** do roteiro de liberação do revisor (definidas fora deste repositório: **A VALIDAR** a numeração e o conteúdo com o revisor antes de usá-las), com o critério "entrou no app", nunca só HTTP 200.
+6. **`npm run nexo:check-deploy -- https://<domínio>`** terminando em `OK` (é o C1).
+7. **Testes de liberação C1–C6** (definidos em `LANCAMENTO_EN.md` §4.5): C1 = `nexo:check-deploy` (passo 6); C2 = login PT no Chrome do PC (janela anônima) entra no app e continua aberto ao recarregar; C3 = o mesmo no Safari do iPhone (aba privada); C4 = `/entrar?lang=en` com chave inventada mostra "We could not find…"; C5 = login EN pela Gumroad com compra real entra no app; C6 = link da bio do Instagram → site → "Comprar na Hotmart" abre o checkout `pay.hotmart.com` (não "Oferta não encontrada" nem loop). Critério: "entrou no app", nunca só HTTP 200.
 8. Só se a Paddle for ligar em produção: `PADDLE_ENTITLEMENT.md` §14.9 (checklist "Paddle LIVE").
 
 ## Reversão

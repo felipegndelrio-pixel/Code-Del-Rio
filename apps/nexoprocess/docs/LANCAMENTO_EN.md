@@ -157,6 +157,20 @@ O comando abre a página, lê os arquivos JS publicados, acha a chave pública q
 - **Ler a aba Response do F12**, não abrir o endpoint na barra de endereço (GET dá 405 por desenho). **"Delivered" na Paddle não prova gravação**, e **Retry é seguro** (idempotente).
 - Critério de aceite do login: "entrou no app", nunca só HTTP 200 (§4.3).
 
+### 4.5 Testes de liberação C1–C6 (definição oficial; rodar depois de TODO deploy, staging e produção)
+Critério de aceite de todos: **"entrou no app"** (a tela do app abre e continua aberta ao recarregar), nunca só HTTP 200. Registre data, ambiente, commit publicado e resultado de cada um (sem e-mail, chave ou token).
+
+| # | Teste | Passa quando |
+|---|---|---|
+| C1 | **Impressão digital:** `npm run nexo:check-deploy -- https://<domínio>` (§4.3) | termina em `OK`: a impressão digital do bundle publicado é a do servidor |
+| C2 | **Login PT no Chrome do PC**, janela anônima, com e-mail de comprador Hotmart ativo | **entra no app** e continua aberto ao recarregar |
+| C3 | **O mesmo no Safari do iPhone**, aba privada | **entra no app** e continua aberto ao recarregar |
+| C4 | `/entrar?lang=en` com uma **chave inventada** | mostra "We could not find…" (sem erro técnico, sem entrar) |
+| C5 | **Login EN pela Gumroad com compra real** (não de teste) | **entra no app** |
+| C6 | Link da bio do Instagram → site → botão **"Comprar na Hotmart"** | abre o checkout `pay.hotmart.com` (não "Oferta não encontrada" e não loop) |
+
+Falhou qualquer um: o deploy não está pronto (rollback em `DEPLOY_CLOUDFLARE.md`). C2 e C3 repetem a lição do D1: a rota responder 200 não prova que o app aceitou o token.
+
 ## 5. Verificação no iPhone (Safari)
 
 | # | Teste | Esperado |
