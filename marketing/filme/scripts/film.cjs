@@ -93,7 +93,7 @@ window.render=async(t)=>{
   const f = `${F}/work/film_${fmt}.html`; fs.writeFileSync(f, html); await p.goto('file://' + f);
   await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(500);
   if (process.argv[3]) { // quadros de teste
-    for (const t of process.argv[3].split(',')) { await p.evaluate((x) => window.render(x), +t); await p.screenshot({ path: `${F}/work/t_${fmt}_${t}.jpg`, type: 'jpeg', quality: 80 }); }
+    for (const t of process.argv[3].split(',')) { await p.evaluate((x) => window.render(x), +t); await p.screenshot({ path: `${F}/work/t_${fmt}_${t}.jpg`, type: 'jpeg', quality: 96 }); }
     await b.close(); return;
   }
   const out = `${F}/work/video_${fmt}.mp4`;
