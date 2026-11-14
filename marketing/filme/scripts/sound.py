@@ -1,7 +1,7 @@
 """Desenho de som do filme (SEM música): ambiência de sala, teclas, passagens de ar e dois impactos graves.
 Tudo sintetizado por código (sem amostras de terceiros). Uso: python3 -I sound.py saida.wav"""
 import sys, wave, numpy as np
-SR, T = 48000, 45.0
+SR, T = 48000, 48.0
 t = np.arange(int(SR * T)) / SR
 rng = np.random.default_rng(7)
 def lp(x, k): return np.convolve(x, np.ones(k) / k, mode='same')
@@ -29,9 +29,10 @@ def hit(d=4.0, f0=38):   # impacto grave com cauda
 add(0.5 * hit(2.5, 34), 0.25)
 for i in range(10): add(key(i), 0.7 + i * 0.11 + rng.uniform(-.012, .012), rng.uniform(-.3, .3))      # data digitada
 for i in range(20): add(0.8 * key(100 + i), 9.9 + i * 0.22 + rng.uniform(-.02, .02), rng.uniform(-.4, .4))  # commits
-for at in (3.9, 8.9, 14.9, 24.9, 30.9): add(0.22 * whoosh(), at - 0.45)
-for at in (18.4, 21.8): add(0.12 * whoosh(0.5), at - 0.25)
-add(0.25 * whoosh(1.4), 37.6); add(hit(5.5, 36), 38.6)
+for at in (3.9, 8.9, 14.9, 27.7, 33.7): add(0.22 * whoosh(), at - 0.45)
+for i in range(12): add(0.7 * key(300 + i), 15.75 + i * 0.11 + rng.uniform(-.015, .015), rng.uniform(-.3, .3))   # digitação no assistente
+for at in (18.2, 21.4, 24.6): add(0.12 * whoosh(0.5), at - 0.25)
+add(0.25 * whoosh(1.4), 40.4); add(hit(5.5, 36), 41.4)
 f = np.clip(t / 0.3, 0, 1) * np.clip((T - t) / 1.2, 0, 1); L *= f; R *= f
 pk = max(np.abs(L).max(), np.abs(R).max()); g = 10 ** (-3 / 20) / pk
 pcm = (np.stack([L, R], 1) * g * 32767).astype('<i2')
