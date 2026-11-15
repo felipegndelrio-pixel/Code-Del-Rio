@@ -76,11 +76,17 @@ e = np.clip((t - 8.2) / 1.5, 0, 1) * np.clip((12.3 - t) / 1.0, 0, 1); L += 0.16 
 add(riser(1.6), 0.15, g=0.26, send=0.25)
 for i in range(10): add(key(i), 0.4 + (i + 0.5) * 0.115 + rng.uniform(-.01, .01), rng.uniform(-.3, .3), g=1.7, send=0.2)   # data
 add(braam(3.6, 36.71), 1.75, g=0.62, send=0.45)
-# ---- passagens
-for at, g in ((4.3, .34), (8.3, .34), (11.9, .34), (17.7, .36), (30.9, .36), (37.1, .38), (42.7, .34)):
-    w = whoosh(1.0); add(w, at - 0.5, pan=-0.35, g=g, send=0.3); add(np.roll(w, 2400), at - 0.5, pan=0.35, g=g * 0.8, send=0.3)
-for at in (21.2, 24.5, 27.8): add(whoosh(0.5), at - 0.25, g=0.18, send=0.2)
-add(thud(), 30.95, g=0.45, send=0.2)
+# ---- passagens: "tuuum" grave de trailer (não é o impacto da abertura/fechamento)
+def tum(f0=44.0, d=1.6):
+    n = int(d * SR); x = np.arange(n) / SR
+    f = f0 * (1 + 0.5 * np.exp(-x * 14))                      # leve queda de afinação no ataque
+    body = np.sin(2 * np.pi * np.cumsum(f) / SR) + 0.25 * np.sin(2 * np.pi * np.cumsum(2 * f) / SR)
+    env = np.minimum(x / 0.008, 1) * np.exp(-x / 0.42)
+    w = rng.standard_normal(n); thump = lp(w, 120) * np.exp(-x / 0.03) * 2.0
+    out = np.tanh(1.4 * (body * env + thump)); out[-int(.1 * SR):] *= np.linspace(1, 0, int(.1 * SR)); return out
+for at, f0, g in ((4.3, 46, .55), (8.3, 42, .55), (11.9, 48, .55), (17.7, 44, .6), (30.9, 41, .6), (37.1, 45, .6), (42.7, 43, .55)):
+    add(tum(f0), at, g=g, send=0.35)
+for at in (21.2, 24.5, 27.8): add(tum(58, 0.9), at, g=0.28, send=0.25)
 for i in range(20): add(key(100 + i), 12.9 + i * 0.22 + rng.uniform(-.02, .02), rng.uniform(-.4, .4), g=1.4, send=0.15)   # commits
 for i in range(14): add(key(300 + i), 18.85 + i * 0.09 + rng.uniform(-.012, .012), rng.uniform(-.3, .3), g=1.3, send=0.15)  # assistente
 for i in range(9): add(key(500 + i), 43.4 + i * 0.13 + rng.uniform(-.02, .02), rng.uniform(-.3, .3), g=0.95, send=0.15)      # código em inglês

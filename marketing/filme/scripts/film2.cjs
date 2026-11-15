@@ -33,8 +33,8 @@ body{--u:${u}px;font-family:Plex,sans-serif;color:#eef3fb;position:relative}
 .sc{position:absolute;inset:0;opacity:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:${PAD}}
 .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .sh{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(4,7,13,.2) 0%,rgba(4,7,13,.88) 100%)}
-.h{font-family:ISerif,Georgia,serif;font-weight:400;font-size:calc(var(--u)*${HS});line-height:1.02;letter-spacing:-.012em;position:relative;text-wrap:balance;max-width:${P ? '100%' : '80%'};text-shadow:0 calc(var(--u)*.4) calc(var(--u)*3) rgba(0,0,0,.55)}
-.h em{font-style:italic;color:#6fdbe6}
+.h{font-family:Plex,sans-serif;font-weight:700;font-size:calc(var(--u)*${HS}*.8);line-height:1.08;letter-spacing:-.03em;position:relative;text-wrap:balance;max-width:${P ? '100%' : '80%'};text-shadow:0 calc(var(--u)*.4) calc(var(--u)*3) rgba(0,0,0,.55)}
+.h em{font-style:normal;color:#6fdbe6}
 .w{display:inline-block;opacity:0;will-change:transform,filter}
 .s{font-weight:400;font-size:calc(var(--u)*${P ? 3.8 : 3});line-height:1.35;color:#b9c6da;margin-top:calc(var(--u)*2.4);position:relative;text-wrap:balance;max-width:${P ? '100%' : '70%'}}
 .s b{color:#eef3fb;font-weight:600}
@@ -186,7 +186,7 @@ window.render=async(t)=>{
   const f = `${F}/work/film2_${fmt}.html`; fs.writeFileSync(f, html); await p.goto('file://' + f);
   await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(600);
   const loaded = await p.evaluate(() => [...document.fonts].filter((x) => x.status === 'loaded').map((x) => x.family + (x.style === 'italic' ? ' it' : '')));
-  if (!loaded.some((x) => x.startsWith('ISerif'))) console.error('AVISO: fonte Serif não carregou', loaded);
+  
   if (process.argv[3]) {
     for (const t of process.argv[3].split(',')) { await p.evaluate((x) => window.render(x), +t); await p.screenshot({ path: `${F}/work/t2_${fmt}_${t}.jpg`, type: 'jpeg', quality: 96 }); }
     await b.close(); return;
