@@ -102,7 +102,7 @@ body{--u:${u}px;font-family:Plex,sans-serif;color:#eef3fb;position:relative}
 <div class="sc" id="s7"><canvas id="g2" width="${W}" height="${H}"></canvas>
 <div class="lock"><svg viewBox="0 0 64 64"><rect id="y0" x="2" y="2" width="60" height="60" rx="12" fill="#173263" stroke="rgba(127,233,245,.35)" stroke-width=".6"/><circle id="y1" cx="17" cy="32" r="6.5" fill="none" stroke="#fff" stroke-width="4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" transform="rotate(-90 17 32)"/><path id="y2" d="M23.5 32h7" stroke="#fff" stroke-width="4" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/><path id="y3" d="M41 21l11 11-11 11-11-11z" fill="#00A8BC" style="transform-origin:41px 32px"/></svg><span id="wm">NexoProcess</span></div>
 <div class="fl1" id="f7" style="margin:calc(var(--u)*3.2) 0 calc(var(--u)*3.4)"></div>
-<div id="tbc">Continua…</div><div id="tbs">A HISTÓRIA COMPLETA, EM BREVE</div><div class="h" id="h7" style="font-size:calc(var(--u)*${HS * 0.78})">${Wd('Do processo na planilha <em>ao plano de melhoria.</em>')}</div>
+<div id="tbc">Continua…</div><div class="h" id="h7" style="font-size:calc(var(--u)*${HS * 0.78})">${Wd('Do processo na planilha <em>ao plano de melhoria.</em>')}</div>
 <div class="en" id="s7b">From spreadsheet process to improvement plan.</div><div class="hr" id="s7h"></div>
 <div class="pl">${chip('HOJE', '🇧🇷', HOT, 'Hotmart')}${chip('EM BREVE', '🇺🇸', ICO('gumroad'), 'Gumroad')}${chip('EM BREVE', '🇬🇧', ICO('paddle'), 'Paddle')}</div>
 <div class="cta" id="s7d">Conheça o NexoProcess</div></div>
@@ -187,7 +187,7 @@ window.render=async(tt)=>{const t=tt<3.2?tt:tt<6.2?4.9+(tt-3.2):tt<9.6?13.2+(tt-
   if(tt>=6.2&&tt<9.6)$('term').style.opacity=1;
   let f=Math.max(1-ez(tt/.3),ez((tt-17.1)/.9));for(const c of CUT)f=Math.max(f,1-Math.min(1,Math.abs(tt-c)/.16));$('fade').style.opacity=f;
   if(LB){$('bt').style.transform='translateY(0)';$('bb').style.transform='translateY(0)'}
-  const a=ez((tt-15.3)/.8),b=ez((tt-16.0)/.8);$('tbc').style.opacity=a;$('tbc').style.transform='translateY('+((1-a)*1.2)+'vh)';$('tbs').style.opacity=b};
+  const a=ez((tt-15.3)/.8);$('tbc').style.opacity=a;$('tbc').style.transform='translateY('+((1-a)*1.2)+'vh)'};
 </script></body></html>`;
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--allow-file-access-from-files'] });
