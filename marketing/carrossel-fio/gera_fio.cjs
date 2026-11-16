@@ -79,7 +79,7 @@ em{font-style:normal;color:#00A8BC}
   <path d="${d}" fill="none" stroke="#bff6fb" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
   <g transform="translate(${X(7) + 730},660) scale(4.375)"><rect x="2" y="2" width="60" height="60" rx="12" fill="#173263" stroke="rgba(127,233,245,.4)" stroke-width=".5"/><circle cx="17" cy="32" r="6.5" fill="#173263" stroke="#fff" stroke-width="4"/><path d="M23.5 32h7" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M41 21l11 11-11 11-11-11z" fill="#00A8BC"/></g>
 </svg>
-<script>document.fonts.ready.then(()=>{const b=document.getElementById('big');b.style.fontSize=(300*(1080-62+46)/b.getBoundingClientRect().width)+'px';document.body.dataset.ok=1})</script>
+<script>document.fonts.ready.then(()=>{const b=document.getElementById('big');b.style.fontSize=(300*(1080-62-48)/b.getBoundingClientRect().width)+'px';document.body.dataset.ok=1})</script>
 </body></html>`;
 fs.writeFileSync(`${OUT}/painel.html`, html);
 (async () => {
