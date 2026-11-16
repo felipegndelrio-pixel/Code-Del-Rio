@@ -15,6 +15,23 @@ Também: `STORYBOARD.md` (roteiro com timecodes) e `qa/` (folhas de contato, tra
 
 Especificação dos vídeos: H.264 High, yuv420p, 30 qps, 1008 quadros, AAC-LC 192 kbps 48 kHz estéreo, `faststart`.
 
+## Controle de qualidade (medido nos arquivos finais, 16/11/2026)
+| Item | 9:16 | 4:5 | 16:9 |
+|---|---|---|---|
+| Tamanho | 26,41 MB | 21,00 MB | 26,15 MB |
+| Resolução | 1080×1920 | 1080×1350 | 1920×1080 |
+| Duração / quadros | 33,6 s / 1008 | 33,6 s / 1008 | 33,6 s / 1008 |
+| Vídeo | H.264 High, 30 qps | idem | idem |
+| Áudio | AAC-LC 48 kHz estéreo | idem | idem |
+| Volume integrado | −14,0 LUFS | −14,0 LUFS | −14,0 LUFS |
+| Pico real | −4,1 dBFS | −4,1 dBFS | −4,1 dBFS |
+
+- **Limite de 29,5 MB:** cumprido nos três, com folga de 3,1 MB ou mais.
+- **Sincronia som × imagem (9:16):** maiores ataques do áudio em 9,62 · 12,62 · 15,60 · 19,22 · 21,61 · 24,02 · 25,84 s. Cortes e palavras na imagem em 9,6 · 12,6 · 15,6 · 19,2 · 21,6 · 24,0 · 25,8 s. Clarões na imagem com pico em 9,63 s e 25,83 s. Diferença máxima: 0,04 s (cerca de 1 quadro).
+- **Quadros pretos:** nenhum trecho preto de 0,2 s ou mais (`blackdetect`). O filme abre e fecha com fusão.
+- **Revisão visual:** folhas de contato dos três formatos (28 quadros cada) e tira de transições em `qa/`. Um defeito achado e corrigido: o selo de dados fictícios entrava 0,15 s antes do painel.
+- **Trilha por seção:** tensão em torno de −17 LUFS, produto em −14, fechamento em −12 (curva crescente). Equilíbrio por faixa em `scripts/analisa_trilha.py`.
+
 ## Como reproduzir
 Requisitos: Node com Playwright e Chromium, FFmpeg, Python 3 com numpy. Fontes IBM Plex vêm de `node_modules/@fontsource`.
 
