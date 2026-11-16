@@ -219,6 +219,14 @@ describe('modo staging-paddle (check-sale-env --staging-paddle e nexo:build:stag
     expect(r.out).toContain('VITE_PADDLE_CSP_STYLE ausente');
     expect(staging({ ...SANDBOX, VITE_PADDLE_CSP_STYLE: 'https://sandbox-cdn.paddle.com' }).out).not.toContain('CSP_STYLE ausente');
   });
+  it('NEXO_EXPECTED_KEY_FP também vale no modo staging-paddle: diferente → recusa; igual → passa', async () => {
+    const { jwkFingerprint } = await import('../../src/license/jwk.mjs');
+    const fp = await jwkFingerprint(JSON.parse(pub));
+    const bad = staging({ ...SANDBOX, NEXO_EXPECTED_KEY_FP: fp === '00000000' ? '11111111' : '00000000' });
+    expect(bad.code).toBe(1);
+    expect(bad.out).toMatch(/DIFERENTE/);
+    expect(staging({ ...SANDBOX, NEXO_EXPECTED_KEY_FP: fp }).code).toBe(0);
+  });
   it('modo staging sem Paddle configurada, ou incompleta, é recusado (não vira build de venda por engano)', () => {
     expect(staging({}).code).toBe(1);
     expect(staging({ VITE_PADDLE_CLIENT_TOKEN: SANDBOX.VITE_PADDLE_CLIENT_TOKEN, VITE_PADDLE_ENV: 'sandbox' }).code).toBe(1);

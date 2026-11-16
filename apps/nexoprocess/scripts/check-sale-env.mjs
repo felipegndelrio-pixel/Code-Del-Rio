@@ -28,6 +28,18 @@ let publicFingerprint = null;
     }
   }
 }
+// Impressão digital ESPERADA (opcional, mas obrigatória em todo build de produção: LANCAMENTO_EN §4.6). Em 14/11/2026 o build de produção saiu
+// com a pública de STAGING (a variável foi sobrescrita no gerenciador de senhas) e ninguém entrava. Com NEXO_EXPECTED_KEY_FP definida, uma
+// pública com outra impressão digital RECUSA o build (venda e staging-paddle). Só impressões digitais (8 hex, públicas) aparecem na mensagem.
+{
+  const expected = (process.env.NEXO_EXPECTED_KEY_FP ?? '').trim().toLowerCase();
+  if (expected) {
+    if (!/^[0-9a-f]{8}$/.test(expected)) errors.push('NEXO_EXPECTED_KEY_FP inválida (esperado 8 caracteres hexadecimais, a impressão digital do par do servidor).');
+    else if (publicFingerprint && publicFingerprint !== expected) {
+      errors.push(`A impressão digital da VITE_LICENSE_PUBLIC_JWK deste build (${publicFingerprint}) é DIFERENTE da esperada (NEXO_EXPECTED_KEY_FP=${expected}). O app publicado não validaria os tokens do servidor. Confira qual item/variável de chave você carregou (produção × staging) e rode de novo.`);
+    }
+  }
+}
 {
   // O botão "Comprar na Hotmart" precisa apontar para o CHECKOUT (https://pay.hotmart.com/<código>). O hotlink de página de vendas
   // (go.hotmart.com/...) aponta de volta para o site e deixa o comprador em loop (produção, 13/11/2026).

@@ -226,6 +226,11 @@ Execute esta sequência em janela de baixo movimento. Na primeira troca e após 
 6. Só então publique o build testado e identificado pelo SHA. Depois, execute V3–V6 abaixo.
 7. Com o backend novo publicado e recebendo webhooks, repita uma vez os passos 2–5: consulte a divergência, reconcilie os eventos confirmados, reaplique `schema-purchases.sql` e confirme divergência zero. Isso captura compras processadas pelo backend antigo entre a consulta final e a publicação, que podem existir apenas em `nexo_licenses` e não serem vistas pelo lookup baseado em compras. Se restar qualquer divergência, pare e analise antes de encerrar a troca.
 
+### Rotação do par de licença (resumo; procedimento completo em `LANCAMENTO_EN.md` §4.6)
+- **Regra:** todo build de produção usa `NEXO_EXPECTED_KEY_FP` (8 hex do par do **servidor**); pública com outra impressão digital = build recusado.
+- **Rotação:** `npm run nexo:rotate-key -- --project <nome-do-projeto-pages>` (Windows). Gera o par, guarda cópia DPAPI, grava `LICENSE_PRIVATE_JWK` pelo stdin com `wrangler pages secret put` e imprime só `FP=` e `PUB=`. Depois: build com a `PUB=` e a `FP=`, deploy, `nexo:check-deploy`.
+- **Efeito:** todos os acessos ativados deixam de validar (cada comprador entra de novo). **Rollback é para a frente:** rotacionar de novo; a privada antiga não é guardada.
+
 ### Verificações de liberação V3–V6
 
 - **V3 — rota da API:** `GET https://nexoprocess.pages.dev/api/license` deve responder HTTP `405` com JSON `{"error":"metodo"}`; nunca deve retornar o HTML da aplicação.

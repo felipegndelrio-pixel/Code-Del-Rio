@@ -103,6 +103,7 @@ git rev-parse HEAD          # anote: é o SHA publicado
 # 2) As 8 variáveis do build de venda, digitadas na própria sessão
 $env:VITE_LICENSE_PUBLIC_JWK       = Read-Host 'VITE_LICENSE_PUBLIC_JWK (linha publica)'
 $env:VITE_HOTMART_CHECKOUT_URL     = Read-Host 'VITE_HOTMART_CHECKOUT_URL (https://pay.hotmart.com/CODIGO, NÃO go.hotmart.com)'
+$env:NEXO_EXPECTED_KEY_FP          = Read-Host 'NEXO_EXPECTED_KEY_FP (8 hex do par do SERVIDOR; obrigatório em produção, §4.6)'
 $env:VITE_SUPPORT_EMAIL            = Read-Host 'VITE_SUPPORT_EMAIL'
 $env:VITE_GUMROAD_CHECKOUT_URL     = Read-Host 'VITE_GUMROAD_CHECKOUT_URL'
 $env:VITE_EN_TERMS_URL             = Read-Host 'VITE_EN_TERMS_URL'
@@ -170,6 +171,22 @@ Critério de aceite de todos: **"entrou no app"** (a tela do app abre e continua
 | C6 | Link da bio do Instagram → site → botão **"Comprar na Hotmart"** | abre o checkout `pay.hotmart.com` (não "Oferta não encontrada" e não loop) |
 
 Falhou qualquer um: o deploy não está pronto (rollback em `DEPLOY_CLOUDFLARE.md`). C2 e C3 repetem a lição do D1: a rota responder 200 não prova que o app aceitou o token.
+
+### 4.6 Rotação do par de licença e a regra `NEXO_EXPECTED_KEY_FP`
+**Regra (vale para TODO build de produção, e de staging quando houver Paddle):** defina `NEXO_EXPECTED_KEY_FP` com a impressão digital (8 hex) do par **do servidor daquele ambiente** antes do build. Se a pública do build tiver outra impressão digital, o `check-sale-env` **recusa o build** e mostra as duas (só impressões digitais). Motivo: em 14/11/2026 o build de produção saiu com a pública de **staging** (`6acc7ec2`) porque o item "PRODUÇÃO" do gerenciador de senhas foi sobrescrito, enquanto o servidor assinava com `db829f06`; ninguém entrava. **De onde vem a impressão digital esperada:** da saída `FP=` do `nexo:rotate-key` (abaixo) ou de `GET https://<domínio>/api/license-key-fingerprint` (§4.3); **nunca** da mesma fonte da chave pública (a falha seria copiada junto). `nexo:check-deploy` (§4.3) continua sendo a conferência do que está no ar.
+```powershell
+$env:NEXO_EXPECTED_KEY_FP = Read-Host 'NEXO_EXPECTED_KEY_FP (8 hex do par do SERVIDOR deste ambiente)'
+```
+**Quando rotacionar:** suspeita de vazamento da privada; ou o par do servidor e o do app não podem mais ser reconciliados (caso de 14/11); ou rotina combinada com o revisor.
+**Como (Windows, PowerShell, clone limpo, `core.autocrlf=false` ou clone novo):**
+```powershell
+npm run nexo:rotate-key -- --project <nome-do-projeto-pages>      # --no-backup só se já houver outro cofre
+```
+O script gera o par ECDSA P-256 e testa (assina e verifica); guarda uma **cópia protegida pelo DPAPI** (só o usuário do Windows que rodou consegue ler) em `%LOCALAPPDATA%\nexoprocess-keys\license-<FP>-<data>.dpapi`; grava a **privada** como secret `LICENSE_PRIVATE_JWK` do projeto (produção) com `wrangler pages secret put` **pelo stdin** (o valor nunca vai para a linha de comando nem para variável de ambiente); e imprime **só** `FP=` e `PUB=`. A privada nunca é impressa, nem em erro. **Se a cópia DPAPI falhar, o script para antes de gravar.** Sem `--project` ou com nome inválido, nada acontece (código 2).
+**Depois:** (1) refaça o build de venda com `VITE_LICENSE_PUBLIC_JWK` = a linha `PUB=` e `NEXO_EXPECTED_KEY_FP` = o `FP=`; (2) faça o deploy (o secret só vale no próximo deployment: **A VALIDAR** no seu painel; é por isso que o deploy vem logo em seguida); (3) `npm run nexo:check-deploy -- https://<domínio>` terminando em `OK` (C1) e C2–C6 (§4.5).
+**Efeito:** **todos os acessos já ativados deixam de validar**; cada comprador entra de novo (Hotmart: e-mail; Gumroad: e-mail + license key; Paddle: e-mail + id da transação). Os projetos e dados ficam nos aparelhos, nada se perde. Entre o secret novo e o build novo publicados, quem estiver com o app antigo aberto recebe "este aparelho não conseguiu validá-lo": faça tudo em seguida e em horário de pouco uso.
+**Rollback é para a frente:** a privada anterior **não** volta (o script não a guarda nem a lê). Se a rotação der errado, **rotacione de novo** (novo par, novo build, novo `NEXO_EXPECTED_KEY_FP`). Restaurar uma cópia DPAPI só serve para a privada que ela guarda: `$ss = Get-Content <arquivo.dpapi> | ConvertTo-SecureString` e depois ler o texto (**A VALIDAR no Windows**: o comando de restauração não foi executado pelo desenvolvimento).
+**NÃO verificado pelo desenvolvimento:** a execução no Windows de verdade (PowerShell, DPAPI e `cmd.exe /c npx wrangler …`) e a gravação real no Cloudflare; os testes usam comandos simulados e provam a ordem, o conteúdo recebido pelo stdin e que a privada não aparece na saída.
 
 ## 5. Verificação no iPhone (Safari)
 

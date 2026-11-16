@@ -5,6 +5,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { jwkFingerprint } from '../../src/license/jwk.mjs';
 
 // Poka-yoke do build de venda: sem as 4 variáveis do EN o app sairia sem compra e sem links legais.
 const pub = JSON.stringify(generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ format: 'jwk' }));
@@ -54,6 +55,32 @@ describe('check-sale-env', () => {
     expect(run({ VITE_EN_PRIVACY_URL: 'https://<seu-dominio>/privacy' }).code).toBe(1);
     expect(run({ VITE_EN_REFUND_URL: 'https://INSIRA.com/refund' }).code).toBe(1);
     expect(run({ VITE_GUMROAD_CHECKOUT_URL: 'https://[produto]' }).code).toBe(1);
+  });
+  describe('NEXO_EXPECTED_KEY_FP (build de produção saiu com a pública de STAGING em 14/11/2026)', () => {
+    it('impressão digital igual → passa e imprime a do build; diferente → RECUSA mostrando as duas; ausente → como antes', async () => {
+      const fp = await jwkFingerprint(JSON.parse(pub));
+      const same = run({ NEXO_EXPECTED_KEY_FP: fp });
+      expect(same.code).toBe(0);
+      expect(same.out).toContain(fp);
+      expect(run({ NEXO_EXPECTED_KEY_FP: fp.toUpperCase() }).code).toBe(0); // maiúsculas aceitas
+      const other = fp === 'deadbeef' ? 'cafebabe' : 'deadbeef';
+      const diff = run({ NEXO_EXPECTED_KEY_FP: other });
+      expect(diff.code).toBe(1);
+      expect(diff.out).toContain(fp);
+      expect(diff.out).toContain(other);
+      expect(diff.out).toMatch(/DIFERENTE/);
+      expect(run({}).code).toBe(0);
+      expect(run({ NEXO_EXPECTED_KEY_FP: '' }).code).toBe(0);
+    });
+    it('formato inválido → recusa com mensagem própria; a chave pública NÃO aparece na mensagem', () => {
+      for (const bad of ['xyz', '1234567', '123456789', 'g1234567']) {
+        const r = run({ NEXO_EXPECTED_KEY_FP: bad });
+        expect(r.code, bad).toBe(1);
+        expect(r.out, bad).toContain('NEXO_EXPECTED_KEY_FP inválida');
+      }
+      const k = JSON.parse(pub) as Record<string, string>;
+      expect(run({ NEXO_EXPECTED_KEY_FP: '00000000' }).out).not.toContain(k.x);
+    });
   });
   describe('VITE_HOTMART_CHECKOUT_URL (hotlink go.hotmart.com em produção deixou o botão em loop, 13/11/2026)', () => {
     it('https://pay.hotmart.com/<código> (com e sem query) → passa', () => {
