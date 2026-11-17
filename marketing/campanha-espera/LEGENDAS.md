@@ -1,6 +1,14 @@
 # Campanha "A espera invisível": textos para Instagram, LinkedIn e YouTube (v1.0)
 
-Use com o Reel `exports/NexoProcess_Espera_Reel_A.mp4` (ou o B, no teste). Nada foi publicado.
+Arquivos por rede em `exports/por_plataforma/`. Nada foi publicado.
+
+| Rede | Vídeo | Capa |
+|---|---|---|
+| Instagram | `1_Instagram_Reel_9x16.mp4` (teste: `1b_…_teste_B.mp4`) | `1_Instagram_capa_9x16.png` |
+| YouTube Shorts | `2_YouTube_Shorts_9x16.mp4` | `2_YouTube_Shorts_capa_9x16.png` |
+| LinkedIn | `3_LinkedIn_4x5.mp4` | `3_LinkedIn_capa_4x5.png` |
+
+O vídeo é o mesmo nas três redes; muda o formato (4:5 no LinkedIn) e o botão final ("link na bio", "link no canal", "Conheça o NexoProcess").
 
 ## Benchmark de caracteres (pesquisado em 17/11/2026)
 

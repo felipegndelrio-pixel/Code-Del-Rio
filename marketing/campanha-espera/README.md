@@ -10,6 +10,7 @@ Estratégia completa em [`CAMPANHA.md`](CAMPANHA.md): diagnóstico, benchmark, d
 | `NexoProcess_Espera_capa_A.png` / `_B.png` | Capas 1080×1920, seguras para o recorte 3:4 da grade |
 | `stories/story_1…4.png` | 4 Stories de apoio (áreas livres para figurinhas nativas) |
 | `NexoProcess_Espera_trilha.wav` | Trilha original separada |
+| `por_plataforma/` | Um arquivo por rede: Instagram (9:16), YouTube Shorts (9:16, botão "link no canal"), LinkedIn (4:5, botão "Conheça o NexoProcess") e as capas |
 
 Especificação dos vídeos: 1080×1920, H.264 High, 30 qps, 756 quadros, AAC-LC 192 kbps 48 kHz, −14,2 LUFS, pico −4,1 dBFS, 17,96 MB cada.
 
@@ -18,7 +19,8 @@ Especificação dos vídeos: 1080×1920, H.264 High, 30 qps, 756 quadros, AAC-LC
 cd marketing/campanha-espera && mkdir -p work exports/stories qa
 python3 -I scripts/espera_sound.py work/trilha_raw.wav
 python3 -I ../video/scripts/loudnorm2.py work/trilha_raw.wav exports/NexoProcess_Espera_trilha.wav
-node scripts/espera.cjs A && node scripts/espera.cjs B      # ~6 min cada
+node scripts/espera.cjs A && node scripts/espera.cjs B      # ~6 min cada (Instagram)
+CTA=yt node scripts/espera.cjs A && CTA=li node scripts/espera.cjs A 4x5   # YouTube Shorts e LinkedIn 4:5
 bash scripts/finaliza.sh
 node scripts/pecas.cjs                                       # capas e Stories
 # quadros de teste: node scripts/espera.cjs A 0,9.9,14.6

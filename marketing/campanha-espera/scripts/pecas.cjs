@@ -24,6 +24,13 @@ const PECAS = {
     <div class="h" style="top:680px;font-size:230px;letter-spacing:-.05em;line-height:.95;color:#f5b84a">espera?</div>
     ${barras(1000)}
     <div class="tag" style="top:1250px">Por execução · exemplo fictício</div>${marca(1480)}`,
+  capa_LinkedIn_4x5: `<div class="tag" style="top:90px">Exemplo fictício · calculado no NexoProcess</div>
+    <div class="h" style="top:170px;font-size:250px;letter-spacing:-.05em;line-height:.9;color:#f5b84a">11 h</div>
+    <div class="h" style="top:410px;font-size:92px">parado.</div>
+    <div class="h" style="top:545px;font-size:92px;color:#3fd0de">2 h 15 min</div>
+    <div class="h" style="top:645px;font-size:92px">trabalhando.</div>
+    ${barras(780, false)}
+    <div class="h" style="top:1050px;font-size:58px;color:#dbe4f1;font-weight:600">Onde o seu processo espera?</div>${marca(1180)}`,
   story_1_teaser: `<div class="tag" style="top:290px">Novo Reel</div>
     <div class="h" style="top:370px;font-size:96px">Um pedido.</div>
     <div class="h" style="top:490px;font-size:150px;color:#f5b84a;letter-spacing:-.045em">11 h parado.</div>
@@ -44,7 +51,7 @@ const PECAS = {
 };
 const css = `${ff(400)}${ff(600)}${ff(700)}
 *{margin:0;box-sizing:border-box}
-body{width:1080px;height:1920px;position:relative;overflow:hidden;font-family:Plex,sans-serif;color:#eef3fb;
+body{width:1080px;height:var(--h,1920px);position:relative;overflow:hidden;font-family:Plex,sans-serif;color:#eef3fb;
   background:radial-gradient(circle at 26% 22%,rgba(23,50,99,.6),rgba(3,6,12,0) 50%),radial-gradient(circle at 80% 82%,rgba(0,168,188,.13),rgba(3,6,12,0) 44%),#03060c}
 .h{position:absolute;left:72px;right:72px;font-weight:700;letter-spacing:-.035em;line-height:1.04}
 .tag{position:absolute;left:72px;right:72px;font-size:36px;font-weight:600;color:#8ea1bd}
@@ -62,8 +69,9 @@ body{width:1080px;height:1920px;position:relative;overflow:hidden;font-family:Pl
   p.on('pageerror', (e) => { console.error('ERRO:', e.message); process.exitCode = 2; });
   for (const [nome, corpo] of Object.entries(PECAS)) {
     const f = `${F}/work/${nome}.html`; fs.writeFileSync(f, `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${corpo}</body></html>`);
-    await p.goto('file://' + f); await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(300);
-    const dest = nome.startsWith('capa') ? `${F}/exports/NexoProcess_Espera_${nome}.png` : `${F}/exports/stories/${nome}.png`;
+    const hh = nome.includes('4x5') ? 1350 : 1920; await p.setViewportSize({ width: 1080, height: hh });
+    await p.goto('file://' + f); await p.evaluate((x) => { document.body.style.setProperty('--h', x + 'px'); return document.fonts.ready; }, hh); await p.waitForTimeout(300);
+    const dest = nome.includes('4x5') ? `${F}/exports/por_plataforma/3_LinkedIn_capa_4x5.png` : nome.startsWith('capa') ? `${F}/exports/NexoProcess_Espera_${nome}.png` : `${F}/exports/stories/${nome}.png`;
     await p.screenshot({ path: dest });
   }
   await b.close(); console.log('ok', Object.keys(PECAS).length);

@@ -5,8 +5,12 @@
 const { chromium } = require('/home/user/Code-Del-Rio/node_modules/playwright');
 const fs = require('fs'); const { spawn } = require('child_process');
 const R = '/home/user/Code-Del-Rio', F = `${R}/marketing/campanha-espera`, A = `${R}/marketing/video/assets`;
-const VAR = (process.argv[2] || 'A').toUpperCase(), TESTS = process.argv[3];
-const W = 1080, H = 1920, T = 25.2, FPS = 30, u = W / 100;
+const VAR = (process.argv[2] || 'A').toUpperCase(), Q = process.argv[3] === '4x5', TESTS = Q ? process.argv[4] : process.argv[3];
+// Q = versão 4:5 (LinkedIn): mesmo filme, posições verticais refeitas para 1080×1350
+const W = 1080, H = Q ? 1350 : 1920, T = 25.2, FPS = 30, u = W / 100, SUF = Q ? '_4x5' : '';
+const Y = (v, q) => (Q ? q : v);
+// botão final por plataforma (CTA=ig|yt|li): no LinkedIn e no YouTube não existe "link na bio"
+const CTAK = process.env.CTA || 'ig', CTA = { ig: 'Conheça · link na bio', yt: 'Conheça · link no canal', li: 'Conheça o NexoProcess' }[CTAK], SUF2 = SUF + (CTAK === 'ig' ? '' : '_' + CTAK);
 const FD = `${R}/node_modules/@fontsource`;
 const ff = (dir, w) => ['latin', 'latin-ext'].map((s) => `@font-face{font-family:Plex;font-weight:${w};src:url(file://${FD}/${dir}/files/${dir}-${s}-${w}-normal.woff2) format('woff2');}`).join('');
 const Wd = (h) => { let em = ''; return h.replace(/<(a|t)>|<\/(a|t)>|<br>|[^\s<]+/g, (m) => { if (m === '<a>') { em = 'a'; return ''; } if (m === '<t>') { em = 't'; return ''; } if (m === '</a>' || m === '</t>') { em = ''; return ''; } if (m === '<br>') return m; return `<span class="w${em ? ' ' + em : ''}">${m}</span>`; }); };
@@ -17,7 +21,7 @@ const SRC = {
   cmp: { f: 'telas-4k/07-comparar-4k.png', w: 3840, h: 2160 },
   plan: { f: 'capturas-v2/plano-m.png', w: 1464, h: 1734 },
 };
-const PANEL = { map: [60, 580, 960, 600], cmp: [60, 600, 960, 430], plan: [60, 560, 960, 700] };   // x, y, largura, altura
+const PANEL = { map: [60, Y(580, 330), 960, 600], cmp: [60, Y(600, 330), 960, 430], plan: [60, Y(560, 250), 960, 700] };   // x, y, largura, altura
 const HL = {   // destaques: [x, y, w, h] na captura, cor
   map: [[958, 438, 158, 48, 'a'], [1490, 438, 164, 48, 'a'], [1650, 438, 204, 48, 'a2']],
   cmp: [[955, 1605, 1700, 105, 't'], [955, 1762, 1700, 105, 'a'], [3405, 1610, 240, 50, 't2'], [3405, 1770, 240, 50, 't2']],
@@ -46,7 +50,7 @@ body{--u:${u}px;font-family:Plex,sans-serif;color:#eef3fb;position:relative}
 .a{color:#f5b84a}.t{color:#3fd0de}
 .w{display:inline-block;opacity:0}
 .lab{position:absolute;left:72px;font-size:calc(var(--u)*3.2);font-weight:600;color:#8ea1bd;letter-spacing:.01em}
-#bars{position:absolute;left:72px;top:1190px;width:860px}
+#bars{position:absolute;left:72px;top:${Y(1190, 800)}px;width:860px}
 .bar{position:relative;height:34px;border-radius:6px;margin-top:62px}
 .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
 #ba i{background:linear-gradient(90deg,#f5b84a,#f0a531);box-shadow:0 0 34px rgba(245,184,74,.35)}
@@ -62,44 +66,44 @@ body{--u:${u}px;font-family:Plex,sans-serif;color:#eef3fb;position:relative}
 .hl.a,.hl.a2{border:4px solid #f5b84a;box-shadow:0 0 0 9999px rgba(3,6,12,0),0 0 28px rgba(245,184,74,.75)}
 .hl.t{border:4px solid #3fd0de;box-shadow:0 0 26px rgba(63,208,222,.7)}
 .hl.t2{border:3px solid #3fd0de;border-radius:99px;box-shadow:0 0 22px rgba(63,208,222,.8)}
-.ttl{position:absolute;left:72px;right:120px;top:300px;font-weight:700;font-size:calc(var(--u)*8.4);letter-spacing:-.035em;line-height:1.04}
+.ttl{position:absolute;left:72px;right:120px;top:${Y(300, 80)}px;font-weight:700;font-size:calc(var(--u)*8.4);letter-spacing:-.035em;line-height:1.04}
 .cal{position:absolute;left:72px;right:150px;font-size:calc(var(--u)*4.7);line-height:1.25;font-weight:600;color:#dbe4f1}
 .cal small{display:block;font-size:calc(var(--u)*3.2);font-weight:400;color:#8ea1bd;margin-top:14px}
 .mini{position:absolute;left:72px;width:860px}
 .mini .r{display:flex;align-items:center;gap:22px;margin-bottom:26px}
 .mini .r i{height:26px;border-radius:5px;flex:none}
 .mini .r span{font-size:calc(var(--u)*4.4);font-weight:700;white-space:nowrap}
-.stmt{position:absolute;left:72px;right:130px;top:520px}
-.lock{position:absolute;left:72px;top:600px;display:flex;align-items:center;gap:30px;font-weight:700;font-size:calc(var(--u)*11);letter-spacing:-.035em}
+.stmt{position:absolute;left:72px;right:130px;top:${Y(520, 200)}px}
+.lock{position:absolute;left:72px;top:${Y(600, 300)}px;display:flex;align-items:center;gap:30px;font-weight:700;font-size:calc(var(--u)*11);letter-spacing:-.035em}
 .lock svg{width:calc(var(--u)*15);height:auto;overflow:visible}
-.pill{position:absolute;left:72px;top:1120px;background:#3fd0de;color:#02161b;font-weight:700;font-size:calc(var(--u)*4.6);border-radius:99px;padding:22px 52px;opacity:0}
+.pill{position:absolute;left:72px;top:${Y(1120, 820)}px;background:#3fd0de;color:#02161b;font-weight:700;font-size:calc(var(--u)*4.6);border-radius:99px;padding:22px 52px;opacity:0}
 #grain{position:absolute;inset:-200px;opacity:.06;mix-blend-mode:overlay;pointer-events:none}
 #vig{background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 55%,rgba(0,0,0,.6) 100%);pointer-events:none}
 #flash{background:radial-gradient(ellipse at 50% 45%,rgba(191,246,251,.4),rgba(64,200,214,0) 65%);opacity:0;pointer-events:none}
 #fade{background:#000;opacity:0;pointer-events:none}
 </style></head><body>
 <div id="bg"></div>
-<div class="lab" id="tag" style="top:250px">Exemplo fictício · calculado no NexoProcess</div>
-<div class="sc" id="s1"><div class="blk" id="b1" style="top:${VAR === 'A' ? 470 : 520}px">${TX.s1}</div></div>
-<div class="sc" id="s2"><div class="blk" id="b2" style="top:${VAR === 'A' ? 470 : 560}px">${TX.s2}</div></div>
-<div class="sc" id="s3"><div class="blk" style="top:560px"><div class="h l" id="q3" style="font-size:calc(var(--u)*11)">${Wd('Onde ele fica<br><a>parado?</a>')}</div></div></div>
+<div class="lab" id="tag" style="top:${Y(250, 60)}px">Exemplo fictício · calculado no NexoProcess</div>
+<div class="sc" id="s1"><div class="blk" id="b1" style="top:${VAR === 'A' ? Y(470, 150) : Y(520, 170)}px">${TX.s1}</div></div>
+<div class="sc" id="s2"><div class="blk" id="b2" style="top:${VAR === 'A' ? Y(470, 150) : Y(560, 200)}px">${TX.s2}</div></div>
+<div class="sc" id="s3"><div class="blk" style="top:${Y(560, 200)}px"><div class="h l" id="q3" style="font-size:calc(var(--u)*11)">${Wd('Onde ele fica<br><a>parado?</a>')}</div></div></div>
 <div id="bars"><div class="bar" id="ba"><b id="la">11 h · <span>espera</span></b><i id="fa"></i>${[0, 1, 2, 3].map((i) => `<div class="seg" id="sg${i}"></div>`).join('')}</div>
   <div class="bar" id="bt"><b id="lt">2 h 15 min · <span>trabalho</span></b><i id="ft"></i></div>
   <div class="lab" id="nota" style="position:relative;left:0;margin-top:34px">Por execução · exemplo fictício</div></div>
 <div class="sc" id="s4"><div class="ttl" id="t4">${Wd('O mapa mostra<br>onde ele <a>trava.</a>')}</div>${panel('map')}
-  <div class="cal" id="k4" style="top:1250px">${Wd('Gargalo e retrabalho destacados no fluxo, com o motivo.')}</div></div>
+  <div class="cal" id="k4" style="top:${Y(1250, 990)}px">${Wd('Gargalo e retrabalho destacados no fluxo, com o motivo.')}</div></div>
 <div class="sc" id="s5"><div class="ttl" id="t5">${Wd('Cada número<br>tem <t>origem.</t>')}</div>${panel('cmp')}
-  <div class="mini" id="k5" style="top:1100px"><div class="r" id="m0"><i style="width:600px;background:#f5b84a"></i><span class="a">11 h</span></div>
+  <div class="mini" id="k5" style="top:${Y(1100, 820)}px"><div class="r" id="m0"><i style="width:600px;background:#f5b84a"></i><span class="a">11 h</span></div>
   <div class="r" id="m1"><i style="width:${Math.round(600 * 2.25 / 11)}px;background:#3fd0de"></i><span class="t">2 h 15 min</span></div>
   <div class="cal" style="position:relative;left:0;font-size:calc(var(--u)*3.9);margin-top:6px">Base: calculado a partir dos dados do processo.</div></div></div>
 <div class="sc" id="s6"><div class="ttl" id="t6">${Wd('E vira <t>ação.</t>')}</div>${panel('plan')}
-  <div class="cal" id="k6" style="top:1310px">${Wd('Com problema, responsável e prazo.')}</div></div>
+  <div class="cal" id="k6" style="top:${Y(1310, 1010)}px">${Wd('Com problema, responsável e prazo.')}</div></div>
 <div class="sc" id="s7"><div class="stmt"><div class="h" id="q7a" style="font-size:calc(var(--u)*9.6)">${Wd('Às vezes,<br>o problema não<br>é o trabalho.')}</div>
   <div class="h a" id="q7b" style="font-size:calc(var(--u)*16.5);margin-top:70px;letter-spacing:-.05em">${Wd('É a espera.')}</div></div></div>
 <div class="sc" id="s8"><div class="lock"><svg viewBox="0 0 64 64"><rect id="y0" x="2" y="2" width="60" height="60" rx="12" fill="#173263" stroke="rgba(127,233,245,.35)" stroke-width=".6"/><circle id="y1" cx="17" cy="32" r="6.5" fill="none" stroke="#fff" stroke-width="4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" transform="rotate(-90 17 32)"/><path id="y2" d="M23.5 32h7" stroke="#fff" stroke-width="4" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/><path id="y3" d="M41 21l11 11-11 11-11-11z" fill="#00A8BC" style="transform-origin:41px 32px"/></svg><span id="wm">NexoProcess</span></div>
-  <div class="cal" id="k8" style="top:860px;font-size:calc(var(--u)*5.6);font-weight:700;color:#eef3fb;letter-spacing:-.02em;line-height:1.12">${Wd('Descubra onde<br>o seu processo <a>espera.</a>')}</div>
-  <div class="pill" id="cta">Conheça · link na bio</div>
-  <div class="lab" id="f8" style="top:1300px;opacity:0">Telas reais do app · dados fictícios</div></div>
+  <div class="cal" id="k8" style="top:${Y(860, 560)}px;font-size:calc(var(--u)*5.6);font-weight:700;color:#eef3fb;letter-spacing:-.02em;line-height:1.12">${Wd('Descubra onde<br>o seu processo <a>espera.</a>')}</div>
+  <div class="pill" id="cta">${CTA}</div>
+  <div class="lab" id="f8" style="top:${Y(1300, 990)}px;opacity:0">Telas reais do app · dados fictícios</div></div>
 <canvas id="grain"></canvas><div id="vig"></div><div id="flash"></div><div id="fade"></div>
 <script>
 const $=(i)=>document.getElementById(i), cl=(x)=>Math.max(0,Math.min(1,x)), ez=(x)=>{x=cl(x);return x*x*(3-2*x)}, eo=(x)=>{x=cl(x);return 1-Math.pow(1-x,3)}, mix=(a,b,k)=>a+(b-a)*k;
@@ -168,13 +172,13 @@ window.render=async(tt)=>{t=tt;
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--allow-file-access-from-files'] });
   const p = await b.newPage({ viewport: { width: W, height: H } });
   p.on('pageerror', (e) => { console.error('ERRO NA PÁGINA:', e.message); process.exitCode = 2; });
-  const f = `${F}/work/espera_${VAR}.html`; fs.writeFileSync(f, html); await p.goto('file://' + f);
+  const f = `${F}/work/espera_${VAR}${SUF2}.html`; fs.writeFileSync(f, html); await p.goto('file://' + f);
   await p.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => 0))); }); await p.waitForTimeout(800);
   if (TESTS) {
-    for (const t of TESTS.split(',')) { await p.evaluate((x) => window.render(x), +t); await p.screenshot({ path: `${F}/work/t_${VAR}_${t}.jpg`, type: 'jpeg', quality: 92 }); }
+    for (const t of TESTS.split(',')) { await p.evaluate((x) => window.render(x), +t); await p.screenshot({ path: `${F}/work/t_${VAR}${SUF2}_${t}.jpg`, type: 'jpeg', quality: 92 }); }
     await b.close(); return;
   }
-  const out = `${F}/work/master_${VAR}.mp4`;
+  const out = `${F}/work/master_${VAR}${SUF2}.mp4`;
   const fm = spawn('ffmpeg', ['-y', '-v', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-pix_fmt', 'yuv420p', '-r', String(FPS), out], { stdio: ['pipe', 'inherit', 'inherit'] });
   for (let i = 0; i < Math.round(T * FPS); i++) {
     await p.evaluate((x) => window.render(x), i / FPS);
