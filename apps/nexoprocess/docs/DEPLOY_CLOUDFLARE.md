@@ -228,7 +228,7 @@ Execute esta sequência em janela de baixo movimento. Na primeira troca e após 
 
 ### Rotação do par de licença (resumo; procedimento completo em `LANCAMENTO_EN.md` §4.6)
 - **Regra:** todo build de produção usa `NEXO_EXPECTED_KEY_FP` (8 hex do par do **servidor**); pública com outra impressão digital = build recusado.
-- **Rotação:** `npm run nexo:rotate-key -- --project <nome-do-projeto-pages>` (Windows). Gera o par, guarda cópia DPAPI, grava `LICENSE_PRIVATE_JWK` pelo stdin com `wrangler pages secret put` e imprime só `FP=` e `PUB=`. Depois: build com a `PUB=` e a `FP=`, deploy, `nexo:check-deploy`.
+- **Rotação:** `npm run --silent nexo:rotate-key -- --project <nome-do-projeto-pages>` (Windows). Gera o par, guarda cópia DPAPI, grava `LICENSE_PRIVATE_JWK` pelo stdin com `wrangler pages secret put` e imprime só `FP=` e `PUB=`. Depois: build com a `PUB=` e a `FP=`, deploy, `nexo:check-deploy`.
 - **Efeito:** todos os acessos ativados deixam de validar (cada comprador entra de novo). **Rollback é para a frente:** rotacionar de novo; a privada antiga não é guardada.
 
 ### Verificações de liberação V3–V6

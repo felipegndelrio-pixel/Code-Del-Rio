@@ -55,6 +55,22 @@ end $$;
 -- 5) Só o servidor acessa.
 alter table public.nexo_licenses enable row level security;
 
+-- 6) Privilégios: no Supabase os papéis anon e authenticated recebem ALL por padrão em tabela nova do schema public (em produção
+-- estava SELECT = true; o fundador rodou o revoke à mão em 19–20/11/2026). Só o servidor (service_role) acessa. A RLS já está ligada
+-- e sem política, mas o privilégio não deve existir (defesa em profundidade). Só revoga de papel que existe; idempotente e reaplicável.
+revoke all on table public.nexo_licenses from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_catalog.pg_roles where rolname = r) then
+      execute pg_catalog.format('revoke all on table public.nexo_licenses from %I', r);
+    end if;
+  end loop;
+end
+$$;
+
 commit;
 
 -- Conferência (deve voltar vazia):

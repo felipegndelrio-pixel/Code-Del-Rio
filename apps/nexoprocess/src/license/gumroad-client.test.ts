@@ -25,6 +25,8 @@ const KEY = '85DB562A-C11D4B06-A2335A6B-8C079166';
 async function load(env: Record<string, string> = {}) {
   vi.resetModules();
   await (await import('../i18n')).loadLocale('en'); // o dicionário EN é carregado sob demanda
+  // Isolamento: variáveis VITE_* herdadas do ambiente (ex.: janela do PowerShell do fundador) não podem mudar o resultado; zera as que o teste não usa.
+  for (const k of ['VITE_PADDLE_CLIENT_TOKEN', 'VITE_PADDLE_ENV', 'VITE_PADDLE_PRICE_ID', 'VITE_PADDLE_CSP_FRAME', 'VITE_PADDLE_CSP_CONNECT', 'VITE_PADDLE_CSP_STYLE', 'VITE_GUMROAD_CHECKOUT_URL', 'VITE_HOTMART_CHECKOUT_URL', 'VITE_EN_TERMS_URL', 'VITE_EN_PRIVACY_URL', 'VITE_EN_REFUND_URL']) vi.stubEnv(k, '');
   vi.stubEnv('VITE_LICENSE_REQUIRED', 'true');
   vi.stubEnv('VITE_LICENSE_PUBLIC_JWK', JSON.stringify(pub));
   for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);

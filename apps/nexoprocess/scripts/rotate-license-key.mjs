@@ -92,6 +92,10 @@ export async function rotateLicenseKey({ project, backup = true, run = realRun, 
     return 1;
   }
 
+  // O stdout do wrangler (ex.: "Success! Uploaded secret LICENSE_PRIVATE_JWK") é a evidência da gravação: vai para o stderr, passado pelo scrub.
+  const evidence = scrub(r.stdout, secrets).trim();
+  if (evidence) log(`wrangler: ${evidence}`);
+
   // 4) Só agora a saída: impressão digital e a linha PÚBLICA.
   out(`FP=${fp}`);
   out(`PUB=${JSON.stringify(pub)}`);

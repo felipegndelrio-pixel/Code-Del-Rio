@@ -910,4 +910,30 @@ describe.skipIf(!REST || !JWT || !PG)('PostgreSQL real via PostgREST (integraç�
     expect(JSON.parse(lookup(blockedOnly))).toEqual({ status: 'revoked' });
     await reset();
   });
+
+  it('schema.sql: anon e authenticated NÃO têm nenhum privilégio em nexo_licenses; o revoke é reaplicável (conceder como o Supabase faz e reaplicar revoga); service_role segue com acesso; PostgREST nega os dois', async () => {
+    const privs = ['select', 'insert', 'update', 'delete', 'truncate', 'references', 'trigger'];
+    const has = (role: string) => privs.map((p) => sql(`select has_table_privilege('${role}', 'public.nexo_licenses', '${p}')`));
+    for (const role of ['anon', 'authenticated']) expect(sql(`select count(*) from pg_roles where rolname = '${role}'`), role).toBe('1');
+    for (const role of ['anon', 'authenticated']) expect(has(role), `${role} após o schema`).toEqual(privs.map(() => 'f'));
+    // O padrão do Supabase dá ALL a esses papéis em tabela nova: simula e reaplica o schema.
+    sql('grant all on table public.nexo_licenses to anon, authenticated');
+    for (const role of ['anon', 'authenticated']) expect(has(role), `${role} com o grant do Supabase`).toContain('t');
+    execFileSync('psql', [PG!, '-X', '-v', 'ON_ERROR_STOP=1', '-f', 'apps/nexoprocess/api/_lib/schema.sql'], { stdio: 'ignore' });
+    for (const role of ['anon', 'authenticated']) expect(has(role), `${role} após reaplicar o schema`).toEqual(privs.map(() => 'f'));
+    // service_role (que o workflow e o Supabase concedem à parte) não é afetado
+    expect(sql(`select has_table_privilege('service_role', 'public.nexo_licenses', 'select')`)).toBe('t');
+    // E pelo PostgREST: sem JWT (anon) e com o papel authenticated, a leitura é negada
+    const secret = process.env.PGRST_JWT_SECRET;
+    expect(secret, 'PGRST_JWT_SECRET é necessário para o teste de permissão').toBeTruthy();
+    const b64 = (x: unknown) => Buffer.from(JSON.stringify(x)).toString('base64url');
+    const jwtBody = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 600 })}`;
+    const authed = `${jwtBody}.${createHmac('sha256', secret!).update(jwtBody).digest('base64url')}`;
+    for (const headers of [{}, { Authorization: `Bearer ${authed}` }] as Record<string, string>[]) {
+      const r = await fetch(`${REST}/nexo_licenses?select=email&limit=1`, { headers });
+      expect([401, 403]).toContain(r.status);
+    }
+    const ok = await fetch(`${REST}/nexo_licenses?select=email&limit=1`, { headers: auth() });
+    expect(ok.status).toBe(200);
+  });
 });

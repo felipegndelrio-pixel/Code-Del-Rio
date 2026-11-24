@@ -49,6 +49,25 @@ describe('rotateLicenseKey', () => {
     expect(put.args.join(' ')).not.toContain(priv.x);
   });
 
+  it('sucesso: o stdout do wrangler vai para o stderr (evidência) com scrub, e NÃO para o stdout do script', async () => {
+    const h = harness({ putResult: { status: 0, stdout: 'Success! Uploaded secret LICENSE_PRIVATE_JWK\n', stderr: '' } });
+    expect(await rotateLicenseKey({ project: 'nexoprocess', backup: false, platform: 'linux', ...h.base })).toBe(0);
+    expect(h.logs.join('\n')).toContain('wrangler: Success! Uploaded secret LICENSE_PRIVATE_JWK');
+    expect(h.out.join('\n')).not.toContain('Success!');
+    // se o wrangler ecoasse a privada no stdout, ela não aparece
+    let priv = '';
+    const h2 = harness();
+    const run = (...a: [string, string[], string]): RunResult => {
+      priv = a[2];
+      return { status: 0, stdout: `Success! ${a[2]}`, stderr: '' };
+    };
+    expect(await rotateLicenseKey({ project: 'nexoprocess', backup: false, platform: 'linux', ...h2.base, run })).toBe(0);
+    const d = (JSON.parse(priv) as Record<string, string>).d;
+    expect(h2.logs.join('\n')).toContain('Success!');
+    expect(h2.logs.join('\n')).not.toContain(d);
+    expect(JSON.stringify(h2.out)).not.toContain(d);
+  });
+
   it('--no-backup (qualquer sistema): só o wrangler é chamado', async () => {
     const h = harness();
     expect(await rotateLicenseKey({ project: 'nexoprocess', backup: false, platform: 'linux', ...h.base })).toBe(0);

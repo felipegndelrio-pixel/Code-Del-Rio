@@ -148,11 +148,11 @@ describe('Cloudflare Web Analytics: só na landing /en/ (K2)', () => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
         const u = new URL(e.name + (e.isDirectory() ? '/' : ''), dir);
         if (e.isDirectory()) walk(u, out);
-        else if (/\.(tsx?|html|json|webmanifest|css|js|mjs)$/.test(e.name)) out.push(u.pathname);
+        else if (/\.(tsx?|html|json|webmanifest|css|js|mjs)$/.test(e.name)) out.push(fileURLToPath(u));
       }
       return out;
     };
-    const files = [...walk(new URL('src/', root)), ...walk(new URL('api/', root)), root.pathname + 'index.html'].filter((f) => !/\.test\./.test(f));
+    const files = [...walk(new URL('src/', root)), ...walk(new URL('api/', root)), fileURLToPath(new URL('index.html', root))].filter((f) => !/\.test\./.test(f));
     expect(files.length).toBeGreaterThan(50);
     expect(files.filter((f) => /cloudflareinsights/i.test(readFileSync(f, 'utf8')))).toEqual([]);
     const pub = readdirSync(new URL('public/', root), { withFileTypes: true }).filter((e) => e.isFile() && /\.(html|json|webmanifest)$/.test(e.name));

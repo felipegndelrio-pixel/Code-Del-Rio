@@ -45,7 +45,7 @@ describe('caminhos no Windows', () => {
       readFileSync(f, 'utf8')
         .split('\n')
         .forEach((line, i) => {
-          if (/new URL\([^)]*import\.meta\.url\)\s*\.pathname/.test(line)) bad.push(`${f.slice(APP.length)}:${i + 1}`);
+          if (/new URL\([^)]*import\.meta\.url\)\s*\.pathname/.test(line) || /\b(?:u|root)\.pathname\b/.test(line)) bad.push(`${f.slice(APP.length)}:${i + 1}`);
         });
     }
     expect(bad).toEqual([]);
