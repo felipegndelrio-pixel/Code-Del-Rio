@@ -56,7 +56,7 @@ ${grain}</body></html>`;
 const slide3 = (canal) => {
   const k = (2 * LUPA.r) / LUPA.view, bs = 2888 * k, bx = LUPA.r - ZP[0] * k, by = LUPA.r - ZP[1] * k;
   const ang = Math.atan2(TGT[1] - LUPA.cy, TGT[0] - LUPA.cx), ex = LUPA.cx + LUPA.r * Math.cos(ang), ey = LUPA.cy + LUPA.r * Math.sin(ang);
-  const sub = { ig: 'Link in bio', li: 'Link in the first comment' }[canal];
+  const sub = { ig: 'Link in bio', li: 'Link in the first comment', none: '' }[canal];
   return `<!doctype html><html><head><meta charset="utf-8"><style>${base}
 #bg{position:absolute;inset:0;background:radial-gradient(ellipse at 52% 52%,rgba(14,52,110,.5) 0%,rgba(8,22,48,.25) 40%,rgba(3,6,12,0) 70%),#03060c}
 h1{position:absolute;left:72px;top:124px;font-weight:700;font-size:84px;line-height:1.02;letter-spacing:-.04em;color:#fff}
@@ -82,7 +82,7 @@ svg#ln{position:absolute;left:0;top:0;width:${W}px;height:${H}px;pointer-events:
   <circle cx="${TGT[0].toFixed(1)}" cy="${TGT[1].toFixed(1)}" r="18" fill="none" stroke="#bff6fb" stroke-width="2.5"/><circle cx="${TGT[0].toFixed(1)}" cy="${TGT[1].toFixed(1)}" r="5" fill="#bff6fb"/></svg>
 <div id="lupa"></div>
 <div class="feat"><div><i></i>Import your spreadsheet.</div><div><i></i>See bottlenecks and rework.</div><div><i></i>Turn them into an action plan.</div></div>
-<div class="foot"><div class="brand">${LOGO(48)}<span>NexoProcess</span></div><div class="cta"><div class="pill">GET IT ON GUMROAD</div><div class="small">${sub.toUpperCase()}</div></div></div>
+<div class="foot"><div class="brand">${LOGO(48)}<span>NexoProcess</span></div>${canal === 'none' ? '<div class="small">REAL APP SCREENS · FICTIONAL SAMPLE DATA</div>' : `<div class="cta"><div class="pill">GET IT ON GUMROAD</div><div class="small">${sub.toUpperCase()}</div></div>`}</div>
 <div class="vig"></div>${grain}</body></html>`;
 };
 
@@ -90,7 +90,7 @@ svg#ln{position:absolute;left:0;top:0;width:${W}px;height:${H}px;pointer-events:
   const teste = process.argv[2] === 'teste', OUT = `${D}/${teste ? 'work' : 'exports'}`;
   fs.mkdirSync(OUT, { recursive: true }); fs.mkdirSync(`${D}/work`, { recursive: true });
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--allow-file-access-from-files'] });
-  const jobs = [['slide2_its_the_wait', slide2('ig')], ['slide3_produto_instagram', slide3('ig')], ['slide3_produto_linkedin', slide3('li')]];
+  const jobs = [['slide2_its_the_wait', slide2('ig')], ['slide3_produto_instagram', slide3('ig')], ['slide3_produto_linkedin', slide3('li')], ['slide3_produto_sem_cta', slide3('none')]];
   for (const [nome, html] of jobs) {
     const p = await b.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
     p.on('pageerror', (e) => { console.error('ERRO:', e.message); process.exitCode = 2; });
