@@ -50,10 +50,10 @@ Conheça a edição em inglês: link na bio.
 
 ## Texto alternativo da imagem (acessibilidade)
 ```
-Launch poster: "It’s today. NexoProcess goes global." A dark globe made of light dots, with glowing lines that start in Brazil and reach North America, Europe and Africa. In front of it, a real screen of the NexoProcess app in English showing an AS-IS process map. Button: "Discover the English edition". Footer: "Now launching on Gumroad".
+Launch poster: "It’s today. NexoProcess goes global." A dark globe made of light dots, with glowing lines that start in Brazil and reach North America, Europe and Africa. In front of it, a laptop and a phone showing real screens of the NexoProcess app in English: the AS-IS process map and the Diagnosis screen. Button: "Discover the English edition". Footer: "Now launching on Gumroad".
 ```
 
 ## Regras seguidas
 - Sem número, resultado, preço, depoimento ou selo de parceria.
 - Gumroad aparece só por nome, sem o logotipo oficial (arquivo e regras de uso da marca não fornecidos).
-- A tela do app é uma captura real da interface em inglês (demonstração "Order processing (fictional sample)"), sem retoque.
+- As telas do app no mockup são capturas reais da interface em inglês (demonstração "Order processing (fictional sample)"), sem retoque.

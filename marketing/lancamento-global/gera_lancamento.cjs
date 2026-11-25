@@ -17,22 +17,28 @@ const LOGO = (s) => `<svg viewBox="0 0 64 64" style="width:${s}px;height:${s}px;
 
 // ---------- formatos: posições de cada elemento (px no tamanho final)
 const F = {
+  // dev = mockup (x, y, largura) · hub = onde o Brasil deve aparecer na peça (o centro do globo é calculado a partir dele)
   feed: { W: 1080, H: 1350, U: 1,
-    globe: { cx: 720, cy: 870, r: 530, lat0: -12, lon0: -48 },
-    panel: { x: 52, y: 640, w: 540, ry: 18, rx: 4 },
-    t: { eye: [72, 92, 23], h1: [72, 126, 168], h2: [72, 316, 45], sup: [72, 1078, 29, 640], cta: [72, 1166, 22], plat: [72, 1254, 17], logo: [1008, 80, 50, 'right'] },
-    scrim: 'linear-gradient(180deg,rgba(3,6,12,.92) 0%,rgba(3,6,12,.55) 24%,rgba(3,6,12,0) 40%,rgba(3,6,12,0) 66%,rgba(3,6,12,.86) 84%,rgba(3,6,12,.97) 100%)' },
+    globe: { r: 470, lat0: -12, lon0: -48, hub: [930, 506] },
+    dev: { x: 46, y: 556, w: 988 },
+    t: { eye: [72, 84, 22], h1: [72, 116, 160], h2: [72, 296, 43], sup: [72, 362, 26, 600], cta: [72, 1214, 22], plat: [1008, 1236, 16, 'right'], logo: [1008, 72, 46, 'right'] },
+    scrim: 'radial-gradient(ellipse 82% 38% at 32% 17%,rgba(3,6,12,.9) 0%,rgba(3,6,12,.62) 58%,rgba(3,6,12,0) 100%),linear-gradient(180deg,rgba(3,6,12,.6) 0%,rgba(3,6,12,0) 22%),linear-gradient(180deg,rgba(3,6,12,0) 85%,rgba(3,6,12,.92) 100%)' },
   story: { W: 1080, H: 1920, U: 1,
-    globe: { cx: 650, cy: 1235, r: 575, lat0: -12, lon0: -48 },
-    panel: { x: 46, y: 960, w: 590, ry: 18, rx: 4 },
-    t: { logo: [72, 262, 54], eye: [72, 384, 25], h1: [72, 424, 180], h2: [72, 624, 50], sup: [72, 1478, 32, 700], cta: [72, 1578, 26], plat: [72, 1668, 20] },
-    scrim: 'linear-gradient(180deg,rgba(3,6,12,.95) 0%,rgba(3,6,12,.6) 30%,rgba(3,6,12,0) 42%,rgba(3,6,12,0) 66%,rgba(3,6,12,.88) 78%,rgba(3,6,12,.98) 100%)' },
+    globe: { r: 540, lat0: -12, lon0: -48, hub: [920, 858] },
+    dev: { x: 34, y: 900, w: 1012 },
+    t: { logo: [72, 262, 50], eye: [72, 372, 24], h1: [72, 410, 172], h2: [72, 600, 47], sup: [72, 672, 28, 640], plat: [72, 1566, 18], cta: [72, 1602, 25] },
+    scrim: 'radial-gradient(ellipse 84% 27% at 34% 27%,rgba(3,6,12,.9) 0%,rgba(3,6,12,.62) 58%,rgba(3,6,12,0) 100%),linear-gradient(180deg,rgba(3,6,12,.85) 0%,rgba(3,6,12,0) 18%),linear-gradient(180deg,rgba(3,6,12,0) 80%,rgba(3,6,12,.95) 100%)' },
   linkedin: { W: 1200, H: 627, U: 0.56,
-    globe: { cx: 960, cy: 350, r: 320, lat0: -12, lon0: -48 },
-    panel: { x: 606, y: 268, w: 320, ry: 18, rx: 4 },
+    globe: { r: 300, lat0: -12, lon0: -48, hub: [1012, 150] },
+    dev: { x: 606, y: 232, w: 574 },
     t: { eye: [60, 58, 16], h1: [60, 84, 112], h2: [60, 214, 30], sup: [60, 278, 21, 500], cta: [60, 378, 16], plat: [60, 452, 13], logo: [60, 530, 36] },
-    scrim: 'linear-gradient(90deg,rgba(3,6,12,.96) 0%,rgba(3,6,12,.85) 36%,rgba(3,6,12,.2) 54%,rgba(3,6,12,0) 64%), linear-gradient(180deg,rgba(3,6,12,0) 70%,rgba(3,6,12,.7) 100%)' },
+    scrim: 'linear-gradient(90deg,rgba(3,6,12,.96) 0%,rgba(3,6,12,.85) 36%,rgba(3,6,12,.2) 50%,rgba(3,6,12,0) 58%)' },
 };
+// centro do globo a partir do ponto desejado para o Brasil
+for (const k in F) { const g = F[k].globe, d = Math.PI / 180, f = -23.55 * d, dl = (-46.63 - g.lon0) * d, l0 = g.lat0 * d;
+  const x = Math.cos(f) * Math.sin(dl), y = Math.cos(l0) * Math.sin(f) - Math.sin(l0) * Math.cos(f) * Math.cos(dl);
+  g.cx = g.hub[0] - g.r * x; g.cy = g.hub[1] + g.r * y; }
+const MOCK = { f: `file://${R}/marketing/lancamento-global/mockup/mockup_en.png`, w: 2110, h: 1339 };
 // destinos dos arcos (visual, sem rótulos): América do Norte, Europa, África, Oceania não aparece no hemisfério visível
 const HUB = [-23.55, -46.63];   // origem: Brasil, onde o produto nasceu
 const ENDS = [[40.7, -74.0, 'c'], [43.7, -79.4, 's'], [19.4, -99.1, 'd'], [51.5, -0.1, 's'], [38.7, -9.1, 'c'], [52.5, 13.4, 'd'], [48.9, 2.35, 'c'], [6.5, 3.4, 's'], [-33.9, 18.4, 'd'], [4.7, -74.1, 'c'], [-34.6, -58.4, 's']];
@@ -41,8 +47,8 @@ function page(fmt, layer) {
   const c = F[fmt], { W, H } = c, t = c.t, k = c.U;
   const showBg = layer === 'all' || layer === 'semtexto' || layer === 'fundo';
   const showPanel = layer === 'all' || layer === 'semtexto' || layer === 'produto';
+  const dv = c.dev, dh = dv.w * MOCK.h / MOCK.w;
   const showText = layer === 'all' || layer === 'textos';
-  const ph = c.panel.w * CROP.h / CROP.w;
   const al = (a) => (a === 'right' ? 'right' : 'left');
   const pos = (v) => (v[3] === 'right' ? `right:${W - v[0]}px;` : `left:${v[0]}px;`) + `top:${v[1]}px;`;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -54,11 +60,9 @@ body{position:relative;font-family:Plex,sans-serif;color:#f2f6fc}
 canvas{position:absolute;left:0;top:0}
 #scrim{position:absolute;inset:0;background:${c.scrim}}
 #stage{position:absolute;inset:0;perspective:${1500 * k}px}
-#panel{position:absolute;left:${c.panel.x}px;top:${c.panel.y}px;width:${c.panel.w}px;height:${ph.toFixed(1)}px;transform-origin:0% 50%;
-  transform:rotateY(${c.panel.ry}deg) rotateX(${c.panel.rx}deg);border-radius:${18 * k}px;overflow:hidden;${crop()};background-repeat:no-repeat;background-color:#0e1117;
-  border:${Math.max(1, 1.5 * k)}px solid rgba(111,219,230,.55);box-shadow:0 ${40 * k}px ${110 * k}px rgba(0,0,0,.75),0 0 ${80 * k}px rgba(64,200,214,.22)}
-#panel:after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,0) 30%,rgba(255,255,255,0) 70%,rgba(111,219,230,.06) 100%)}
-#mk{position:absolute;width:2px;height:2px;left:${((CROP.end[0] - CROP.x) / CROP.w * 100).toFixed(2)}%;top:${((CROP.end[1] - CROP.y) / CROP.h * 100).toFixed(2)}%}
+#floor{position:absolute;left:${dv.x + dv.w * 0.08}px;top:${dv.y + dh * 0.86}px;width:${dv.w * 0.84}px;height:${dh * 0.2}px;border-radius:50%;background:radial-gradient(ellipse at 50% 50%,rgba(64,200,214,.28) 0%,rgba(23,70,140,.12) 45%,rgba(3,6,12,0) 72%);filter:blur(${10 * k}px)}
+#dev{position:absolute;left:${dv.x}px;top:${dv.y}px;width:${dv.w}px;height:${dh.toFixed(1)}px;filter:drop-shadow(0 ${26 * k}px ${40 * k}px rgba(0,0,0,.75)) drop-shadow(0 0 ${30 * k}px rgba(64,200,214,.18))}
+#dev img{width:100%;height:100%;display:block}
 .tx{position:absolute;white-space:nowrap}
 #eye{${pos(t.eye)}font-weight:600;font-size:${t.eye[2]}px;letter-spacing:.34em;color:#6fdbe6}
 #h1{${pos(t.h1)}font-weight:700;font-size:${t.h1[2]}px;letter-spacing:-.045em;line-height:.92;color:#fff;text-shadow:0 0 ${60 * k}px rgba(111,219,230,.25)}
@@ -70,8 +74,7 @@ canvas{position:absolute;left:0;top:0}
 #logo{${pos(t.logo)}display:flex;align-items:center;gap:${0.36 * t.logo[2]}px;font-weight:700;font-size:${0.8 * t.logo[2]}px;letter-spacing:-.02em;color:#fff}
 </style></head><body>
 ${showBg ? '<div id="bg"></div><canvas id="g"></canvas>' : ''}
-<div id="stage">${showPanel ? '<div id="panel"><div id="mk"></div></div>' : ''}</div>
-${showBg || showPanel ? '<canvas id="o"></canvas>' : ''}
+${showPanel ? `<div id="floor"></div><div id="dev"><img src="${MOCK.f}"></div>` : ''}
 ${showBg ? '<div id="scrim"></div>' : ''}
 ${showText ? `<div class="tx" id="eye">A NEW CHAPTER BEGINS</div>
 <div class="tx" id="h1">IT’S TODAY.</div>
@@ -148,16 +151,15 @@ if(SHOWBG){
   x.fillStyle=fl;x.fillRect(hp[0]-260*K,hp[1]-1.2*K,520*K,2.4*K);x.globalCompositeOperation='source-over';
   ring(x,false);
   window.HUBXY=[hp[0],hp[1]];
+  { const DV=${JSON.stringify(dv)},DH=${dh.toFixed(1)};const s0=[DV.x+DV.w*0.5,DV.y+DH*0.12];
+    x.globalCompositeOperation='lighter';
+    const bl=x.createRadialGradient(s0[0],s0[1],0,s0[0],s0[1],DV.w*0.42);bl.addColorStop(0,'rgba(64,200,214,.30)');bl.addColorStop(.5,'rgba(23,90,170,.12)');bl.addColorStop(1,'rgba(3,6,12,0)');
+    x.fillStyle=bl;x.beginPath();x.arc(s0[0],s0[1],DV.w*0.42,0,7);x.fill();
+    const c1=[s0[0]+(hp[0]-s0[0])*.1,s0[1]-(s0[1]-hp[1])*.75],c2=[hp[0]-(hp[0]-s0[0])*.35,hp[1]+40*K];
+    for(const [lw,al,bb] of [[9,.10,18],[3,.95,7]]){x.beginPath();x.moveTo(s0[0],s0[1]);x.bezierCurveTo(c1[0],c1[1],c2[0],c2[1],hp[0],hp[1]);x.strokeStyle='rgba(170,245,252,'+al+')';x.lineWidth=lw*K;x.shadowColor='#40C8D6';x.shadowBlur=bb*K;x.stroke()}
+    x.globalCompositeOperation='source-over';x.shadowBlur=0 }
 }
 // conexão: a linha do fluxo sai do evento final do mapa real e chega ao núcleo do globo
-if(SHOWP&&document.getElementById('o')){
-  const x=setup('o');const m=document.getElementById('mk').getBoundingClientRect();const a=[m.x+1,m.y+1];
-  const hp=window.HUBXY||(()=>{const v=vec(HUB[0],HUB[1]);return proj(v)})();
-  const c1=[a[0]+(hp[0]-a[0])*.45,a[1]-60*K],c2=[hp[0]-(hp[0]-a[0])*.2,hp[1]-90*K];
-  x.globalCompositeOperation='lighter';
-  for(const [lw,al,bl] of [[8,.10,16],[3,.98,7]]){x.beginPath();x.moveTo(a[0],a[1]);x.bezierCurveTo(c1[0],c1[1],c2[0],c2[1],hp[0],hp[1]);x.strokeStyle='rgba(150,240,250,'+al+')';x.lineWidth=lw*K;x.shadowColor='#40C8D6';x.shadowBlur=bl*K;x.stroke()}
-  x.beginPath();x.arc(a[0],a[1],5*K,0,7);x.fillStyle='#ffffff';x.shadowBlur=18*K;x.fill();
-}
 document.body.dataset.ok=1;
 </script></body></html>`;
 }
