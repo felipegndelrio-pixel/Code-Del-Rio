@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +65,82 @@ describe('rascunho legal', () => {
   });
 });
 
+describe('variante Paddle publicada: /en/paddle/{terms,privacy,refund}.html (sempre, com ou sem a Paddle ligada)', () => {
+  const PADDLE_DIR = SITE + 'paddle/';
+  const NAMES = ['terms.html', 'privacy.html', 'refund.html'];
+  const MD = { 'terms.html': 'TERMS_EN', 'privacy.html': 'PRIVACY_EN', 'refund.html': 'REFUND_EN' } as Record<string, string>;
+  const SALE = { VITE_GUMROAD_CHECKOUT_URL: 'https://x.gumroad.com/l/n', VITE_SUPPORT_EMAIL: 'support@example.com', VITE_CF_WA_TOKEN: 'abcdef0123456789abcdef0123456789' };
+  const PADDLE = { VITE_PADDLE_CLIENT_TOKEN: 'test_0123456789abcdef0123456789', VITE_PADDLE_ENV: 'sandbox', VITE_PADDLE_PRICE_ID: `pri_${'a1'.repeat(13)}`, VITE_PADDLE_CSP_FRAME: 'https://buy.paddle.com' };
+
+  it('as 3 páginas existem, vêm dos textos Paddle aprovados (sem faixa DRAFT) e o legalGate da variante está vazio', () => {
+    expect(readdirSync(PADDLE_DIR).sort()).toEqual([...NAMES].sort());
+    expect(legalGate(fileURLToPath(new URL('../../docs/legal-en/paddle', import.meta.url)))).toEqual([]);
+    for (const f of NAMES) {
+      const h = readFileSync(PADDLE_DIR + f, 'utf8');
+      const md = readFileSync(new URL(`../../docs/legal-en/paddle/${MD[f]}.md`, import.meta.url), 'utf8');
+      expect(/data-draft="true"/.test(h), f).toBe(isLegalDraft(md));
+      expect(h, f).not.toMatch(/data-draft|TO VALIDATE/);
+      expect(h, f).toMatch(/merchant of record/i); // os textos citam a Paddle
+    }
+  });
+  it('caminhos relativos certos para um nível abaixo (CSS, home) e nenhum script nem recurso externo', () => {
+    for (const f of NAMES) {
+      const h = readFileSync(PADDLE_DIR + f, 'utf8');
+      expect(h, f).toContain('href="../assets/site.css"');
+      expect(h, f).toContain('<a class="logo" href="../">');
+      expect(h, f).not.toMatch(/href="assets\//);
+      expect(h, f).not.toMatch(/<script/i);
+      expect(h, f).not.toMatch(/<(img|link|source|iframe)[^>]+(src|href)="https?:\/\//i);
+      for (const m of h.matchAll(/href="((?:terms|privacy|refund)\.html)"/g)) expect(existsSync(PADDLE_DIR + m[1]), `${f} → ${m[1]}`).toBe(true);
+      expect(existsSync(SITE + 'assets/site.css')).toBe(true);
+    }
+  });
+  it('as páginas Gumroad continuam idênticas ao que o gerador produz (nada mudou nelas)', () => {
+    for (const f of NAMES) {
+      const md = readFileSync(new URL(`../../docs/legal-en/${MD[f]}.md`, import.meta.url), 'utf8');
+      const h = readFileSync(SITE + f, 'utf8');
+      expect(h).toContain('href="assets/site.css"');
+      expect(h).not.toContain('../assets');
+      expect(/data-draft="true"/.test(h)).toBe(isLegalDraft(md));
+    }
+  });
+  it('dist de venda SEM Paddle: as 3 páginas vão para dist/en/paddle sem {{ }}; o rodapé de /en/ NÃO linka a variante Paddle', () => {
+    const d = tmp();
+    mkdirSync(join(d, 'en', 'paddle'), { recursive: true });
+    cpSync(PADDLE_DIR, join(d, 'en', 'paddle'), { recursive: true });
+    cpSync(SITE + 'index.html', join(d, 'en', 'index.html'));
+    expect(injectDist(d, SALE, { sale: true })).toEqual([]);
+    for (const f of NAMES) {
+      const h = readFileSync(join(d, 'en', 'paddle', f), 'utf8');
+      expect(h, f).not.toContain('{{');
+      expect(h, f).toContain('mailto:support@example.com');
+    }
+    const idx = readFileSync(join(d, 'en', 'index.html'), 'utf8');
+    expect(idx).not.toContain('{{');
+    expect(idx).not.toContain('paddle/terms.html');
+    expect(idx).toContain('<a href="refund.html">Refund Policy</a> · <a href="mailto:support@example.com">'); // rodapé como antes
+  });
+  it('dist de venda COM Paddle: o rodapé de /en/ linka as variantes Paddle ao lado das da Gumroad; as páginas Paddle seguem iguais', () => {
+    const d = tmp();
+    mkdirSync(join(d, 'en', 'paddle'), { recursive: true });
+    cpSync(PADDLE_DIR, join(d, 'en', 'paddle'), { recursive: true });
+    cpSync(SITE + 'index.html', join(d, 'en', 'index.html'));
+    expect(injectDist(d, { ...SALE, ...PADDLE }, { sale: true })).toEqual([]);
+    const idx = readFileSync(join(d, 'en', 'index.html'), 'utf8');
+    expect(idx).not.toContain('{{');
+    for (const f of NAMES) expect(idx).toContain(`href="paddle/${f}"`);
+    expect(idx).toContain('<a href="terms.html">Terms of Use</a>'); // as da Gumroad continuam
+    for (const f of NAMES) expect(readFileSync(join(d, 'en', 'paddle', f), 'utf8')).not.toContain('{{');
+  });
+  it('rascunho em /en/paddle/ (data-draft) é achado pelo draftPages e recusa o build de venda; o modo staging-paddle aceita só o da Paddle', () => {
+    const d = tmp();
+    mkdirSync(join(d, 'paddle'));
+    writeFileSync(join(d, 'index.html'), '<body>ok</body>');
+    writeFileSync(join(d, 'paddle', 'terms.html'), '<body data-draft="true">rascunho</body>');
+    expect(draftPages(d)).toEqual(['paddle/terms.html']);
+  });
+});
+
 describe('páginas estáticas EN: sem dependência externa, sem script', () => {
   const files = readdirSync(SITE).filter((f) => f.endsWith('.html'));
   it('existem as 4 páginas', () => {
@@ -82,7 +158,7 @@ describe('páginas estáticas EN: sem dependência externa, sem script', () => {
   }
   it('index: só estes marcadores (analytics, compra, compra Paddle opcional, dias offline e suporte) e título/descrição presentes', () => {
     const h = readFileSync(SITE + 'index.html', 'utf8');
-    expect([...new Set(h.match(/\{\{[A-Z_]+\}\}/g))].sort()).toEqual(['{{CF_WA_SNIPPET}}', '{{GUMROAD_CHECKOUT_URL}}', '{{LICENSE_OFFLINE_DAYS}}', '{{PADDLE_BUY_BUTTON}}', '{{PADDLE_SCRIPTS}}', '{{SUPPORT_EMAIL}}']);
+    expect([...new Set(h.match(/\{\{[A-Z_]+\}\}/g))].sort()).toEqual(['{{CF_WA_SNIPPET}}', '{{GUMROAD_CHECKOUT_URL}}', '{{LICENSE_OFFLINE_DAYS}}', '{{PADDLE_BUY_BUTTON}}', '{{PADDLE_LEGAL_LINKS}}', '{{PADDLE_SCRIPTS}}', '{{SUPPORT_EMAIL}}']);
     expect(h).toContain('From process spreadsheet to improvement plan.');
     expect(h).toContain('href="/entrar?lang=en"');
     expect(h).toMatch(/<meta name="description" content="[^"]{60,}/);

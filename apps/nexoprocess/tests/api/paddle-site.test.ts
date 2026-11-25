@@ -2,7 +2,7 @@
 // Sem Paddle configurada, a landing e os cabeçalhos ficam IDÊNTICOS ao que já era publicado.
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -141,16 +141,21 @@ describe('check-sale-env com Paddle', () => {
     const r = spawnSync(process.execPath, [`${ROOT}scripts/check-sale-env.mjs`], { env, encoding: 'utf8' });
     return { code: r.status, out: `${r.stdout}${r.stderr}` };
   };
-  it('Paddle ausente → nada muda (passa)', () => {
-    expect(run({}, dir('draft')).code).toBe(0);
+  // As páginas /en/paddle/* são publicadas SEMPRE: com ou sem a Paddle ligada, os textos Paddle precisam estar aprovados no build de venda.
+  const SALE_OK = { ...OK, VITE_PADDLE_CSP_FRAME: 'https://buy.paddle.com' };
+  it('Paddle ausente e textos Paddle aprovados → passa; Paddle ausente com textos Paddle em rascunho → RECUSA (as páginas são publicadas sempre)', () => {
+    expect(run({}, dir('approved')).code).toBe(0);
+    const r = run({}, dir('draft'));
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/Texto legal Paddle não aprovado/);
   });
   it('Paddle ligada com textos legais Paddle em rascunho → recusa', () => {
-    const r = run(OK, dir('draft'));
+    const r = run(SALE_OK, dir('draft'));
     expect(r.code).toBe(1);
     expect(r.out).toMatch(/Texto legal Paddle não aprovado/);
   });
   it('Paddle ligada, textos aprovados e origem do checkout → passa; sem VITE_PADDLE_CSP_FRAME → recusa', () => {
-    expect(run(OK, dir('approved')).code).toBe(0);
+    expect(run(SALE_OK, dir('approved')).code).toBe(0);
     const { VITE_PADDLE_CSP_FRAME: _omit, ...noFrame } = OK;
     void _omit;
     const r = run(noFrame, dir('approved'));
@@ -158,17 +163,40 @@ describe('check-sale-env com Paddle', () => {
     expect(r.out).toContain('VITE_PADDLE_CSP_FRAME');
   });
   it('VITE_PADDLE_CSP_STYLE: ausente com Paddle ligada → AVISA sem recusar; presente → sem aviso; inválida → recusa', () => {
-    const warn = run(OK, dir('approved'));
+    const warn = run(SALE_OK, dir('approved'));
     expect(warn.code).toBe(0);
     expect(warn.out).toContain('VITE_PADDLE_CSP_STYLE ausente');
-    const ok = run({ ...OK, VITE_PADDLE_CSP_STYLE: 'https://sandbox-cdn.paddle.com' }, dir('approved'));
+    const ok = run({ ...SALE_OK, VITE_PADDLE_CSP_STYLE: 'https://sandbox-cdn.paddle.com' }, dir('approved'));
     expect(ok.code).toBe(0);
     expect(ok.out).not.toContain('CSP_STYLE ausente');
-    const bad = run({ ...OK, VITE_PADDLE_CSP_STYLE: 'https://*.paddle.com' }, dir('approved'));
+    const bad = run({ ...SALE_OK, VITE_PADDLE_CSP_STYLE: 'https://*.paddle.com' }, dir('approved'));
     expect(bad.code).toBe(1);
     expect(bad.out).toContain('VITE_PADDLE_CSP_STYLE');
     // sem Paddle ligada o aviso não aparece
     expect(run({}, dir('approved')).out).not.toContain('CSP_STYLE');
+  });
+  it('(2) origens do CSP do LIVE: candidatas explícitas da família paddle.com passam COM aviso de "candidatas"; outro host recusa; NEXO_PADDLE_CSP_ANY_HOST=1 libera; nada vem de padrão no código', () => {
+    const live = { ...SALE_OK, VITE_PADDLE_CSP_CONNECT: 'https://cdn.paddle.com', VITE_PADDLE_CSP_STYLE: 'https://cdn.paddle.com' };
+    const ok = run(live, dir('approved'));
+    expect(ok.code).toBe(0);
+    expect(ok.out).toMatch(/CANDIDATAS/);
+    expect(ok.out).toContain('VITE_PADDLE_CSP_FRAME=https://buy.paddle.com');
+    expect(ok.out).toMatch(/ANTES de divulgar/);
+    // sem FRAME: recusa e a mensagem manda informar a candidata e conferir no console do checkout live
+    const { VITE_PADDLE_CSP_FRAME: _omit, ...noFrame } = SALE_OK;
+    void _omit;
+    const none = run(noFrame, dir('approved'));
+    expect(none.code).toBe(1);
+    expect(none.out).toMatch(/CANDIDATA explícita/);
+    // host fora de paddle.com
+    for (const bad of ['https://checkout.example.test', 'https://paddle.com.evil.test', 'https://notpaddle.com']) {
+      const r = run({ ...SALE_OK, VITE_PADDLE_CSP_FRAME: bad }, dir('approved'));
+      expect(r.code, bad).toBe(1);
+      expect(r.out, bad).toContain('fora de paddle.com');
+    }
+    expect(run({ ...SALE_OK, VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test', NEXO_PADDLE_CSP_ANY_HOST: '1' }, dir('approved')).code).toBe(0);
+    // curinga continua proibido, mesmo na família paddle.com
+    expect(run({ ...SALE_OK, VITE_PADDLE_CSP_FRAME: 'https://*.paddle.com' }, dir('approved')).code).toBe(1);
   });
   it('Paddle parcial → recusa', () => {
     const r = run({ VITE_PADDLE_CLIENT_TOKEN: OK.VITE_PADDLE_CLIENT_TOKEN }, dir('approved'));
@@ -218,6 +246,16 @@ describe('modo staging-paddle (check-sale-env --staging-paddle e nexo:build:stag
     expect(staging({ ...SANDBOX, VITE_PADDLE_CSP_FRAME: 'https://checkout.example.test' }).out).not.toContain('CSP_FRAME ausente');
     expect(r.out).toContain('VITE_PADDLE_CSP_STYLE ausente');
     expect(staging({ ...SANDBOX, VITE_PADDLE_CSP_STYLE: 'https://sandbox-cdn.paddle.com' }).out).not.toContain('CSP_STYLE ausente');
+  });
+  it('rascunho em public/en/paddle/ (data-draft): o build de venda RECUSA; o staging-paddle (sandbox + test_) aceita', () => {
+    const site = mkdtempSync(join(tmpdir(), 'site-draft-paddle-'));
+    mkdirSync(join(site, 'paddle'));
+    writeFileSync(join(site, 'index.html'), '<body>ok</body>');
+    writeFileSync(join(site, 'paddle', 'terms.html'), '<body data-draft="true">rascunho</body>');
+    const sale = run('check-sale-env.mjs', [], { NEXO_EN_SITE_DIR: site }, legal('approved'));
+    expect(sale.code).toBe(1);
+    expect(sale.out).toContain('paddle/terms.html');
+    expect(run('check-sale-env.mjs', ['--staging-paddle'], { ...SANDBOX, NEXO_EN_SITE_DIR: site }, legal('approved')).code).toBe(0);
   });
   it('NEXO_EXPECTED_KEY_FP também vale no modo staging-paddle: diferente → recusa; igual → passa', async () => {
     const { jwkFingerprint } = await import('../../src/license/jwk.mjs');

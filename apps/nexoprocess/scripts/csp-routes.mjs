@@ -85,7 +85,7 @@ try {
   const negReports = violations.splice(beforeNeg); // violações geradas por este controle são esperadas
   if (!appBeaconBlocked || negReports.length === 0) violations.push('a CSP do app NÃO bloqueou/registrou o beacon do Cloudflare Web Analytics');
   else console.log(`Controle negativo: o app bloqueou o beacon (${negReports.length} violação esperada)`);
-  const enPages = ['/en/', '/en/terms.html', '/en/privacy.html', '/en/refund.html'];
+  const enPages = ['/en/', '/en/terms.html', '/en/privacy.html', '/en/refund.html', '/en/paddle/terms.html', '/en/paddle/privacy.html', '/en/paddle/refund.html'];
   let beaconPages = 0;
   for (const r of enPages) {
     await page.goto(server.base + r);

@@ -68,7 +68,8 @@ for (const name of ['VITE_GUMROAD_CHECKOUT_URL', 'VITE_EN_TERMS_URL', 'VITE_EN_P
 }
 // Páginas estáticas EN com faixa DRAFT (termos/privacidade/reembolso ainda com "TO VALIDATE"): não publicar.
 const siteDir = process.env.NEXO_EN_SITE_DIR || fileURLToPath(new URL('../public/en', import.meta.url));
-const drafts = draftPages(siteDir);
+// No modo --staging-paddle (sandbox + test_) os rascunhos Paddle (public/en/paddle/) são aceitos, como os textos em docs/legal-en/paddle.
+const drafts = draftPages(siteDir).filter((f) => !(process.argv.includes('--staging-paddle') && f.startsWith('paddle/')));
 if (drafts.length) errors.push(`Páginas EN ainda em rascunho (faixa DRAFT): ${drafts.join(', ')}. Resolva os "TO VALIDATE" em docs/legal-en/*.md e rode npm run nexo:site:en.`);
 // Aprovação jurídica explícita: cada docs/legal-en/*.md precisa de "status: approved" e não pode ter "TO VALIDATE"/"DRAFT".
 const legalDir = process.env.NEXO_LEGAL_DIR || fileURLToPath(new URL('../docs/legal-en', import.meta.url));
@@ -93,8 +94,18 @@ errors.push(...legalGate(legalDir).map((p) => `Texto legal EN não aprovado: ${p
       if (!pc.style.length) console.warn('AVISO: VITE_PADDLE_CSP_STYLE ausente: a folha de estilo que a Paddle.js injeta será bloqueada pelo CSP de /en/ (style-src) até você informar a origem (§14.5).');
     }
   } else if (pc.enabled) {
-    if (!pc.frame.length) errors.push('VITE_PADDLE_CSP_FRAME ausente (origem do checkout da Paddle; descubra no sandbox, PADDLE_ENTITLEMENT.md, checklist).');
+    if (!pc.frame.length) errors.push('VITE_PADDLE_CSP_FRAME ausente (origem do checkout da Paddle; informe a CANDIDATA explícita, ex. https://buy.paddle.com, e confirme no console do checkout LIVE antes de divulgar: PADDLE_ENTITLEMENT.md §14.9 passo 7).');
+    // Origens do CSP vêm do OPERADOR (nunca de um padrão no código) e, no build de venda, só da família paddle.com (host literal, sem curinga).
+    // Outro host exige o aviso explícito NEXO_PADDLE_CSP_ANY_HOST=1 (só quando o console do checkout live mostrar outro host).
+    const all = { VITE_PADDLE_CSP_FRAME: pc.frame, VITE_PADDLE_CSP_CONNECT: pc.connect, VITE_PADDLE_CSP_STYLE: pc.style };
+    const outside = Object.entries(all).flatMap(([n, l]) => l.filter((o) => !/^https:\/\/([a-z0-9-]+\.)*paddle\.com(:\d{1,5})?$/.test(o)).map((o) => `${n}: ${o}`));
+    if (outside.length && process.env.NEXO_PADDLE_CSP_ANY_HOST !== '1') errors.push(`Origem de CSP fora de paddle.com no build de venda (${outside.join('; ')}). Confira no console do checkout live; se for mesmo necessário, defina NEXO_PADDLE_CSP_ANY_HOST=1.`);
+    const shown = Object.entries(all).filter(([, l]) => l.length).map(([n, l]) => `${n}=${l.join(',')}`);
+    if (shown.length) console.warn(`AVISO: origens de CSP da Paddle deste build (${shown.join(' ')}) são CANDIDATAS informadas por você, não verificadas. Depois do deploy, abra o checkout LIVE com o console do Chrome aberto; se houver "Refused to…", ajuste as variáveis e republique ANTES de divulgar (PADDLE_ENTITLEMENT.md §14.9 passo 7).`);
     if (!pc.style.length) console.warn('AVISO: VITE_PADDLE_CSP_STYLE ausente: a folha de estilo que a Paddle.js injeta será bloqueada pelo CSP de /en/ (style-src); confira no console do navegador com a conta live (§14.5).');
+  }
+  // As páginas /en/paddle/{terms,privacy,refund} são publicadas SEMPRE (com ou sem a Paddle ligada): os textos Paddle têm de estar aprovados em todo build de venda.
+  if (!staging) {
     const paddleLegal = process.env.NEXO_LEGAL_PADDLE_DIR || fileURLToPath(new URL('../docs/legal-en/paddle', import.meta.url));
     errors.push(...legalGate(paddleLegal).map((p) => `Texto legal Paddle não aprovado: ${p}`));
   }

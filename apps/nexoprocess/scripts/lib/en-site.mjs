@@ -26,6 +26,7 @@ const CF_TOKEN_RE = /^[A-Za-z0-9]{16,64}$/;
 export const PADDLE_SCRIPT = 'https://cdn.paddle.com/paddle/v2/paddle.js';
 export const PADDLE_BUTTON_MARKER = '{{PADDLE_BUY_BUTTON}}';
 export const PADDLE_SCRIPTS_MARKER = '{{PADDLE_SCRIPTS}}';
+export const PADDLE_LEGAL_LINKS_MARKER = '{{PADDLE_LEGAL_LINKS}}';
 const PADDLE_NAMES = ['VITE_PADDLE_CLIENT_TOKEN', 'VITE_PADDLE_ENV', 'VITE_PADDLE_PRICE_ID'];
 const ORIGIN_RE = /^https:\/\/[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/;
 
@@ -67,6 +68,10 @@ const attr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</
 /** Botão e scripts (sem JavaScript inline: o CSP de /en/ não libera 'unsafe-inline' em script-src). */
 export function paddleButtonHtml(cfg) {
   return cfg.enabled ? ' <a class="btn" href="/entrar?lang=en" data-paddle-buy>Buy with Paddle</a>' : '';
+}
+/** Rodapé de /en/: com a Paddle ligada, linka as variantes Paddle (publicadas sempre em /en/paddle/) ao lado das da Gumroad. */
+export function paddleLegalLinksHtml(cfg) {
+  return cfg.enabled ? ' · <a href="paddle/terms.html">Terms of Use (Paddle)</a> · <a href="paddle/privacy.html">Privacy Policy (Paddle)</a> · <a href="paddle/refund.html">Refund Policy (Paddle)</a>' : '';
 }
 export function paddleScriptsHtml(cfg) {
   return cfg.enabled
@@ -147,10 +152,10 @@ export function injectHtml(html, env, { sale, file = 'html' }) {
     const tag = token && CF_TOKEN_RE.test(token) ? `<script type="module" src="${CF_BEACON.script}" data-cf-beacon='{"token": "${token}"}'></script>` : '';
     out = out.split(CF_SNIPPET_MARKER).join(tag);
   }
-  if (out.includes(PADDLE_BUTTON_MARKER) || out.includes(PADDLE_SCRIPTS_MARKER)) {
+  if (out.includes(PADDLE_BUTTON_MARKER) || out.includes(PADDLE_SCRIPTS_MARKER) || out.includes(PADDLE_LEGAL_LINKS_MARKER)) {
     const cfg = paddleConfig(env);
     if (sale && cfg.partial) errors.push(...cfg.problems.map((p) => `${file}: ${p}`));
-    out = out.split(PADDLE_BUTTON_MARKER).join(paddleButtonHtml(cfg)).split(PADDLE_SCRIPTS_MARKER).join(paddleScriptsHtml(cfg));
+    out = out.split(PADDLE_BUTTON_MARKER).join(paddleButtonHtml(cfg)).split(PADDLE_SCRIPTS_MARKER).join(paddleScriptsHtml(cfg)).split(PADDLE_LEGAL_LINKS_MARKER).join(paddleLegalLinksHtml(cfg));
   }
   for (const [marker, name] of Object.entries(MARKERS)) {
     if (!out.includes(marker)) continue;
@@ -180,11 +185,16 @@ export function injectDist(distDir, env, { sale }) {
     const lf = n === '_headers' && pcfg.enabled ? patchHeaders(text, pcfg) : toLf(text);
     if (lf !== text) writeFileSync(p, lf);
   }
-  for (const f of readdirSync(dir).filter((x) => x.endsWith('.html'))) {
-    const p = join(dir, f);
-    const r = injectHtml(toLf(readFileSync(p, 'utf8')), env, { sale, file: `en/${f}` });
-    errors.push(...r.errors);
-    if (!r.errors.length || !sale) writeFileSync(p, r.html);
+  // /en/*.html e /en/paddle/*.html (variante Paddle dos textos legais, publicada sempre).
+  for (const sub of ['', 'paddle']) {
+    const d = sub ? join(dir, sub) : dir;
+    if (!existsSync(d)) continue;
+    for (const f of readdirSync(d).filter((x) => x.endsWith('.html'))) {
+      const p = join(d, f);
+      const r = injectHtml(toLf(readFileSync(p, 'utf8')), env, { sale, file: `en/${sub ? `${sub}/` : ''}${f}` });
+      errors.push(...r.errors);
+      if (!r.errors.length || !sale) writeFileSync(p, r.html);
+    }
   }
   if (sale && errors.length) throw new Error(`Páginas EN não podem ser publicadas:\n- ${errors.join('\n- ')}`);
   return errors;
@@ -193,9 +203,15 @@ export function injectDist(distDir, env, { sale }) {
 /** Páginas com faixa de rascunho (data-draft="true"). */
 export function draftPages(siteDir) {
   if (!existsSync(siteDir)) return [];
-  return readdirSync(siteDir)
-    .filter((f) => f.endsWith('.html'))
-    .filter((f) => /data-draft="true"/.test(readFileSync(join(siteDir, f), 'utf8')));
+  const scan = (sub) => {
+    const d = sub ? join(siteDir, sub) : siteDir;
+    if (!existsSync(d)) return [];
+    return readdirSync(d)
+      .filter((f) => f.endsWith('.html'))
+      .filter((f) => /data-draft="true"/.test(readFileSync(join(d, f), 'utf8')))
+      .map((f) => (sub ? `${sub}/${f}` : f));
+  };
+  return [...scan(''), ...scan('paddle')];
 }
 
 export const LEGAL_FILES = ['TERMS_EN.md', 'PRIVACY_EN.md', 'REFUND_EN.md'];

@@ -9,6 +9,8 @@ export const LEGAL_FILES: string[];
 export function parseLegal(md: string): { status: string; body: string };
 export function isLegalDraft(md: string): boolean;
 export function legalGate(dir: string): string[];
+export const PADDLE_LEGAL_LINKS_MARKER: string;
+export function paddleLegalLinksHtml(cfg: PaddleConfig): string;
 export function toLf(text: string): string;
 export function deployFilesProblems(headers: string | undefined, redirects: string | undefined): string[];
 export function assertDeployFiles(distDir: string): void;

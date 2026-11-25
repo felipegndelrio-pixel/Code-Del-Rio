@@ -398,12 +398,73 @@ select platform, transaction_id, email, status, access_active, amount, currency,
 - [ ] 4. **Token de cliente `live_…`** (client-side token da conta live).
 - [ ] 5. **Destino de notificação live** apontando para `https://<domínio de produção>/api/paddle-webhook`, com os 3 eventos (`transaction.completed`, `adjustment.created`, `adjustment.updated`) e **`traffic_source` = Platform only**; guarde o segredo do destino.
 - [ ] 6. **Variáveis do servidor (Production)**: `PADDLE_ENV=production`, `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRODUCT_ID` (o do passo 2; ver lição 2), mais as já existentes. Conferir que **todas são da mesma conta live**.
-- [ ] 7. **Origens de CSP do LIVE descobertas pelo console** (§14.5) com o checkout live: `VITE_PADDLE_CSP_FRAME`, `VITE_PADDLE_CSP_CONNECT`, `VITE_PADDLE_CSP_STYLE`. Não copiar as do sandbox.
-- [ ] 8. **Build de venda com Paddle** (`npm run nexo:build:venda`, não o de staging): `VITE_PADDLE_CLIENT_TOKEN=live_…`, `VITE_PADDLE_ENV=production`, `VITE_PADDLE_PRICE_ID`, as três de CSP, `VITE_HOTMART_CHECKOUT_URL=https://pay.hotmart.com/<código>`; textos legais da Paddle em `approved`; clone limpo no commit/tag da rc3.
+- [ ] 7. **Origens de CSP do LIVE: candidatas → deploy → console → ajuste, ANTES de divulgar** (§14.9a). O build de venda **exige** `VITE_PADDLE_CSP_FRAME` (candidata informada por você) e só aceita origens da família `paddle.com`; `CONNECT`/`STYLE` são opcionais. Não copiar as do sandbox. Item só fecha com o console do Chrome do checkout live **sem** violações.
+- [ ] 8. **Build de venda com Paddle** (`npm run nexo:build:venda`, não o de staging): `VITE_PADDLE_CLIENT_TOKEN=live_…`, `VITE_PADDLE_ENV=production`, `VITE_PADDLE_PRICE_ID`, as origens de CSP candidatas do item 7, `VITE_HOTMART_CHECKOUT_URL=https://pay.hotmart.com/<código>`; textos legais da Paddle em `approved`; clone limpo no commit/tag da rc3.
 - [ ] 9. **Schema no banco de produção** (§14.6 item 0, com `OPERACAO_EN.md` §7.1 antes e depois).
 - [ ] 10. **Deploy** e, logo depois, **`npm run nexo:check-deploy -- https://<domínio>`** terminando em `OK` (`LANCAMENTO_EN.md` §4.3).
 - [ ] 11. **Compra real do próprio fundador + reembolso** (§14.6 item 4): entrou no app (não só HTTP 200), a compra aparece em P-A, o reembolso revoga no próximo check; `OPERACAO_EN.md` P-F **sem** linhas inesperadas.
 - [ ] 12. **Reversão pronta** (§14.6 item 5) e ninguém mais usando o sandbox no domínio de produção.
+
+### 14.9a CSP do checkout LIVE sem "ovo e galinha" (candidatas → deploy → console → ajuste, ANTES de divulgar)
+**Problema:** no sandbox, o 1º build ia sem origens e o console mostrava o que faltava (§14.5). No live o build de venda **não aceita** `VITE_PADDLE_*` sem `VITE_PADDLE_CSP_FRAME` (senão o checkout abriria bloqueado em produção), e a doc oficial consultada não lista os hosts (§14.5). **Caminho mais curto e seguro:** você informa **candidatas explícitas**; o build as aceita só se forem `https://<host>.paddle.com` (família `paddle.com`, até 6 por variável, sem `*`, sem caminho); o console do checkout live confirma ou corrige; só então se divulga.
+1. **Candidatas (quem informa é o operador; nenhum valor padrão vem de memória do desenvolvimento).** `VITE_PADDLE_CSP_FRAME` (obrigatória no build de venda): o host do iframe do checkout live. Candidata de partida a **VALIDAR**: `https://buy.paddle.com` (por analogia com o `sandbox-buy.paddle.com` visto no sandbox; **INFERÊNCIA, não fato**). `VITE_PADDLE_CSP_CONNECT` e `VITE_PADDLE_CSP_STYLE`: deixe vazias no 1º build do live, ou use candidatas só se você já as viu em outra fonte. Origem fora de `*.paddle.com` é **recusada** pelo build; só `NEXO_PADDLE_CSP_ANY_HOST=1` (decisão consciente, registre o motivo) libera outro host.
+2. **Build de venda** com as candidatas (§14.9b) → **deploy** → `nexo:check-deploy` em `OK`. O build imprime o aviso "origens de CSP da Paddle deste build são CANDIDATAS: confirme no console do checkout live ANTES de divulgar".
+3. **Console do Chrome no checkout live** (com o site recém-publicado, ainda **sem divulgar**): F12 > Console, abra `/en/`, clique em **Buy with Paddle** e repita até o checkout carregar por inteiro (a tela de pagamento abre sem erro). Cada `Refused to frame/connect/apply inline style` traz a origem que faltou; copie **só a origem**. Se a origem pedida **não** for de `paddle.com`, pare e chame o revisor (não use `NEXO_PADDLE_CSP_ANY_HOST` sem decisão).
+4. **Se houve violação: ajuste e REPUBLIQUE antes de divulgar** (novo build de venda com as origens corrigidas, deploy, `nexo:check-deploy`, e o passo 3 de novo). **Só anuncie o canal Paddle com o console limpo.** Registre as origens finais (públicas) no item 14 da tabela de §14.7.
+5. **Sem Paddle (sem `VITE_PADDLE_*`)** nada disso se aplica e o CSP de `/en/*` fica como hoje.
+
+### 14.9b Roteiro no PC: build de venda com Paddle LIVE (PowerShell, processo filho limpo)
+**Por que um filho limpo ("padrão D-E"):** o build herda tudo do ambiente. Variáveis `VITE_*`/`NEXO_*` esquecidas na janela (de um staging, de outra chave) entram no build sem aviso. O filho abaixo **apaga** as `VITE_*` e `NEXO_*` herdadas e só depois recebe as suas. **A VALIDAR no Windows:** estes comandos **não** foram executados pelo desenvolvimento (container Linux).
+```powershell
+# 0) Janela filha LIMPA (abre outra janela do PowerShell sem perfil; as variáveis herdadas VITE_* e NEXO_* são removidas ali)
+powershell.exe -NoProfile -NoExit -Command 'Get-ChildItem Env: | Where-Object { $_.Name -match ''^(VITE|NEXO)_'' } | ForEach-Object { Remove-Item -Path (''Env:'' + $_.Name) }; Write-Host (''Variaveis VITE_/NEXO_ restantes: '' + @(Get-ChildItem Env: | Where-Object { $_.Name -match ''^(VITE|NEXO)_'' }).Count + '' (tem de ser 0)'')'
+# >>> Os passos 1 a 5 abaixo rodam NESSA janela nova. Se o contador não for 0, FECHE a janela e refaça o passo 0.
+
+# 1) Clone limpo no commit/tag da rc3 (ou no commit informado pelo revisor)
+cd $env:USERPROFILE
+git clone https://github.com/felipegndelrio-pixel/Code-Del-Rio.git nexo-paddle-live
+cd nexo-paddle-live
+$SHA = Read-Host 'SHA do commit (informado pelo revisor)'
+git checkout $SHA
+git status --short          # tem de ficar vazio
+git rev-parse HEAD          # tem de ser igual ao SHA informado
+
+# 2) Variáveis do build de venda COM Paddle LIVE (digitadas na própria janela; nada vai para arquivo)
+$env:VITE_LICENSE_PUBLIC_JWK       = Read-Host 'VITE_LICENSE_PUBLIC_JWK (linha PUBLICA da chave de PRODUCAO)'
+$env:NEXO_EXPECTED_KEY_FP          = '96ae5bc6'
+$env:VITE_HOTMART_CHECKOUT_URL     = Read-Host 'VITE_HOTMART_CHECKOUT_URL (https://pay.hotmart.com/CODIGO)'
+$env:VITE_SUPPORT_EMAIL            = Read-Host 'VITE_SUPPORT_EMAIL'
+$env:VITE_GUMROAD_CHECKOUT_URL     = Read-Host 'VITE_GUMROAD_CHECKOUT_URL'
+$env:VITE_EN_TERMS_URL             = Read-Host 'VITE_EN_TERMS_URL'
+$env:VITE_EN_PRIVACY_URL           = Read-Host 'VITE_EN_PRIVACY_URL'
+$env:VITE_EN_REFUND_URL            = Read-Host 'VITE_EN_REFUND_URL'
+$env:VITE_CF_WA_TOKEN              = Read-Host 'VITE_CF_WA_TOKEN'
+$env:VITE_PADDLE_ENV               = 'production'
+$env:VITE_PADDLE_CLIENT_TOKEN      = Read-Host 'VITE_PADDLE_CLIENT_TOKEN (comeca com live_)'
+$env:VITE_PADDLE_PRICE_ID          = Read-Host 'VITE_PADDLE_PRICE_ID (pri_... da conta LIVE)'
+$env:VITE_PADDLE_CSP_FRAME         = Read-Host 'VITE_PADDLE_CSP_FRAME (candidata, ex.: https://buy.paddle.com; ver 14.9a)'
+# CONNECT e STYLE: só se você tiver candidatas; senão NAO defina (nada de variável vazia herdada).
+# $env:VITE_PADDLE_CSP_CONNECT     = Read-Host 'VITE_PADDLE_CSP_CONNECT (opcional)'
+# $env:VITE_PADDLE_CSP_STYLE       = Read-Host 'VITE_PADDLE_CSP_STYLE (opcional)'
+
+# 3) Conferir o que o filho vai usar (só nomes; os valores são públicos, mas não precisam aparecer)
+Get-ChildItem Env: | Where-Object { $_.Name -match '^(VITE|NEXO)_' } | Select-Object -ExpandProperty Name | Sort-Object
+
+# 4) Build de venda (roda o check-sale-env; recusa o que estiver fora das regras) e orçamento do bundle
+npm ci
+npm run nexo:build:venda
+npm run nexo:check-bundle
+
+# 5) Deploy (produção), com o SHA e a árvore limpa, e logo depois o check-deploy
+$GIT_COMMIT = git rev-parse HEAD
+cd apps/nexoprocess
+npx wrangler pages deploy dist --project-name nexoprocess --branch main --commit-hash $GIT_COMMIT --commit-dirty=false
+cd ..\..
+npm run nexo:check-deploy -- https://<domínio de produção>
+```
+- `NEXO_EXPECTED_KEY_FP=96ae5bc6` é a impressão digital do par do **servidor de produção** informada pelo fundador (FATO do usuário); confirme com `GET https://<domínio>/api/license-key-fingerprint` (§4.3) e **não** a tire da mesma fonte da chave pública. Se a pública do build tiver outra impressão digital, o build é **recusado** (§4.6).
+- Depois do deploy: **não divulgue** ainda; faça o passo 3 de §14.9a (console do checkout live). As páginas `/en/paddle/{terms,privacy,refund}.html` já saem no build (aparecem ligadas no rodapé de `/en/` só com `VITE_PADDLE_*`); abra as três no navegador e confira o texto.
+- **Reversão:** §14.6 item 5.
 
 ### 14.7 O que registrar (sem segredos)
 Data, ambiente (sandbox/live), commit do build (`VITE_BUILD_ID`), resultado de cada linha, onde o `txn_…` aparece (item 11), a tolerância usada (item 12) e as origens de CSP encontradas (item 14, são públicas). Anexar prints sem dados pessoais.
