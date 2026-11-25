@@ -9,16 +9,37 @@ const R = '/home/user/Code-Del-Rio', F = `${R}/marketing/campanha-espera`, A = `
 const Q = process.argv[2] === '4x5', TESTS = Q ? process.argv[3] : process.argv[2];
 const W = 1080, H = Q ? 1350 : 1920, T = 25.2, FPS = 30, u = W / 100;
 const Y = (v, q) => (Q ? q : v), S = Q ? 0.8 : 1;   // S: escala de texto no 4:5
-const CTAK = process.env.CTA || 'ig', CTA = { ig: 'Conheça · link na bio', yt: 'Conheça · link no canal', li: 'Conheça o NexoProcess' }[CTAK];
-const SUF = (Q ? '_4x5' : '') + (CTAK === 'ig' ? '' : '_' + CTAK);
+const CTAK = process.env.CTA || 'ig', EN = (process.env.NX_LANG || 'pt') === 'en';
+// textos por idioma (EN = termos da interface em inglês do app: AS-IS map, bottleneck, rework, action plan)
+const X = EN ? {
+  tag: 'Fictional sample · calculated in NexoProcess', s1a: 'This order spent', s1b: 'waiting.', s2a: 'And only', s2c: 'being worked on.',
+  q3: 'Where does it<br><a>get stuck?</a>', q3b: 'NexoProcess<br><t>shows you.</t>', ba: '11 h · waiting', bt: '2 h 15 min · work',
+  t4: 'The map shows<br>where it <a>stalls.</a>', k4: 'Bottlenecks and rework flagged in the flow, with the reason.',
+  t6: 'Then, <t>action.</t>', k6: 'With the problem, an owner and a due date.', q7a: 'Sometimes the problem<br>isn’t the work.', q7Px: 80, esp: 'It’s the wait.', espPx: 132,
+  k8: 'Find where<br>your process <a>waits.</a>', cta: { ig: 'Get it on Gumroad', yt: 'Get it on Gumroad', li: 'Get it on Gumroad' },
+  sub: { ig: 'Link in bio', yt: 'Link on the channel page', li: 'Link in the first comment' }, f8: 'Real app screens · fictional data',
+} : {
+  tag: 'Exemplo fictício · calculado no NexoProcess', s1a: 'Este pedido ficou', s1b: 'parado.', s2a: 'E só', s2c: 'sendo trabalhado.',
+  q3: 'Onde ele fica<br><a>parado?</a>', q3b: 'O NexoProcess<br><t>mostra.</t>', ba: '11 h · espera', bt: '2 h 15 min · trabalho',
+  t4: 'O mapa mostra<br>onde ele <a>trava.</a>', k4: 'Gargalo e retrabalho destacados no fluxo, com o motivo.',
+  t6: 'E vira <t>ação.</t>', k6: 'Com problema, responsável e prazo.', q7a: 'Às vezes, o problema<br>não é o trabalho.', q7Px: 92, esp: 'É a espera.', espPx: 172,
+  k8: 'Descubra onde<br>o seu processo <a>espera.</a>', cta: { ig: 'Conheça · link na bio', yt: 'Conheça · link no canal', li: 'Conheça o NexoProcess' },
+  sub: { ig: 'Também em inglês, na Gumroad.', yt: 'Também em inglês, na Gumroad.', li: 'Também em inglês, na Gumroad.' }, f8: 'Telas reais do app · dados fictícios',
+};
+const CTA = X.cta[CTAK], SUB = X.sub[CTAK];
+const SUF = (EN ? '_en' : '') + (Q ? '_4x5' : '') + (CTAK === 'ig' ? '' : '_' + CTAK);
 const FD = `${R}/node_modules/@fontsource`;
 const ff = (dir, w) => ['latin', 'latin-ext'].map((s) => `@font-face{font-family:Plex;font-weight:${w};src:url(file://${FD}/${dir}/files/${dir}-${s}-${w}-normal.woff2) format('woff2');}`).join('');
 const Wd = (h) => { let em = ''; return h.replace(/<(a|t)>|<\/(a|t)>|<br>|[^\s<]+/g, (m) => { if (m === '<a>') { em = 'a'; return ''; } if (m === '<t>') { em = 't'; return ''; } if (m === '</a>' || m === '</t>') { em = ''; return ''; } if (m === '<br>') return m; return `<span class="w${em ? ' ' + em : ''}">${m}</span>`; }); };
 const img = (n) => `file://${A}/${n}`;
 const BAND = Y(640, 380), BH = 608;            // faixa de cinema com o clipe (largura total)
-const SRC = { map: { f: 'telas-4k/03b-mapa-macro-recorte.png', w: 2850, h: 1470 }, plan: { f: 'capturas-v2/plano-m.png', w: 1464, h: 1734 } };
+const SRC = EN ? { map: { f: 'telas-en/en_map_canvas.png', w: 3330, h: 1920 }, plan: { f: 'telas-en/en_plan_card.png', w: 1400, h: 1670 } }
+  : { map: { f: 'telas-4k/03b-mapa-macro-recorte.png', w: 2850, h: 1470 }, plan: { f: 'capturas-v2/plano-m.png', w: 1464, h: 1734 } };
+// vistas da câmera [x, y, largura] na captura: mapa (início → fim) e plano (largura, deslocamento final)
+const CV = EN ? { m0: [420, 330, 2000], m1: [1030, 480, 1240], pw: 1400, py: 380 } : { m0: [360, 300, 1660], m1: [860, 300, 1150], pw: 1464, py: 380 };
 const PANEL = { map: [60, Y(580, 330), 960, 600], plan: [60, Y(560, 250), 960, 700] };
-const HL = { map: [[958, 438, 158, 48, 'a'], [1490, 438, 164, 48, 'a'], [1650, 438, 204, 48, 'a2']], plan: [[52, 528, 1360, 268, 'a']] };
+const HL = EN ? { map: [[1110, 620, 220, 48, 'a'], [1726, 620, 221, 48, 'a'], [1960, 620, 163, 48, 'a2']], plan: [[51, 465, 1298, 277, 'a']] }
+  : { map: [[958, 438, 158, 48, 'a'], [1490, 438, 164, 48, 'a'], [1650, 438, 204, 48, 'a2']], plan: [[52, 528, 1360, 268, 'a']] };
 const panel = (k) => { const s = SRC[k]; return `<div class="pan" id="p_${k}"><div class="cam" id="c_${k}" style="width:${s.w}px;height:${s.h}px"><img src="${img(s.f)}"></div>${HL[k].map((h, i) => `<div class="hl ${h[4]}" id="h_${k}${i}"></div>`).join('')}</div>`; };
 const fs_ = (x) => `font-size:${(x * S).toFixed(1)}px`;
 const TOP = Y(262, 92);
@@ -51,7 +72,7 @@ body{--u:${u}px;font-family:Plex,sans-serif;color:#eef3fb;position:relative}
 .hl{position:absolute;border-radius:12px;opacity:0;pointer-events:none;border:4px solid #f5b84a;box-shadow:0 0 28px rgba(245,184,74,.75)}
 .ttl{position:absolute;left:72px;right:120px;top:${Y(300, 80)}px;font-weight:700;font-size:calc(var(--u)*8.4);letter-spacing:-.035em;line-height:1.04}
 .cal{position:absolute;left:72px;right:150px;font-size:calc(var(--u)*4.7);line-height:1.25;font-weight:600;color:#dbe4f1}
-#esp{position:absolute;left:0;right:0;top:${BAND + BH / 2 - 95 * S}px;text-align:center;${fs_(172)};font-weight:700;letter-spacing:-.05em;color:#f5b84a;text-shadow:0 10px 60px rgba(0,0,0,.9),0 0 50px rgba(245,184,74,.25)}
+#esp{position:absolute;left:0;right:0;top:${BAND + BH / 2 - X.espPx * 0.55 * S}px;text-align:center;${fs_(X.espPx)};font-weight:700;letter-spacing:-.05em;color:#f5b84a;text-shadow:0 10px 60px rgba(0,0,0,.9),0 0 50px rgba(245,184,74,.25)}
 .lock{position:absolute;left:72px;top:${Y(600, 300)}px;display:flex;align-items:center;gap:30px;font-weight:700;font-size:calc(var(--u)*11);letter-spacing:-.035em}
 .lock svg{width:calc(var(--u)*15);height:auto;overflow:visible}
 .pill{position:absolute;left:72px;top:${Y(1120, 820)}px;background:#3fd0de;color:#02161b;font-weight:700;font-size:calc(var(--u)*4.6);border-radius:99px;padding:22px 52px;opacity:0}
@@ -60,26 +81,27 @@ body{--u:${u}px;font-family:Plex,sans-serif;color:#eef3fb;position:relative}
 #flash{background:radial-gradient(ellipse at 50% 45%,rgba(191,246,251,.42),rgba(64,200,214,0) 65%);opacity:0;pointer-events:none}
 </style></head><body>
 <div id="bg"></div><img id="cb"><div id="band"><img id="cf"><div id="scrim"></div></div>
-<div class="lab" id="tag" style="top:${Y(206, 40)}px">Exemplo fictício · calculado no NexoProcess</div>
-<div class="sc" id="s1"><div class="blk" id="b1"><div class="h" style="${fs_(69)}">Este pedido ficou</div>
-  <div class="h" style="margin-top:6px;white-space:nowrap"><span class="a" style="${fs_(220)};letter-spacing:-.05em;line-height:.92">11 h</span><span style="${fs_(100)};margin-left:.32em">parado.</span></div></div></div>
-<div class="sc" id="s2"><div class="blk" id="b2"><div class="h" style="${fs_(69)}">${Wd('E só')}</div><div class="h t" style="${fs_(150)};letter-spacing:-.045em;margin:6px 0 4px">${Wd('2 h 15 min')}</div><div class="h" style="${fs_(84)}">${Wd('sendo trabalhado.')}</div></div></div>
-<div class="sc" id="s3"><div class="blk"><div class="h" id="q3" style="${fs_(112)}">${Wd('Onde ele fica<br><a>parado?</a>')}</div></div></div>
-<div class="sc" id="s3b"><div class="blk"><div class="h" id="q3b" style="${fs_(100)}">${Wd('O NexoProcess<br><t>mostra.</t>')}</div></div></div>
-<div id="bars"><div class="bar" id="ba"><b>11 h · espera</b><i id="fa"></i></div><div class="bar" id="bt"><b>2 h 15 min · trabalho</b><i id="ft"></i></div></div>
-<div class="sc" id="s4"><div class="ttl" id="t4">${Wd('O mapa mostra<br>onde ele <a>trava.</a>')}</div>${panel('map')}
-  <div class="cal" id="k4" style="top:${Y(1250, 990)}px">${Wd('Gargalo e retrabalho destacados no fluxo, com o motivo.')}</div></div>
-<div class="sc" id="s6"><div class="ttl" id="t6">${Wd('E vira <t>ação.</t>')}</div>${panel('plan')}
-  <div class="cal" id="k6" style="top:${Y(1310, 1010)}px">${Wd('Com problema, responsável e prazo.')}</div></div>
-<div class="sc" id="s7"><div class="blk"><div class="h" id="q7a" style="${fs_(92)}">${Wd('Às vezes, o problema<br>não é o trabalho.')}</div></div><div id="esp">${Wd('É a espera.')}</div></div>
+<div class="lab" id="tag" style="top:${Y(206, 40)}px">${X.tag}</div>
+<div class="sc" id="s1"><div class="blk" id="b1"><div class="h" style="${fs_(69)}">${X.s1a}</div>
+  <div class="h" style="margin-top:6px;white-space:nowrap"><span class="a" style="${fs_(220)};letter-spacing:-.05em;line-height:.92">11 h</span><span style="${fs_(100)};margin-left:.32em">${X.s1b}</span></div></div></div>
+<div class="sc" id="s2"><div class="blk" id="b2"><div class="h" style="${fs_(69)}">${Wd(X.s2a)}</div><div class="h t" style="${fs_(150)};letter-spacing:-.045em;margin:6px 0 4px">${Wd('2 h 15 min')}</div><div class="h" style="${fs_(84)}">${Wd(X.s2c)}</div></div></div>
+<div class="sc" id="s3"><div class="blk"><div class="h" id="q3" style="${fs_(112)}">${Wd(X.q3)}</div></div></div>
+<div class="sc" id="s3b"><div class="blk"><div class="h" id="q3b" style="${fs_(100)}">${Wd(X.q3b)}</div></div></div>
+<div id="bars"><div class="bar" id="ba"><b>${X.ba}</b><i id="fa"></i></div><div class="bar" id="bt"><b>${X.bt}</b><i id="ft"></i></div></div>
+<div class="sc" id="s4"><div class="ttl" id="t4">${Wd(X.t4)}</div>${panel('map')}
+  <div class="cal" id="k4" style="top:${Y(1250, 990)}px">${Wd(X.k4)}</div></div>
+<div class="sc" id="s6"><div class="ttl" id="t6">${Wd(X.t6)}</div>${panel('plan')}
+  <div class="cal" id="k6" style="top:${Y(1310, 1010)}px">${Wd(X.k6)}</div></div>
+<div class="sc" id="s7"><div class="blk"><div class="h" id="q7a" style="${fs_(X.q7Px)};white-space:nowrap">${Wd(X.q7a)}</div></div><div id="esp">${Wd(X.esp)}</div></div>
 <div class="sc" id="s8"><div class="lock"><svg viewBox="0 0 64 64"><rect id="y0" x="2" y="2" width="60" height="60" rx="12" fill="#173263" stroke="rgba(127,233,245,.35)" stroke-width=".6"/><circle id="y1" cx="17" cy="32" r="6.5" fill="none" stroke="#fff" stroke-width="4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" transform="rotate(-90 17 32)"/><path id="y2" d="M23.5 32h7" stroke="#fff" stroke-width="4" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/><path id="y3" d="M41 21l11 11-11 11-11-11z" fill="#00A8BC" style="transform-origin:41px 32px"/></svg><span id="wm">NexoProcess</span></div>
-  <div class="cal" id="k8" style="top:${Y(860, 560)}px;font-size:calc(var(--u)*5.6);font-weight:700;color:#eef3fb;letter-spacing:-.02em;line-height:1.12">${Wd('Descubra onde<br>o seu processo <a>espera.</a>')}</div>
+  <div class="cal" id="k8" style="top:${Y(860, 560)}px;font-size:calc(var(--u)*5.6);font-weight:700;color:#eef3fb;letter-spacing:-.02em;line-height:1.12">${Wd(X.k8)}</div>
   <div class="pill" id="cta">${CTA}</div>
-  <div class="lab" id="f8" style="top:${Y(1300, 990)}px;opacity:0">Telas reais do app · dados fictícios</div></div>
+  <div class="lab" id="sub8" style="top:${Y(1250, 944)}px;opacity:0;color:#dbe4f1">${SUB}</div>
+  <div class="lab" id="f8" style="top:${Y(1310, 1000)}px;opacity:0">${X.f8}</div></div>
 <canvas id="grain"></canvas><div id="vig"></div><div id="flash"></div>
 <script>
 const $=(i)=>document.getElementById(i), cl=(x)=>Math.max(0,Math.min(1,x)), ez=(x)=>{x=cl(x);return x*x*(3-2*x)}, eo=(x)=>{x=cl(x);return 1-Math.pow(1-x,3)}, mix=(a,b,k)=>a+(b-a)*k;
-const SRC=${JSON.stringify(SRC)}, PANEL=${JSON.stringify(PANEL)}, HL=${JSON.stringify(HL)}, CLIP='file://${F}/work/clip_';
+const SRC=${JSON.stringify(SRC)}, PANEL=${JSON.stringify(PANEL)}, HL=${JSON.stringify(HL)}, CV=${JSON.stringify(CV)}, CLIP='file://${F}/work/clip_';
 const g=$('grain'); g.width=${W / 2 + 200}; g.height=${H / 2 + 200}; g.style.width=(g.width*2)+'px'; g.style.height=(g.height*2)+'px';
 {const c=g.getContext('2d'),d=c.createImageData(g.width,g.height);let s=7;for(let i=0;i<d.data.length;i+=4){s=(s*1103515245+12345)&0x7fffffff;const v=s>>>23;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255}c.putImageData(d,0,0)}
 for(const k in PANEL){const [x,y,w,h]=PANEL[k],p=$('p_'+k);p.style.left=x+'px';p.style.top=y+'px';p.style.width=w+'px';p.style.height=h+'px'}
@@ -126,10 +148,10 @@ window.render=async(tt)=>{t=tt;
   if(($('s3b').style.opacity=vis(7.82,9.5,.15,.2))>0)rv('q3b',7.85,.1,.38);
   // mapa real
   if(($('s4').style.opacity=vis(9.55,13.8,.25,.3))>0){rv('t4',9.6,.07,.4);panelIn('map',9.7,13.9);
-    const z=ez((t-10.7)/1.8);cam('map',mix(360,860,z),300,mix(1660,1150,z),[pulse(10.5),pulse(11.15),pulse(11.15)]);rv('k4',11.4,.05,.4)}
+    const z=ez((t-10.7)/1.8);cam('map',mix(CV.m0[0],CV.m1[0],z),mix(CV.m0[1],CV.m1[1],z),mix(CV.m0[2],CV.m1[2],z),[pulse(10.5),pulse(11.15),pulse(11.15)]);rv('k4',11.4,.05,.4)}
   // plano real
   if(($('s6').style.opacity=vis(13.8,17.4,.25,.3))>0){rv('t6',13.85,.08,.4);panelIn('plan',13.95,17.5);
-    const z=ez((t-14.3)/1.6);cam('plan',0,mix(0,380,z),1464,[pulse(15.1)]);rv('k6',15.3,.05,.4)}
+    const z=ez((t-14.3)/1.6);cam('plan',0,mix(0,CV.py,z),CV.pw,[pulse(15.1)]);rv('k6',15.3,.05,.4)}
   // o gestor; o tempo congela em 19,8 s
   if(($('s7').style.opacity=vis(17.45,21.0,.25,.3))>0){rv('q7a',17.55,.11,.42);rv('esp',${'FREEZE'},.12,.28);
     $('q7a').style.opacity=t>FREEZE?mix(1,.45,ez((t-FREEZE)/.4)):1}
@@ -139,7 +161,7 @@ window.render=async(tt)=>{t=tt;
     $('y1').style.strokeDashoffset=1-ez((t-b-.2)/.5);$('y1').style.opacity=t>b+.2?1:0;$('y2').style.strokeDashoffset=1-ez((t-b-.55)/.3);$('y2').style.opacity=t>b+.55?1:0;
     const dv=cl((t-b-.8)/.4);$('y3').style.transform='scale('+(dv<=0?0:1+.25*Math.sin(dv*Math.PI)*(1-dv))+')';$('y3').style.opacity=dv>0?1:0;
     const wv=ez((t-b-.3)/.8);$('wm').style.clipPath='inset(0 '+((1-wv)*100)+'% 0 0)';
-    rv('k8',b+1.0,.07,.4);const c=ez((t-b-1.8)/.45);$('cta').style.opacity=c;$('cta').style.transform='translateY('+((1-c)*20)+'px)';$('f8').style.opacity=ez((t-b-2.2)/.4)*.95}
+    rv('k8',b+1.0,.07,.4);const c=ez((t-b-1.8)/.45);$('cta').style.opacity=c;$('cta').style.transform='translateY('+((1-c)*20)+'px)';$('sub8').style.opacity=ez((t-b-2.05)/.4);$('f8').style.opacity=ez((t-b-2.3)/.4)*.9}
   $('flash').style.opacity=.6*Math.exp(-Math.abs(t-9.6)*10)+.75*Math.exp(-Math.abs(t-FREEZE-.02)*12)+.4*Math.exp(-Math.abs(t-22.0)*10);
   g.style.transform='translate('+(-(Math.floor(t*30)*37%190))+'px,'+(-(Math.floor(t*30)*53%190))+'px)';
 };

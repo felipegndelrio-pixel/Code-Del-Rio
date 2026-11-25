@@ -49,3 +49,17 @@ Mesma ideia ("às vezes o problema não é o trabalho, é a espera"), agora com 
 Reproduzir: extrair quadros dos clipes (`ffmpeg -i fontes/pessoa_parede_aistudio_640x360.mp4 -vf "hqdn3d=1.5:1.5:4:4,scale=1080:608:flags=lanczos,unsharp=5:5:0.55:5:5:0,eq=contrast=1.05:saturation=1.05" -q:v 3 work/clip_A/f_%04d.jpg`; idem `fio_fluxo` → `work/clip_B`), depois `python3 -I scripts/espera2_sound.py work/trilha2_raw.wav`, `loudnorm2.py` para `exports/v2/NexoProcess_Espera_v2_trilha.wav`, `node scripts/espera2.cjs`, `CTA=yt node scripts/espera2.cjs`, `CTA=li node scripts/espera2.cjs 4x5` e `bash scripts/finaliza2.sh`.
 
 Limites: os clipes originais têm 640×360. Por isso a pessoa aparece numa faixa de cinema (1080×608, ampliação de 1,7×), e não em tela cheia. O trecho final do clipe "8a064bcd" tem um logotipo inventado pela IA e não foi usado.
+
+## Versão 2 em inglês (Gumroad) — `exports/v2_en/`
+| Arquivo | Uso |
+|---|---|
+| `1_Instagram_Reel_v2_EN_9x16.mp4` | Instagram EN (botão "Get it on Gumroad" · "Link in bio") |
+| `2_YouTube_Shorts_v2_EN_9x16.mp4` | YouTube Shorts EN ("Link on the channel page") |
+| `3_LinkedIn_v2_EN_4x5.mp4` | LinkedIn EN ("Link in the first comment") |
+| `capa_v2_EN_9x16.png` / `capa_v2_EN_4x5.png` | Capas |
+
+- **Telas em inglês:** capturas reais da interface EN (ramo `wip/en-foundation`, demonstração "Order processing (fictional sample)", tema escuro). Estão em `marketing/video/assets/telas-en/`.
+- **Números:** os da tela EN, iguais aos do português: 2 h 15 min de trabalho ativo e 11 h de espera por execução, ambos *Calculated*.
+- **Português:** os arquivos em `exports/v2/` foram refeitos com a linha "Também em inglês, na Gumroad." abaixo do botão.
+- **Reproduzir:** `NX_LANG=en node scripts/espera2.cjs`, `NX_LANG=en CTA=yt node scripts/espera2.cjs`, `NX_LANG=en CTA=li node scripts/espera2.cjs 4x5` e `bash scripts/finaliza2.sh`.
+- **Textos e estratégia:** em `LEGENDAS_EN.md`.
