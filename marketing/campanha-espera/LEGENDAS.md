@@ -142,3 +142,18 @@ De onde vêm os números: é um exemplo fictício de processamento de pedido, ca
 - LinkedIn: [AuthoredUp](https://authoredup.com/blog/linkedin-character-limit) · [Contentin (15/07/2026)](https://contentin.io/blog/linkedin-post-character-limit/) · [Eden](https://eden.so/blog/linkedin-character-limits/)
 - YouTube: [Influencer Marketing Hub](https://influencermarketinghub.com/youtube-character-limits/) · [HashtagTools](https://hashtagtools.io/blog/youtube-shorts-character-limits-title-description-hashtags-2026) · [Tubefilter (10/08/2023)](https://tubefilter.com/2023/08/10/youtube-shorts-comments-spam/) · [Search Engine Journal](https://www.searchenginejournal.com/youtube-adds-shorts-links-limits-links-elsewhere/495463)
 - Isca de engajamento: [Social Media Today (Instagram e CTAs)](https://www.socialmediatoday.com/news/instagram-says-using-certain-ctas-can-impact-post-reach/717732/) · [PR Daily (Facebook, 2017)](https://www.prdaily.com/facebook-to-punish-posts-that-ask-for-likes-and-shares/)
+
+---
+
+## Versão 2 (com pessoa): o que muda no post
+
+Os arquivos ficam em `exports/v2/`. As legendas são as mesmas da versão 1, com **uma linha a mais** logo depois de "Telas reais do app. Dados de um exemplo fictício.":
+
+```
+Cenas com a pessoa e o fio: geradas com IA.
+```
+
+**Rótulo de IA (obrigatório ou recomendado):**
+- **Instagram:** ative o rótulo de IA ("Informações de IA") ao publicar. A Meta exige o rótulo para vídeo fotorrealista criado digitalmente ([Meta, 2024](https://about.fb.com/news/2024/02/labeling-ai-generated-images-on-facebook-instagram/)).
+- **YouTube:** em "Conteúdo alterado ou sintético", marque **Sim**. A regra vale para o que pode ser confundido com uma pessoa real; o rótulo sozinho não muda a recomendação do vídeo ([YouTube](https://blog.youtube/news-and-events/disclosing-ai-generated-content/) · [Google](https://blog.youtube/news-and-events/improving-ai-labels-for-viewers-and-creators/)).
+- **LinkedIn:** a linha na legenda basta.
